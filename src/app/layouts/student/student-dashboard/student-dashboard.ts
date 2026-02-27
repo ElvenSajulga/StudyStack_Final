@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivityService, ActivitySubmission, AttendanceStatus } from '../../../services/activity.service';
 import { Announcement, AnnouncementService } from '../../../services/announcement.service';
@@ -11,7 +11,7 @@ import { AuthService } from '../../../services/auth.service';
   templateUrl: './student-dashboard.html',
   styleUrl: './student-dashboard.scss',
 })
-export class StudentDashboard {
+export class StudentDashboard implements OnInit {
   presentCount = 0;
   lateCount = 0;
   absentCount = 0;
@@ -22,8 +22,11 @@ export class StudentDashboard {
     private readonly activityService: ActivityService,
     private readonly announcementService: AnnouncementService,
     private readonly auth: AuthService,
-  ) {
-    this.init();
+    private readonly cdr: ChangeDetectorRef,
+  ) {}
+
+  ngOnInit(): void {
+    void this.init();
   }
 
   private get studentID(): string | undefined {
@@ -34,6 +37,7 @@ export class StudentDashboard {
     await this.computeStats();
     const all = await this.announcementService.getAllForStudents();
     this.latestAnnouncements = all.slice(0, 3);
+    this.cdr.detectChanges();
   }
 
   private async computeStats(): Promise<void> {

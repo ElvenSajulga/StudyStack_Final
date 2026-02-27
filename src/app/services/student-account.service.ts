@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { Observable, map } from 'rxjs';
 
 export interface StudentAccount {
     id?: string;
@@ -120,7 +121,7 @@ export class StudentAccountService {
         );
     }
 
-    add(student: StudentAccount): void {
+    add(student: StudentAccount): Observable<void> {
         const existing = this.getByUID(student.UID);
         if (existing) {
             throw new Error('A student with this UID already exists.');
@@ -134,13 +135,9 @@ export class StudentAccountService {
         this.students.push(withId);
         this.saveToStorage();
 
-        // Persist to json-server (best-effort, keep local copy even if this fails)
-        this.http.post<StudentAccount>(this.API_URL, withId).subscribe({
-            // eslint-disable-next-line @typescript-eslint/no-empty-function
-            next: () => {},
-            // eslint-disable-next-line @typescript-eslint/no-empty-function
-            error: () => {},
-        });
+        return this.http.post<StudentAccount>(this.API_URL, withId).pipe(
+            map(() => undefined)
+        );
     }
 
     update(uid: string, changes: Partial<StudentAccount>): void {
@@ -165,18 +162,15 @@ export class StudentAccountService {
         });
     }
 
-    remove(uid: string): void {
+    remove(uid: string): Observable<void> {
         const toRemove = this.students.find(s => s.UID === uid);
         this.students = this.students.filter(s => s.UID !== uid);
         this.saveToStorage();
 
         const id = toRemove?.id ?? uid;
-        this.http.delete<void>(`${this.API_URL}/${encodeURIComponent(id)}`).subscribe({
-            // eslint-disable-next-line @typescript-eslint/no-empty-function
-            next: () => {},
-            // eslint-disable-next-line @typescript-eslint/no-empty-function
-            error: () => {},
-        });
+        return this.http.delete<void>(`${this.API_URL}/${encodeURIComponent(id)}`).pipe(
+            map(() => undefined)
+        );
     }
 
     getCount(): number {

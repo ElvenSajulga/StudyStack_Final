@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { Observable, map } from 'rxjs';
 
 export interface TeacherAccount {
     id?: string;
@@ -130,7 +131,7 @@ export class TeacherAccountService {
         );
     }
 
-    add(teacher: TeacherAccount): void {
+    add(teacher: TeacherAccount): Observable<void> {
         const existing = this.getByUID(teacher.UID);
         if (existing) {
             throw new Error('A teacher with this UID already exists.');
@@ -144,12 +145,9 @@ export class TeacherAccountService {
         this.teachers.push(withId);
         this.saveToStorage();
 
-        this.http.post<TeacherAccount>(this.API_URL, withId).subscribe({
-            // eslint-disable-next-line @typescript-eslint/no-empty-function
-            next: () => {},
-            // eslint-disable-next-line @typescript-eslint/no-empty-function
-            error: () => {},
-        });
+        return this.http.post<TeacherAccount>(this.API_URL, withId).pipe(
+            map(() => undefined)
+        );
     }
 
     update(uid: string, changes: Partial<TeacherAccount>): void {
@@ -174,18 +172,15 @@ export class TeacherAccountService {
         });
     }
 
-    remove(uid: string): void {
+    remove(uid: string): Observable<void> {
         const toRemove = this.teachers.find(t => t.UID === uid);
         this.teachers = this.teachers.filter(t => t.UID !== uid);
         this.saveToStorage();
 
         const id = toRemove?.id ?? uid;
-        this.http.delete<void>(`${this.API_URL}/${encodeURIComponent(id)}`).subscribe({
-            // eslint-disable-next-line @typescript-eslint/no-empty-function
-            next: () => {},
-            // eslint-disable-next-line @typescript-eslint/no-empty-function
-            error: () => {},
-        });
+        return this.http.delete<void>(`${this.API_URL}/${encodeURIComponent(id)}`).pipe(
+            map(() => undefined)
+        );
     }
 
     getCount(): number {

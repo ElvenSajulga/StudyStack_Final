@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Activity, ActivityService, ActivitySubmission } from '../../services/activity.service';
 import { AuthService } from '../../services/auth.service';
@@ -11,7 +11,7 @@ import { StudentAccount, StudentAccountService } from '../../services/student-ac
   templateUrl: './teacher-class-record.html',
   styleUrl: './teacher-class-record.scss',
 })
-export class TeacherClassRecord {
+export class TeacherClassRecord implements OnInit {
   activities: Activity[] = [];
   students: StudentAccount[] = [];
   private submissionsByKey: Record<string, ActivitySubmission | undefined> = {};
@@ -20,7 +20,10 @@ export class TeacherClassRecord {
     private readonly activityService: ActivityService,
     private readonly auth: AuthService,
     private readonly studentService: StudentAccountService,
-  ) {
+    private readonly cdr: ChangeDetectorRef,
+  ) {}
+
+  ngOnInit(): void {
     void this.loadData();
   }
 
@@ -38,8 +41,10 @@ export class TeacherClassRecord {
       this.activities = [];
       this.students = [];
       this.submissionsByKey = {};
+      this.cdr.detectChanges();
       return;
     }
+    await this.studentService.reloadFromServer();
     this.activities = await this.activityService.getActivitiesForTeacher(id);
     this.students = this.studentService.getAll();
 
@@ -49,6 +54,7 @@ export class TeacherClassRecord {
     for (const sub of subs) {
       this.submissionsByKey[this.submissionKey(sub.activityId, sub.studentID)] = sub;
     }
+    this.cdr.detectChanges();
   }
 
   submissionsForStudent(student: StudentAccount): ActivitySubmission[] {

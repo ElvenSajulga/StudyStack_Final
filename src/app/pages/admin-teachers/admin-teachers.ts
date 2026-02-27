@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TeacherAccount, TeacherAccountService } from '../../services/teacher-account.service';
@@ -10,7 +10,7 @@ import { TeacherAccount, TeacherAccountService } from '../../services/teacher-ac
   templateUrl: './admin-teachers.html',
   styleUrl: './admin-teachers.scss',
 })
-export class AdminTeachers {
+export class AdminTeachers implements OnInit {
   teachers: TeacherAccount[] = [];
 
   form: Partial<TeacherAccount> = {
@@ -25,7 +25,12 @@ export class AdminTeachers {
     middlename: '',
   };
 
-  constructor(private teacherService: TeacherAccountService) {
+  constructor(
+    private teacherService: TeacherAccountService,
+    private cdr: ChangeDetectorRef,
+  ) {}
+
+  ngOnInit(): void {
     void this.loadTeachers();
   }
 
@@ -36,6 +41,7 @@ export class AdminTeachers {
   private async loadTeachers(): Promise<void> {
     await this.teacherService.reloadFromServer();
     this.teachers = this.teacherService.getAll();
+    this.cdr.detectChanges();
   }
 
   addTeacher(): void {
@@ -45,27 +51,37 @@ export class AdminTeachers {
     }
 
     try {
-      this.teacherService.add(this.form as TeacherAccount);
-      this.form = {
-        UID: '',
-        name: '',
-        teacherID: '',
-        password: '',
-        email: '',
-        status: 'active',
-        lastname: '',
-        firstname: '',
-        middlename: '',
-      };
-      this.loadTeachers();
-    } catch (e: any) {
-      alert(e.message ?? 'Unable to add teacher.');
+      this.teacherService.add(this.form as TeacherAccount).subscribe({
+        next: () => {
+          this.form = {
+            UID: '',
+            name: '',
+            teacherID: '',
+            password: '',
+            email: '',
+            status: 'active',
+            lastname: '',
+            firstname: '',
+            middlename: '',
+          };
+          void this.loadTeachers();
+        },
+        error: (e: unknown) => {
+          alert((e as { message?: string })?.message ?? 'Unable to add teacher.');
+        },
+      });
+    } catch (e: unknown) {
+      alert((e as { message?: string })?.message ?? 'Unable to add teacher.');
     }
   }
 
   removeTeacher(uid: string): void {
     if (!confirm('Remove this teacher?')) return;
-    this.teacherService.remove(uid);
-    this.loadTeachers();
+    this.teacherService.remove(uid).subscribe({
+      next: () => void this.loadTeachers(),
+      error: (e: unknown) => {
+        alert((e as { message?: string })?.message ?? 'Unable to remove teacher.');
+      },
+    });
   }
 }

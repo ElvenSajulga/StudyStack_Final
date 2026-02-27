@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { StudentAccountService } from '../../../services/student-account.service';
 import { TeacherAccountService } from '../../../services/teacher-account.service';
@@ -12,7 +12,7 @@ import { AnnouncementService } from '../../../services/announcement.service';
   templateUrl: './admin-dashboard.html',
   styleUrl: './admin-dashboard.scss',
 })
-export class AdminDashboard {
+export class AdminDashboard implements OnInit {
   totalStudents = 0;
   totalTeachers = 0;
   totalActivities = 0;
@@ -23,7 +23,10 @@ export class AdminDashboard {
     private readonly teachers: TeacherAccountService,
     private readonly activities: ActivityService,
     private readonly announcements: AnnouncementService,
-  ) {
+    private readonly cdr: ChangeDetectorRef,
+  ) {}
+
+  ngOnInit(): void {
     void this.loadStats();
   }
 
@@ -37,5 +40,6 @@ export class AdminDashboard {
     this.totalActivities = allActivities.length;
     const all = await this.announcements.getAllForStudents();
     this.totalAnnouncements = all.length;
+    this.cdr.detectChanges();
   }
 }

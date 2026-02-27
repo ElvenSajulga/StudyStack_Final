@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { StudentAccount, StudentAccountService } from '../../services/student-account.service';
@@ -10,7 +10,7 @@ import { StudentAccount, StudentAccountService } from '../../services/student-ac
   templateUrl: './admin-students.html',
   styleUrl: './admin-students.scss',
 })
-export class AdminStudents {
+export class AdminStudents implements OnInit {
   students: StudentAccount[] = [];
 
   // simple form model
@@ -27,7 +27,12 @@ export class AdminStudents {
     middlename: '',
   };
 
-  constructor(private studentService: StudentAccountService) {
+  constructor(
+    private studentService: StudentAccountService,
+    private cdr: ChangeDetectorRef,
+  ) {}
+
+  ngOnInit(): void {
     void this.loadStudents();
   }
 
@@ -38,6 +43,7 @@ export class AdminStudents {
   private async loadStudents(): Promise<void> {
     await this.studentService.reloadFromServer();
     this.students = this.studentService.getAll();
+    this.cdr.detectChanges();
   }
 
   addStudent(): void {
@@ -47,28 +53,38 @@ export class AdminStudents {
     }
 
     try {
-      this.studentService.add(this.form as StudentAccount);
-      this.form = {
-        UID: '',
-        name: '',
-        course: '',
-        studentID: '',
-        password: '',
-        email: '',
-        status: 'active',
-        lastname: '',
-        firstname: '',
-        middlename: '',
-      };
-      this.loadStudents();
-    } catch (e: any) {
-      alert(e.message ?? 'Unable to add student.');
+      this.studentService.add(this.form as StudentAccount).subscribe({
+        next: () => {
+          this.form = {
+            UID: '',
+            name: '',
+            course: '',
+            studentID: '',
+            password: '',
+            email: '',
+            status: 'active',
+            lastname: '',
+            firstname: '',
+            middlename: '',
+          };
+          void this.loadStudents();
+        },
+        error: (e: unknown) => {
+          alert((e as { message?: string })?.message ?? 'Unable to add student.');
+        },
+      });
+    } catch (e: unknown) {
+      alert((e as { message?: string })?.message ?? 'Unable to add student.');
     }
   }
 
   removeStudent(uid: string): void {
     if (!confirm('Remove this student?')) return;
-    this.studentService.remove(uid);
-    this.loadStudents();
+    this.studentService.remove(uid).subscribe({
+      next: () => void this.loadStudents(),
+      error: (e: unknown) => {
+        alert((e as { message?: string })?.message ?? 'Unable to remove student.');
+      },
+    });
   }
 }

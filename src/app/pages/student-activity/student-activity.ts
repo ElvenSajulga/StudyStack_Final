@@ -1,9 +1,8 @@
-import { Component, OnDestroy, inject } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject, PLATFORM_ID, ChangeDetectorRef } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Activity, ActivityService, ActivitySubmission, AttendanceStatus } from '../../services/activity.service';
 import { AuthService } from '../../services/auth.service';
-import { PLATFORM_ID } from '@angular/core';
 
 @Component({
   selector: 'app-student-activity',
@@ -12,7 +11,7 @@ import { PLATFORM_ID } from '@angular/core';
   templateUrl: './student-activity.html',
   styleUrl: './student-activity.scss',
 })
-export class StudentActivity implements OnDestroy {
+export class StudentActivity implements OnInit, OnDestroy {
   activities: Activity[] = [];
   submissions: Record<string, ActivitySubmission | undefined> = {};
   draftContent: Record<string, string> = {};
@@ -25,15 +24,18 @@ export class StudentActivity implements OnDestroy {
   constructor(
     private readonly activityService: ActivityService,
     private readonly auth: AuthService,
+    private readonly cdr: ChangeDetectorRef,
   ) {
-    void this.loadActivities();
-
     if (isPlatformBrowser(this.platformId)) {
       document.addEventListener('visibilitychange', this.onVisibility);
       this.refreshTimer = window.setInterval(() => {
         void this.loadActivities();
       }, 1000);
     }
+  }
+
+  ngOnInit(): void {
+    void this.loadActivities();
   }
 
   private get studentID(): string | undefined {
@@ -66,23 +68,21 @@ export class StudentActivity implements OnDestroy {
       subs = [];
     }
 
-    // Update submissions but avoid overwriting drafts the student is currently editing.
+    // Update submissions but never overwrite draft when the user has entered something.
     for (const sub of subs) {
-      const prevSub = this.submissions[sub.activityId];
       this.submissions[sub.activityId] = sub;
-
-      const currentDraft = this.draftContent[sub.activityId];
-      const draftMatchesPrev = currentDraft == null || (prevSub && currentDraft === (prevSub.content ?? ''));
-      if (draftMatchesPrev) {
-        this.draftContent[sub.activityId] = sub.content ?? '';
+      const currentDraft = (this.draftContent[sub.activityId] ?? '').trim();
+      if (currentDraft.length > 0) {
+        this.draftContent[sub.activityId] = this.draftContent[sub.activityId] ?? '';
       } else {
-        this.draftContent[sub.activityId] = currentDraft ?? '';
+        this.draftContent[sub.activityId] = sub.content ?? '';
       }
     }
 
     for (const a of this.activities) {
       this.draftContent[a.id] = this.draftContent[a.id] ?? '';
     }
+    this.cdr.detectChanges();
   }
 
   getAttendanceStatus(activity: Activity): AttendanceStatus {

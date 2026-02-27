@@ -1,7 +1,6 @@
-import { Component, OnDestroy, inject } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject, PLATFORM_ID, ChangeDetectorRef } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { Announcement, AnnouncementService } from '../../services/announcement.service';
-import { PLATFORM_ID } from '@angular/core';
 
 @Component({
   selector: 'app-student-announcement',
@@ -10,7 +9,7 @@ import { PLATFORM_ID } from '@angular/core';
   templateUrl: './student-announcement.html',
   styleUrl: './student-announcement.scss',
 })
-export class StudentAnnouncement implements OnDestroy {
+export class StudentAnnouncement implements OnInit, OnDestroy {
   announcements: Announcement[] = [];
   private readonly platformId = inject(PLATFORM_ID);
   private refreshTimer?: number;
@@ -18,9 +17,10 @@ export class StudentAnnouncement implements OnDestroy {
     if (document.visibilityState === 'visible') void this.loadAnnouncements();
   };
 
-  constructor(private readonly announcementService: AnnouncementService) {
-    void this.loadAnnouncements();
-
+  constructor(
+    private readonly announcementService: AnnouncementService,
+    private readonly cdr: ChangeDetectorRef,
+  ) {
     if (isPlatformBrowser(this.platformId)) {
       document.addEventListener('visibilitychange', this.onVisibility);
       this.refreshTimer = window.setInterval(() => {
@@ -29,12 +29,17 @@ export class StudentAnnouncement implements OnDestroy {
     }
   }
 
+  ngOnInit(): void {
+    void this.loadAnnouncements();
+  }
+
   private async loadAnnouncements(): Promise<void> {
     try {
       this.announcements = await this.announcementService.getAllForStudents();
     } catch {
       this.announcements = [];
     }
+    this.cdr.detectChanges();
   }
 
   ngOnDestroy(): void {

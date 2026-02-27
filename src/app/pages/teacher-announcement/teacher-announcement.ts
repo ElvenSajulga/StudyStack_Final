@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Announcement, AnnouncementService } from '../../services/announcement.service';
@@ -11,7 +11,7 @@ import { AuthService } from '../../services/auth.service';
   templateUrl: './teacher-announcement.html',
   styleUrl: './teacher-announcement.scss',
 })
-export class TeacherAnnouncement {
+export class TeacherAnnouncement implements OnInit {
   announcements: Announcement[] = [];
   title = '';
   message = '';
@@ -19,8 +19,11 @@ export class TeacherAnnouncement {
   constructor(
     private readonly announcementService: AnnouncementService,
     private readonly auth: AuthService,
-  ) {
-    this.loadAnnouncements();
+    private readonly cdr: ChangeDetectorRef,
+  ) {}
+
+  ngOnInit(): void {
+    void this.loadAnnouncements();
   }
 
   private get teacherID(): string | undefined {
@@ -31,9 +34,11 @@ export class TeacherAnnouncement {
     const id = this.teacherID;
     if (!id) {
       this.announcements = [];
+      this.cdr.detectChanges();
       return;
     }
     this.announcements = await this.announcementService.getForTeacher(id);
+    this.cdr.detectChanges();
   }
 
   async createAnnouncement(): Promise<void> {
@@ -51,7 +56,7 @@ export class TeacherAnnouncement {
     await this.announcementService.create(id, this.title.trim(), this.message.trim());
     this.title = '';
     this.message = '';
-    this.loadAnnouncements();
+    await this.loadAnnouncements();
   }
 
   async deleteAnnouncement(id: string | number): Promise<void> {

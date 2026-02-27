@@ -1,8 +1,7 @@
-import { Component, OnDestroy, inject } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject, PLATFORM_ID, ChangeDetectorRef } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { Activity, ActivityService, ActivitySubmission } from '../../services/activity.service';
 import { AuthService } from '../../services/auth.service';
-import { PLATFORM_ID } from '@angular/core';
 
 @Component({
   selector: 'app-student-grade',
@@ -11,7 +10,7 @@ import { PLATFORM_ID } from '@angular/core';
   templateUrl: './student-grade.html',
   styleUrl: './student-grade.scss',
 })
-export class StudentGrade implements OnDestroy {
+export class StudentGrade implements OnInit, OnDestroy {
   activities: Activity[] = [];
   submissions: ActivitySubmission[] = [];
   private submissionsByActivityId: Record<string, ActivitySubmission | undefined> = {};
@@ -24,15 +23,18 @@ export class StudentGrade implements OnDestroy {
   constructor(
     private readonly activityService: ActivityService,
     private readonly auth: AuthService,
+    private readonly cdr: ChangeDetectorRef,
   ) {
-    void this.loadData();
-
     if (isPlatformBrowser(this.platformId)) {
       document.addEventListener('visibilitychange', this.onVisibility);
       this.refreshTimer = window.setInterval(() => {
         void this.loadData();
       }, 1000);
     }
+  }
+
+  ngOnInit(): void {
+    void this.loadData();
   }
 
   private get studentID(): string | undefined {
@@ -73,6 +75,7 @@ export class StudentGrade implements OnDestroy {
     this.submissions = this.activities
       .map(a => this.submissionsByActivityId[a.id])
       .filter((s): s is ActivitySubmission => !!s);
+    this.cdr.detectChanges();
   }
 
   scoreForActivity(activity: Activity): number | undefined {

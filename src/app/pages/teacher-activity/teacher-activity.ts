@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Activity, ActivityService, ActivityType } from '../../services/activity.service';
@@ -11,7 +11,7 @@ import { AuthService } from '../../services/auth.service';
   templateUrl: './teacher-activity.html',
   styleUrl: './teacher-activity.scss',
 })
-export class TeacherActivity {
+export class TeacherActivity implements OnInit {
   activities: Activity[] = [];
 
   form: {
@@ -32,7 +32,10 @@ export class TeacherActivity {
   constructor(
     private readonly activityService: ActivityService,
     private readonly auth: AuthService,
-  ) {
+    private readonly cdr: ChangeDetectorRef,
+  ) {}
+
+  ngOnInit(): void {
     void this.loadActivities();
   }
 
@@ -44,9 +47,11 @@ export class TeacherActivity {
     const id = this.teacherID;
     if (!id) {
       this.activities = [];
+      this.cdr.detectChanges();
       return;
     }
     this.activities = await this.activityService.getActivitiesForTeacher(id);
+    this.cdr.detectChanges();
   }
 
   async createActivity(): Promise<void> {
@@ -56,13 +61,16 @@ export class TeacherActivity {
       return;
     }
 
-    if (!this.form.title || !this.form.deadline || !this.form.closeAt) {
+    const title = (this.form.title ?? '').trim();
+    const deadline = (this.form.deadline ?? '').trim();
+    const closeAt = (this.form.closeAt ?? '').trim();
+    if (!title || !deadline || !closeAt) {
       alert('Please fill in at least title, deadline, and close time.');
       return;
     }
 
-    const deadlineDate = new Date(this.form.deadline);
-    const closeAtDate = new Date(this.form.closeAt);
+    const deadlineDate = new Date(deadline);
+    const closeAtDate = new Date(closeAt);
 
     if (closeAtDate <= deadlineDate) {
       alert('Close time must be after the deadline.');
@@ -70,8 +78,8 @@ export class TeacherActivity {
     }
 
     await this.activityService.createActivity({
-      title: this.form.title,
-      description: this.form.description,
+      title,
+      description: (this.form.description ?? '').trim(),
       type: this.form.type,
       deadline: deadlineDate.toISOString(),
       closeAt: closeAtDate.toISOString(),
