@@ -1,0 +1,55 @@
+<div class="login-page">
+    <!--Top-Left Logo-->
+    <div class="toplogo">
+        <img src="/stacklogo.png" alt="StudyStack Logo"/>
+        <h2>
+            <span class="Study">Study</span><span class="Stack">Stack</span>
+        </h2>
+    </div>
+
+    <!--Bottom-Left Text-->
+    <div class="tagline">
+        <h1>Manage, Learn, Stay Connected</h1>
+        <p>
+            An online classroom management system <br>
+            that keeps records, activites, attendance, and<br>
+            announements in one place.
+        </p>
+    </div>
+
+    <!--Login card-->
+    <div class="login-container">
+
+        <h2>Welcome back to StudyStack!</h2>
+        <p class="subtitle"> Please enter your credentials to log in. </p>
+
+        <form (ngSubmit)="login()">
+            <input 
+                id="UID" 
+                name="UID" 
+                class="form-control" 
+                [(ngModel)]="UID"
+                required
+                placeholder="Enter UID"
+            />
+
+
+            <div>
+                <input 
+                    type="password" 
+                    id="password" name="password" 
+                    class="form-control" 
+                    [(ngModel)]="password" 
+                    required
+                    placeholder="Password"
+                 />
+            </div>
+
+            <button type="submit" class="login-button">Login</button>
+        </form>
+
+        <div class="forgot">
+            <a>Forgot Password?</a>
+        </div>
+    </div>
+</div>

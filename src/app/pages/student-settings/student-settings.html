@@ -1,0 +1,78 @@
+<div class="student-page">
+  <header>
+    <h2 class="page-title">Settings</h2>
+    <p class="page-subtitle">
+      Adjust how StudyStack behaves for your student account.
+    </p>
+  </header>
+
+  <section class="card">
+    <header>
+      <h3>Preferences</h3>
+      <p class="card-description">Personalize your dashboard and notifications.</p>
+    </header>
+
+    <div class="settings-grid">
+      <div class="toggle-row">
+        <div>
+          <p class="toggle-label">Show deadlines in dashboard</p>
+          <p class="toggle-caption">
+            Display upcoming activity deadlines on your main dashboard.
+          </p>
+        </div>
+        <input type="checkbox" checked />
+      </div>
+
+      <div class="toggle-row">
+        <div>
+          <p class="toggle-label">Email me when a teacher posts a new activity</p>
+          <p class="toggle-caption">
+            In a real deployment this would send an email notification from your school.
+          </p>
+        </div>
+        <input type="checkbox" />
+      </div>
+
+      <div class="toggle-row">
+        <div>
+          <p class="toggle-label">Email me when my grade is updated</p>
+          <p class="toggle-caption">
+            Receive a notification when a teacher checks your submissions.
+          </p>
+        </div>
+        <input type="checkbox" />
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <header>
+      <h3>Account security</h3>
+      <p class="card-description">
+        Use this section in the future to update your password. For now, changes are handled by the
+        school administrator.
+      </p>
+    </header>
+
+    <div class="settings-grid">
+      <label class="field">
+        <span class="field-label">Current password</span>
+        <input type="password" placeholder="Enter current password" disabled />
+      </label>
+
+      <label class="field">
+        <span class="field-label">New password</span>
+        <input type="password" placeholder="Set a new password" disabled />
+      </label>
+
+      <label class="field">
+        <span class="field-label">Confirm new password</span>
+        <input type="password" placeholder="Repeat new password" disabled />
+      </label>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn primary" type="button" disabled>Update password</button>
+    </div>
+  </section>
+</div>

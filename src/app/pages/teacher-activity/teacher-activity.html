@@ -1,0 +1,89 @@
+<div class="teacher-activity">
+  <header>
+    <h2 class="page-title">Activities</h2>
+    <p class="page-subtitle">
+      Create and manage activities that will be shown on the student activity page.
+    </p>
+  </header>
+
+  <section class="form-section">
+    <h3>Create new activity</h3>
+
+    <form (ngSubmit)="createActivity()" #activityForm="ngForm">
+      <div class="form-grid">
+        <label>
+          <span>Title</span>
+          <input type="text" name="title" [(ngModel)]="form.title" required />
+        </label>
+
+        <label>
+          <span>Type</span>
+          <select name="type" [(ngModel)]="form.type">
+            <option value="quiz">Quiz</option>
+            <option value="output">Output-based</option>
+          </select>
+        </label>
+
+        <label class="full-width">
+          <span>Description</span>
+          <textarea name="description" rows="3" [(ngModel)]="form.description"></textarea>
+        </label>
+
+        <label>
+          <span>Deadline</span>
+          <input type="datetime-local" name="deadline" [(ngModel)]="form.deadline" required />
+        </label>
+
+        <label>
+          <span>Close time</span>
+          <input type="datetime-local" name="closeAt" [(ngModel)]="form.closeAt" required />
+        </label>
+
+        <label>
+          <span>Max points</span>
+          <input type="number" name="maxPoints" [(ngModel)]="form.maxPoints" min="0" />
+        </label>
+      </div>
+
+      <div class="form-actions">
+        <button type="submit">Create activity</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="list-section" *ngIf="activities.length > 0; else emptyState">
+    <h3>Existing activities</h3>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Title</th>
+            <th>Type</th>
+            <th>Deadline</th>
+            <th>Closes</th>
+            <th>Max points</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let a of activities">
+            <td>{{ a.title }}</td>
+            <td>{{ a.type }}</td>
+            <td>{{ a.deadline | date: 'short' }}</td>
+            <td>{{ a.closeAt | date: 'short' }}</td>
+            <td>{{ a.maxPoints ?? '-' }}</td>
+            <td>
+              <button type="button" (click)="deleteActivity(a.id)">Delete</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <ng-template #emptyState>
+    <section class="empty-card">
+      <p class="empty-text">No activities created yet.</p>
+    </section>
+  </ng-template>
+</div>

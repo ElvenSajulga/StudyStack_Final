@@ -1,0 +1,41 @@
+<div class="student-grade">
+  <header>
+    <h2 class="page-title">My grades</h2>
+    <p class="page-subtitle">
+      Track your scores across all activities that have been graded.
+    </p>
+  </header>
+
+  <section *ngIf="activities.length > 0; else emptyState">
+    <div class="table-card">
+      <table>
+        <thead>
+          <tr>
+            <th>Activity</th>
+            <th>Type</th>
+            <th>Score</th>
+            <th>Max points</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let a of activities">
+            <td data-label="Activity">{{ a.title }}</td>
+            <td data-label="Type">{{ a.type }}</td>
+            <td data-label="Score">{{ scoreForActivity(a) ?? '-' }}</td>
+            <td data-label="Max points">{{ a.maxPoints ?? '-' }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="total">
+      <strong>Total score:</strong> {{ totalScore }}
+    </p>
+  </section>
+
+  <ng-template #emptyState>
+    <section class="empty-card">
+      <p class="empty-text">No graded activities yet.</p>
+    </section>
+  </ng-template>
+</div>

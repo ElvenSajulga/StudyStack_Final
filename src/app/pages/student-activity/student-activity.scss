@@ -1,0 +1,162 @@
+.student-activity {
+  max-width: 960px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.page-subtitle {
+  margin: 4px 0 0;
+  font-size: 0.9rem;
+  color: #6b7280;
+}
+
+.activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.activity-card {
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 16px 18px 18px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+  border: 1px solid #e5e7eb;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.activity-card header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.activity-card h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.badge {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+.description {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #4b5563;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: 0;
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.meta span::before {
+  content: '•';
+  margin-right: 4px;
+  color: #9ca3af;
+}
+
+.meta span:first-child::before {
+  content: '';
+  margin-right: 0;
+}
+
+.status {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #374151;
+}
+
+.submission {
+  border-top: 1px solid #e5e7eb;
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.submission h4 {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #111827;
+}
+
+.submission textarea {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid #d1d5db;
+  padding: 8px 10px;
+  font-size: 0.85rem;
+  resize: vertical;
+  min-height: 80px;
+}
+
+.submission textarea:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 1px #2563eb33;
+  background: #ffffff;
+}
+
+.submission button {
+  align-self: flex-end;
+  border: none;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: #f9fafb;
+  cursor: pointer;
+}
+
+.submission button:hover {
+  filter: brightness(1.03);
+}
+
+.empty-card {
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 16px 18px 18px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+  border: 1px solid #e5e7eb;
+}
+
+.empty-text,
+.student-activity > p {
+  font-size: 0.9rem;
+  color: #6b7280;
+}
+
+@media (max-width: 640px) {
+  .activity-card header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

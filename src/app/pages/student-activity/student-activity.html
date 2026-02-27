@@ -1,0 +1,48 @@
+<div class="student-activity">
+  <header>
+    <h2 class="page-title">Activities</h2>
+    <p class="page-subtitle">
+      View all activities assigned to you and submit your answers before the deadline.
+    </p>
+  </header>
+
+  <section class="activity-list" *ngIf="activities.length > 0; else emptyState">
+    <article class="activity-card" *ngFor="let a of activities">
+      <header>
+        <h3>{{ a.title }}</h3>
+        <span class="badge">{{ a.type }}</span>
+      </header>
+
+      <p class="description">{{ a.description }}</p>
+
+      <p class="meta">
+        <span>Deadline: {{ a.deadline | date: 'short' }}</span>
+        <span>Closes: {{ a.closeAt | date: 'short' }}</span>
+        <span *ngIf="a.maxPoints != null">Max points: {{ a.maxPoints }}</span>
+      </p>
+
+      <p class="status">
+        Attendance status:
+        <strong>{{ getAttendanceStatus(a) }}</strong>
+      </p>
+
+      <section class="submission">
+        <h4>Your answer / output</h4>
+        <textarea
+          rows="4"
+          [(ngModel)]="draftContent[a.id]"
+          placeholder="Write your quiz answers or attach your output description here."
+        ></textarea>
+        <button type="button" (click)="submit(a)">
+          Submit / Update
+        </button>
+      </section>
+    </article>
+  </section>
+
+  <ng-template #emptyState>
+    <section class="empty-card">
+      <p class="empty-text">No activities available yet.</p>
+    </section>
+  </ng-template>
+</div>

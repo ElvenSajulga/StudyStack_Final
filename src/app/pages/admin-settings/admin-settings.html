@@ -1,0 +1,75 @@
+<div class="admin-page">
+  <header>
+    <h2 class="page-title">Settings</h2>
+    <p class="page-subtitle">Configure how the StudyStack admin portal behaves.</p>
+  </header>
+
+  <section class="card">
+    <header>
+      <h3>General</h3>
+      <p class="card-description">Basic information about your portal.</p>
+    </header>
+
+    <div class="settings-grid">
+      <label class="field">
+        <span class="field-label">Portal name</span>
+        <input type="text" value="StudyStack Admin Portal" />
+      </label>
+
+      <label class="field">
+        <span class="field-label">Support email</span>
+        <input type="email" value="support@example.com" />
+      </label>
+
+      <label class="field">
+        <span class="field-label">Academic year</span>
+        <input type="text" value="2025–2026" />
+      </label>
+
+      <label class="field">
+        <span class="field-label">Default status for new accounts</span>
+        <select>
+          <option>Active</option>
+          <option>Inactive</option>
+        </select>
+      </label>
+    </div>
+  </section>
+
+  <section class="card">
+    <header>
+      <h3>Preferences</h3>
+      <p class="card-description">Display and notification preferences for administrators.</p>
+    </header>
+
+    <div>
+      <div class="toggle-row">
+        <div>
+          <p class="toggle-label">Dark sidebar theme</p>
+          <p class="toggle-caption">Use a dark theme for the admin navigation.</p>
+        </div>
+        <input type="checkbox" checked />
+      </div>
+
+      <div class="toggle-row">
+        <div>
+          <p class="toggle-label">Email me when a teacher creates an activity</p>
+          <p class="toggle-caption">Helpful while you are still setting up the system.</p>
+        </div>
+        <input type="checkbox" />
+      </div>
+
+      <div class="toggle-row">
+        <div>
+          <p class="toggle-label">Email me when a student enrolls</p>
+          <p class="toggle-caption">Summary emails about new student accounts.</p>
+        </div>
+        <input type="checkbox" />
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn primary" type="button">Save changes</button>
+    </div>
+  </section>
+</div>

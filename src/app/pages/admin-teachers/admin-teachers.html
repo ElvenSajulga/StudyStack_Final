@@ -1,0 +1,130 @@
+<div class="admin-page admin-teachers">
+  <header class="page-header">
+    <div>
+      <h2 class="page-title">Teacher Accounts</h2>
+      <p class="page-subtitle">Create and manage teacher accounts for the portal.</p>
+    </div>
+
+    <div class="metric-pill">
+      <span class="metric-label">Total teachers</span>
+      <span class="metric-value">{{ totalTeachers }}</span>
+    </div>
+  </header>
+
+  <section class="content-grid">
+    <article class="card form-card">
+      <header class="card-header">
+        <h3>Create new teacher</h3>
+        <p class="card-description">
+          Provide the basic information below to add a new teacher.
+        </p>
+      </header>
+
+      <form (ngSubmit)="addTeacher()" #teacherForm="ngForm" class="card-body">
+        <div class="form-grid">
+          <label class="field">
+            <span class="field-label">UID</span>
+            <input type="text" name="UID" [(ngModel)]="form.UID" required />
+          </label>
+
+          <label class="field">
+            <span class="field-label">Password</span>
+            <input type="password" name="password" [(ngModel)]="form.password" required />
+          </label>
+
+          <label class="field">
+            <span class="field-label">Teacher ID</span>
+            <input type="text" name="teacherID" [(ngModel)]="form.teacherID" required />
+          </label>
+
+          <label class="field">
+            <span class="field-label">Lastname</span>
+            <input type="text" name="lastname" [(ngModel)]="form.lastname" required />
+          </label>
+
+          <label class="field">
+            <span class="field-label">Firstname</span>
+            <input type="text" name="firstname" [(ngModel)]="form.firstname" required />
+          </label>
+
+          <label class="field">
+            <span class="field-label">Middlename</span>
+            <input type="text" name="middlename" [(ngModel)]="form.middlename" />
+          </label>
+
+          <label class="field">
+            <span class="field-label">Email</span>
+            <input type="email" name="email" [(ngModel)]="form.email" />
+          </label>
+
+          <label class="field">
+            <span class="field-label">Status</span>
+            <select name="status" [(ngModel)]="form.status">
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn primary" [disabled]="teacherForm.invalid">
+            Add teacher
+          </button>
+        </div>
+      </form>
+    </article>
+
+    <article class="card table-card">
+      <header class="card-header">
+        <div>
+          <h3>Teacher list</h3>
+          <p class="card-description">Overview of all registered teachers.</p>
+        </div>
+
+        <p class="muted" *ngIf="teachers.length">Showing {{ teachers.length }} teachers</p>
+      </header>
+
+      <section class="card-body" *ngIf="teachers.length > 0; else emptyState">
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>UID</th>
+                <th>Teacher ID</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let t of teachers">
+                <td>{{ t.UID }}</td>
+                <td>{{ t.teacherID }}</td>
+                <td>{{ t.lastname }}, {{ t.firstname }} {{ t.middlename }}</td>
+                <td>{{ t.email }}</td>
+                <td>
+                  <span class="status-chip" [class.inactive]="t.status === 'inactive'">
+                    {{ t.status }}
+                  </span>
+                </td>
+                <td class="actions">
+                  <button type="button" class="btn subtle" (click)="removeTeacher(t.UID)">
+                    Remove
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <ng-template #emptyState>
+        <div class="empty-state">
+          <p>No teachers created yet.</p>
+          <p class="muted">Use the form on the left to add your first teacher.</p>
+        </div>
+      </ng-template>
+    </article>
+  </section>
+</div>

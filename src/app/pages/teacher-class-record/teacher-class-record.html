@@ -1,0 +1,45 @@
+<div class="teacher-class-record">
+  <h2>Class record</h2>
+
+  <section *ngIf="students.length > 0 && activities.length > 0; else emptyState">
+    <article class="card">
+      <header class="card-header">
+        <h3>Scores per activity</h3>
+      </header>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Student</th>
+              <th *ngFor="let a of activities">
+                {{ a.title }}
+              </th>
+              <th class="total-col">Total score</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let s of students">
+              <td>{{ s.lastname }}, {{ s.firstname }} {{ s.middlename }}</td>
+              <td *ngFor="let a of activities">
+                {{ scoreFor(s, a) ?? '-' }}
+              </td>
+              <td class="total-col">
+                {{ totalScoreForStudent(s) }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </article>
+  </section>
+
+  <ng-template #emptyState>
+    <article class="card empty-state">
+      <p>No students or activities yet.</p>
+      <p class="meta">
+        Once you have students and activities in the system, this page will show their scores per activity.
+      </p>
+    </article>
+  </ng-template>
+</div>

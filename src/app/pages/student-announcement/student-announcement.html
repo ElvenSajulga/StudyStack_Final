@@ -1,0 +1,24 @@
+<div class="student-announcement">
+  <header>
+    <h2 class="page-title">Announcements</h2>
+    <p class="page-subtitle">
+      Stay updated with the latest posts from your teachers and school.
+    </p>
+  </header>
+
+  <section class="announcement-list" *ngIf="announcements.length > 0; else emptyState">
+    <article class="announcement-card" *ngFor="let a of announcements">
+      <header>
+        <h3>{{ a.title }}</h3>
+        <span class="meta">{{ a.createdAt | date: 'short' }}</span>
+      </header>
+      <p>{{ a.message }}</p>
+    </article>
+  </section>
+
+  <ng-template #emptyState>
+    <section class="empty-card">
+      <p class="empty-text">No announcements yet.</p>
+    </section>
+  </ng-template>
+</div>
