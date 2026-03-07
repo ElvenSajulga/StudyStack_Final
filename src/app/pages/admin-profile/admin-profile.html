@@ -1,0 +1,56 @@
+<div class="admin-page">
+  <header>
+    <h2 class="page-title">My profile</h2>
+    <p class="page-subtitle">View your administrator details and update your account information.</p>
+  </header>
+
+  <section class="card">
+    <div class="profile-grid">
+      <div>
+        <div class="avatar">A</div>
+        <dl class="profile-meta">
+          <dt>Role</dt>
+          <dd>System administrator</dd>
+          <dt>Username</dt>
+          <dd>admin</dd>
+        </dl>
+      </div>
+
+      <div>
+        <h3>Account information</h3>
+        <p class="card-description">
+          These details are used for admin communication and login. In a real deployment this would be
+          connected to your backend.
+        </p>
+
+        <form>
+          <div class="form-grid">
+            <label class="field">
+              <span class="field-label">Full name</span>
+              <input type="text" value="Admin User" />
+            </label>
+
+            <label class="field">
+              <span class="field-label">Email address</span>
+              <input type="email" value="admin@example.com" />
+            </label>
+
+            <label class="field">
+              <span class="field-label">Contact number</span>
+              <input type="tel" placeholder="+63 9XX XXX XXXX" />
+            </label>
+
+            <label class="field">
+              <span class="field-label">Department</span>
+              <input type="text" value="IT Department" />
+            </label>
+          </div>
+
+          <div class="btn-row">
+            <button class="btn primary" type="button">Save profile</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </section>
+</div>

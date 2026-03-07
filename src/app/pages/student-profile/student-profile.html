@@ -1,0 +1,74 @@
+<div class="student-page">
+  <header>
+    <h2 class="page-title">My profile</h2>
+    <p class="page-subtitle">
+      View your student details and make sure your information is up to date.
+    </p>
+  </header>
+
+  <ng-container *ngIf="user; else noProfile">
+    <section class="card">
+      <div class="profile-grid">
+        <div>
+          <div class="avatar">{{ initials }}</div>
+          <dl class="profile-meta">
+            <dt>Name</dt>
+            <dd>{{ user.name || 'Student' }}</dd>
+
+            <dt>Student ID</dt>
+            <dd>{{ studentID || 'Not set' }}</dd>
+
+            <dt>Role</dt>
+            <dd>Student</dd>
+          </dl>
+        </div>
+
+        <div>
+          <h3>Account information</h3>
+          <p class="card-description">
+            These details are based on your logged-in account. For changes to your official records,
+            please contact your teacher or school administrator.
+          </p>
+
+          <form>
+            <div class="form-grid">
+              <label class="field">
+                <span class="field-label">Full name</span>
+                <input type="text" [value]="user.name || ''" disabled />
+              </label>
+
+              <label class="field">
+                <span class="field-label">Student ID</span>
+                <input type="text" [value]="studentID || 'Not set'" disabled />
+              </label>
+
+              <label class="field">
+                <span class="field-label">Email address</span>
+                <input type="email" placeholder="Provided by the school" disabled />
+              </label>
+
+              <label class="field">
+                <span class="field-label">Course / strand</span>
+                <input type="text" placeholder="Provided by the school" disabled />
+              </label>
+            </div>
+
+            <p class="info-note">
+              Profile fields are managed by the school. If something looks incorrect, ask your teacher
+              or administrator to update it.
+            </p>
+          </form>
+        </div>
+      </div>
+    </section>
+  </ng-container>
+
+  <ng-template #noProfile>
+    <section class="card">
+      <p class="card-description">
+        No profile information is available for this session. Try logging in again or contact your teacher
+        if the problem continues.
+      </p>
+    </section>
+  </ng-template>
+</div>

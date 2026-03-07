@@ -1,0 +1,137 @@
+<div class="admin-page admin-students">
+  <header class="page-header">
+    <div>
+      <h2 class="page-title">Student Accounts</h2>
+      <p class="page-subtitle">Create and manage all student accounts in the portal.</p>
+    </div>
+
+    <div class="metric-pill">
+      <span class="metric-label">Total students</span>
+      <span class="metric-value">{{ totalStudents }}</span>
+    </div>
+  </header>
+
+  <section class="content-grid">
+    <article class="card form-card">
+      <header class="card-header">
+        <h3>Create new student</h3>
+        <p class="card-description">
+          Fill in the fields below to register a new student account.
+        </p>
+      </header>
+
+      <form (ngSubmit)="addStudent()" #studentForm="ngForm" class="card-body">
+        <div class="form-grid">
+          <label class="field">
+            <span class="field-label">UID</span>
+            <input type="text" name="UID" [(ngModel)]="form.UID" required />
+          </label>
+
+          <label class="field">
+            <span class="field-label">Password</span>
+            <input type="password" name="password" [(ngModel)]="form.password" required />
+          </label>
+
+          <label class="field">
+            <span class="field-label">Student ID</span>
+            <input type="text" name="studentID" [(ngModel)]="form.studentID" required />
+          </label>
+
+          <label class="field">
+            <span class="field-label">Course</span>
+            <input type="text" name="course" [(ngModel)]="form.course" />
+          </label>
+
+          <label class="field">
+            <span class="field-label">Lastname</span>
+            <input type="text" name="lastname" [(ngModel)]="form.lastname" required />
+          </label>
+
+          <label class="field">
+            <span class="field-label">Firstname</span>
+            <input type="text" name="firstname" [(ngModel)]="form.firstname" required />
+          </label>
+
+          <label class="field">
+            <span class="field-label">Middlename</span>
+            <input type="text" name="middlename" [(ngModel)]="form.middlename" />
+          </label>
+
+          <label class="field">
+            <span class="field-label">Email</span>
+            <input type="email" name="email" [(ngModel)]="form.email" />
+          </label>
+
+          <label class="field">
+            <span class="field-label">Status</span>
+            <select name="status" [(ngModel)]="form.status">
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn primary" [disabled]="studentForm.invalid">
+            Add student
+          </button>
+        </div>
+      </form>
+    </article>
+
+    <article class="card table-card">
+      <header class="card-header">
+        <div>
+          <h3>Student list</h3>
+          <p class="card-description">Overview of all registered students.</p>
+        </div>
+
+        <p class="muted" *ngIf="students.length">Showing {{ students.length }} students</p>
+      </header>
+
+      <section class="card-body" *ngIf="students.length > 0; else emptyState">
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>UID</th>
+                <th>Student ID</th>
+                <th>Name</th>
+                <th>Course</th>
+                <th>Email</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let s of students">
+                <td>{{ s.UID }}</td>
+                <td>{{ s.studentID }}</td>
+                <td>{{ s.lastname }}, {{ s.firstname }} {{ s.middlename }}</td>
+                <td>{{ s.course }}</td>
+                <td>{{ s.email }}</td>
+                <td>
+                  <span class="status-chip" [class.inactive]="s.status === 'inactive'">
+                    {{ s.status }}
+                  </span>
+                </td>
+                <td class="actions">
+                  <button type="button" class="btn subtle" (click)="removeStudent(s.UID)">
+                    Remove
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <ng-template #emptyState>
+        <div class="empty-state">
+          <p>No students enrolled yet.</p>
+          <p class="muted">Use the form on the left to create the first account.</p>
+        </div>
+      </ng-template>
+    </article>
+  </section>
+</div>

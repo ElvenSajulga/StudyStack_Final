@@ -1,0 +1,118 @@
+.student-grade {
+  max-width: 960px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.page-subtitle {
+  margin: 4px 0 0;
+  font-size: 0.9rem;
+  color: #6b7280;
+}
+
+.table-card {
+  background: #ffffff;
+  border-radius: 18px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+}
+
+.table-card table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table-card thead {
+  background: #f3f4f6;
+}
+
+.table-card th,
+.table-card td {
+  padding: 10px 12px;
+  font-size: 0.85rem;
+  text-align: left;
+}
+
+.table-card th {
+  font-weight: 600;
+  color: #374151;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.table-card tbody tr:nth-child(even) {
+  background: #f9fafb;
+}
+
+.table-card tbody tr:hover {
+  background: #eff6ff;
+}
+
+.table-card td {
+  color: #4b5563;
+}
+
+.total {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #111827;
+}
+
+.empty-card {
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 16px 18px 18px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+  border: 1px solid #e5e7eb;
+}
+
+.empty-text,
+.student-grade > p {
+  font-size: 0.9rem;
+  color: #6b7280;
+}
+
+@media (max-width: 768px) {
+  .table-card table,
+  .table-card thead,
+  .table-card tbody,
+  .table-card th,
+  .table-card td,
+  .table-card tr {
+    display: block;
+  }
+
+  .table-card thead {
+    display: none;
+  }
+
+  .table-card tr {
+    margin-bottom: 10px;
+    border-radius: 12px;
+    border: 1px solid #e5e7eb;
+    overflow: hidden;
+  }
+
+  .table-card td {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 10px;
+  }
+
+  .table-card td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    margin-right: 8px;
+    color: #374151;
+  }
+}
+

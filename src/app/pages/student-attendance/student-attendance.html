@@ -1,0 +1,37 @@
+<div class="student-attendance">
+  <header>
+    <h2 class="page-title">My attendance</h2>
+    <p class="page-subtitle">
+      See your attendance status for each activity based on your submissions.
+    </p>
+  </header>
+
+  <section *ngIf="activities.length > 0; else emptyState">
+    <div class="table-card">
+      <table>
+        <thead>
+          <tr>
+            <th>Activity</th>
+            <th>Type</th>
+            <th>Deadline</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let a of activities">
+            <td data-label="Activity">{{ a.title }}</td>
+            <td data-label="Type">{{ a.type }}</td>
+            <td data-label="Deadline">{{ a.deadline | date: 'short' }}</td>
+            <td data-label="Status">{{ attendanceStatus(a) }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <ng-template #emptyState>
+    <section class="empty-card">
+      <p class="empty-text">No activities yet.</p>
+    </section>
+  </ng-template>
+</div>

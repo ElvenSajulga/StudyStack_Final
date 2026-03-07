@@ -1,0 +1,47 @@
+<div class="teacher-announcement">
+  <header>
+    <h2 class="page-title">Announcements</h2>
+    <p class="page-subtitle">
+      Post important updates that will appear on your students' announcement page.
+    </p>
+  </header>
+
+  <section class="form-section">
+    <h3>Post new announcement</h3>
+
+    <form (ngSubmit)="createAnnouncement()" #announcementForm="ngForm">
+      <label>
+        <span>Title</span>
+        <input type="text" name="title" [(ngModel)]="title" required />
+      </label>
+
+      <label>
+        <span>Message</span>
+        <textarea name="message" rows="4" [(ngModel)]="message" required></textarea>
+      </label>
+
+      <div class="form-actions">
+        <button type="submit">Post announcement</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="list-section" *ngIf="announcements.length > 0; else emptyState">
+    <h3>My announcements</h3>
+
+    <article class="announcement-card" *ngFor="let a of announcements">
+      <header>
+        <h4>{{ a.title }}</h4>
+        <span class="meta">{{ a.createdAt | date: 'short' }}</span>
+      </header>
+      <p>{{ a.message }}</p>
+      <button type="button" (click)="deleteAnnouncement(a.id)">Delete</button>
+    </article>
+  </section>
+
+  <ng-template #emptyState>
+    <section class="empty-card">
+      <p class="empty-text">No announcements yet.</p>
+    </section>
+  </ng-template>
+</div>

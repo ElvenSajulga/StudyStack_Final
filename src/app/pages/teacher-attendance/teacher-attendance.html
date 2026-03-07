@@ -1,0 +1,51 @@
+<div class="teacher-attendance">
+  <h2>Class attendance</h2>
+
+  <section *ngIf="activities.length > 0 && students.length > 0; else emptyState">
+    <article class="card" *ngFor="let a of activities">
+      <header class="card-header">
+        <h3>{{ a.title }}</h3>
+        <span class="meta">Deadline: {{ a.deadline | date: 'short' }}</span>
+      </header>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Student ID</th>
+              <th>Name</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let s of students">
+              <td>{{ s.studentID }}</td>
+              <td>{{ s.lastname }}, {{ s.firstname }} {{ s.middlename }}</td>
+              <td>
+                <span
+                  class="status-pill"
+                  [ngClass]="{
+                    present: attendanceStatus(a, s) === 'present',
+                    late: attendanceStatus(a, s) === 'late',
+                    absent: attendanceStatus(a, s) === 'absent'
+                  }"
+                >
+                  {{ attendanceStatus(a, s) | titlecase }}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </article>
+  </section>
+
+  <ng-template #emptyState>
+    <article class="card empty-state">
+      <p>No activities or students to show yet.</p>
+      <p class="meta">
+        Create activities first and make sure there are student accounts in the system to track attendance.
+      </p>
+    </article>
+  </ng-template>
+</div>

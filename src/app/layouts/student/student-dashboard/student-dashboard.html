@@ -1,0 +1,47 @@
+<div class="student-dashboard">
+  <h2 class="page-title">My dashboard</h2>
+
+  <section class="stats-grid">
+    <article class="stat-card primary">
+      <h3>Present</h3>
+      <p class="stat-number">{{ presentCount }}</p>
+      <p class="stat-caption">On-time submissions</p>
+    </article>
+
+    <article class="stat-card">
+      <h3>Late</h3>
+      <p class="stat-number">{{ lateCount }}</p>
+      <p class="stat-caption">Submitted after deadline</p>
+    </article>
+
+    <article class="stat-card">
+      <h3>Absent</h3>
+      <p class="stat-number">{{ absentCount }}</p>
+      <p class="stat-caption">No valid submission</p>
+    </article>
+
+    <article class="stat-card">
+      <h3>Open activities</h3>
+      <p class="stat-number">{{ openActivities }}</p>
+      <p class="stat-caption">Still accepting submissions</p>
+    </article>
+  </section>
+
+  <section class="panels">
+    <article class="panel">
+      <h3>Recent announcements</h3>
+      <ng-container *ngIf="latestAnnouncements.length; else noAnnouncements">
+        <ul class="announcement-list">
+          <li *ngFor="let a of latestAnnouncements">
+            <strong>{{ a.title }}</strong>
+            <span class="meta">{{ a.createdAt | date: 'short' }}</span>
+            <p>{{ a.message }}</p>
+          </li>
+        </ul>
+      </ng-container>
+      <ng-template #noAnnouncements>
+        <p class="panel-empty">No announcements yet.</p>
+      </ng-template>
+    </article>
+  </section>
+</div>
