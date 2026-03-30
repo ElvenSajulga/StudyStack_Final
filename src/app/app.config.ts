@@ -1,22 +1,31 @@
-import { ApplicationConfig, provideBrowserGlobalErrorListeners, provideZoneChangeDetection } from '@angular/core';
+// src/app/app.config.ts
+import { ApplicationConfig } from '@angular/core';
 import { provideRouter, withRouterConfig } from '@angular/router';
 import { provideHttpClient, withFetch } from '@angular/common/http';
+import { provideClientHydration, withEventReplay } from '@angular/platform-browser';
+
+// Firebase imports
+import { provideFirebaseApp, initializeApp } from '@angular/fire/app';
+import { provideFirestore, getFirestore } from '@angular/fire/firestore';
+import { provideAuth, getAuth } from '@angular/fire/auth';
 
 import { routes } from './app.routes';
-import { provideClientHydration, withEventReplay } from '@angular/platform-browser';
+import { firebaseConfig } from './firebase.config';
 
 export const appConfig: ApplicationConfig = {
   providers: [
-    provideBrowserGlobalErrorListeners(),
     provideRouter(
       routes,
       withRouterConfig({
         onSameUrlNavigation: 'reload',
       }),
     ),
-    // Ensure async tasks (HTTP promises, timers, etc.) trigger UI updates without manual refresh.
-    provideZoneChangeDetection({ eventCoalescing: true }),
+    provideHttpClient(withFetch()),
     provideClientHydration(withEventReplay()),
-    provideHttpClient(withFetch())
+    
+    // Firebase providers
+    provideFirebaseApp(() => initializeApp(firebaseConfig)),
+    provideFirestore(() => getFirestore()),
+    provideAuth(() => getAuth()),
   ]
 };

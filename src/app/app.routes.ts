@@ -21,6 +21,7 @@ import { TeacherActivity } from './pages/teacher-activity/teacher-activity';
 import { TeacherAnnouncement } from './pages/teacher-announcement/teacher-announcement';
 import { TeacherAttendance } from './pages/teacher-attendance/teacher-attendance';
 import { TeacherClassRecord } from './pages/teacher-class-record/teacher-class-record';
+import { MigrateComponent } from './migration/migration';
 
 
 export const routes: Routes = [
@@ -51,4 +52,6 @@ export const routes: Routes = [
     { path: 'teacher-announcement', component: TeacherAnnouncement},
     { path: 'teacher-attendance', component: TeacherAttendance},
     { path: 'teacher-class-record', component: TeacherClassRecord},
+
+    { path: 'migrate', component: MigrateComponent },
 ];
