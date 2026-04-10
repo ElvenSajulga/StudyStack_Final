@@ -51,6 +51,7 @@ export class StudentDashboard implements OnInit {
 
     const now = new Date();
     const submissionsByActivityId: Record<string, ActivitySubmission | undefined> = {};
+
     if (sid) {
       const subs = await this.activityService.getSubmissionsForStudent(sid);
       for (const sub of subs) {
@@ -60,12 +61,14 @@ export class StudentDashboard implements OnInit {
 
     for (const a of activities) {
       const closeAt = new Date(a.closeAt);
-      if (now <= closeAt) {
-        this.openActivities++;
-      }
+      if (now <= closeAt) this.openActivities++;
 
       if (!sid) continue;
-      const status: AttendanceStatus = this.activityService.getAttendanceStatus(a, submissionsByActivityId[a.id]);
+
+      const status: AttendanceStatus = this.activityService.getAttendanceStatus(
+        a,
+        submissionsByActivityId[a.id]
+      );
       if (status === 'present') this.presentCount++;
       if (status === 'late') this.lateCount++;
       if (status === 'absent') this.absentCount++;

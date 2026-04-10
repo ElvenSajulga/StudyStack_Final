@@ -13,7 +13,6 @@ import { StudentAccount, StudentAccountService } from '../../services/student-ac
 export class AdminStudents implements OnInit {
   students: StudentAccount[] = [];
 
-  // simple form model
   form: Partial<StudentAccount> = {
     UID: '',
     name: '',

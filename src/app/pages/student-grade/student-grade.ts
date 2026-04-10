@@ -54,7 +54,6 @@ export class StudentGrade implements OnInit, OnDestroy {
       return;
     }
 
-    // All activities currently visible to all students
     try {
       this.activities = await this.activityService.getAllActivities();
     } catch {
@@ -67,6 +66,7 @@ export class StudentGrade implements OnInit, OnDestroy {
     } catch {
       subs = [];
     }
+
     this.submissionsByActivityId = {};
     for (const sub of subs) {
       this.submissionsByActivityId[sub.activityId] = sub;
@@ -75,6 +75,7 @@ export class StudentGrade implements OnInit, OnDestroy {
     this.submissions = this.activities
       .map(a => this.submissionsByActivityId[a.id])
       .filter((s): s is ActivitySubmission => !!s);
+
     this.cdr.detectChanges();
   }
 

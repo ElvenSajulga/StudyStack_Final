@@ -30,7 +30,7 @@
         <h4>Your answer / output</h4>
         <textarea
           rows="4"
-          [(ngModel)]="draftContent[a.id]"
+          [(ngModel)]="draftContent[a.id || '']"
           placeholder="Write your quiz answers or attach your output description here."
         ></textarea>
         <button type="button" (click)="submit(a)">

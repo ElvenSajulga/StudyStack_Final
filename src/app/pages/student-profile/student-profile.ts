@@ -26,9 +26,7 @@ export class StudentProfile {
 
     const parts = name.split(' ').filter(Boolean);
     if (!parts.length) return 'S';
-    if (parts.length === 1) {
-      return parts[0].charAt(0).toUpperCase();
-    }
+    if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
 
     const first = parts[0].charAt(0);
     const last = parts[parts.length - 1].charAt(0);

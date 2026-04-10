@@ -5,6 +5,7 @@ import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../services/auth.service';
 import { StudentAccountService } from '../../services/student-account.service';
 import { TeacherAccountService } from '../../services/teacher-account.service';
+import { FirestoreService } from '../../services/firestore.service';
 import Swal from 'sweetalert2';
 
 interface AdminAccount {
@@ -29,108 +30,92 @@ export class Login implements OnInit {
   constructor(
     private readonly router: Router,
     private readonly http: HttpClient,
-    private auth: AuthService,
-    private studentAccounts: StudentAccountService,
-    private teacherAccounts: TeacherAccountService
+    private readonly auth: AuthService,
+    private readonly studentAccounts: StudentAccountService,
+    private readonly teacherAccounts: TeacherAccountService,
+    private readonly firestoreService: FirestoreService,
   ) {}
 
   ngOnInit(): void {
     const user = this.auth.getCurrentUser();
     if (!user) return;
-
-    if (user.role === 'admin') {
-      void this.router.navigate(['/admin-dashboard']);
-    } else if (user.role === 'student') {
-      void this.router.navigate(['/student-dashboard']);
-    } else if (user.role === 'teacher') {
-      void this.router.navigate(['/teacher-dashboard']);
-    }
+    if (user.role === 'admin') void this.router.navigate(['/admin-dashboard']);
+    else if (user.role === 'student') void this.router.navigate(['/student-dashboard']);
+    else if (user.role === 'teacher') void this.router.navigate(['/teacher-dashboard']);
   }
 
-  async login(){
-    const trimmedUID = this.UID.trim();
-    const trimmedPassword = this.password.trim();
+  async login(): Promise<void> {
+    const uid = this.UID.trim();
+    const pwd = this.password.trim();
 
-    if (!trimmedUID || !trimmedPassword) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: 'Please enter both UID and password.',
-      });
+    if (!uid || !pwd) {
+      Swal.fire({ icon: 'error', title: 'Error', text: 'Please enter both UID and password.' });
       return;
     }
 
-    // admin login (fetched from json-server / db.json)
+    // 1. Try Firestore admins first
     try {
-      const admins = await this.http
-        .get<AdminAccount[]>(
-          `${this.ADMIN_API_URL}?UID=${encodeURIComponent(trimmedUID)}&password=${encodeURIComponent(trimmedPassword)}`
-        )
-        .toPromise();
-
-      if (admins && admins.length > 0) {
-        const admin = admins[0];
-        this.auth.setCurrentUser({
-          role: 'admin',
-          name: admin.name ?? '',
-        });
-        Swal.fire({
-          icon: 'success',
-          title: 'Login successful',
-          text: 'Welcome, admin!',
-          timer: 2000,
-          showConfirmButton: false,
-        });
+      const admins = await this.firestoreService.getAll<AdminAccount>('admins');
+      const admin = admins.find(a => a.UID === uid && a.password === pwd);
+      if (admin) {
+        this.auth.setCurrentUser({ role: 'admin', name: admin.name ?? '' });
+        this.showSuccess('Welcome, admin!');
         void this.router.navigate(['/admin-dashboard']);
         return;
       }
     } catch {
-      // If the admin API is unreachable, fall through to other checks
+      // Firestore unreachable → try json-server
+      try {
+        const admins = await this.http
+          .get<AdminAccount[]>(
+            `${this.ADMIN_API_URL}?UID=${encodeURIComponent(uid)}&password=${encodeURIComponent(pwd)}`
+          )
+          .toPromise();
+        if (admins && admins.length > 0) {
+          this.auth.setCurrentUser({ role: 'admin', name: admins[0].name ?? '' });
+          this.showSuccess('Welcome, admin!');
+          void this.router.navigate(['/admin-dashboard']);
+          return;
+        }
+      } catch { /* continue */ }
     }
 
-    // student accounts (managed by admin)
-    const student = this.studentAccounts.getByCredentials(trimmedUID, trimmedPassword);
+    // 2. Student accounts
+    const student = this.studentAccounts.getByCredentials(uid, pwd);
     if (student) {
       this.auth.setCurrentUser({
         role: 'student',
         name: `${student.firstname} ${student.lastname}`.trim(),
         studentID: student.studentID,
       });
-      Swal.fire({
-        icon: 'success',
-        title : 'Login successful',
-        text: 'Welcome, student!',
-        timer: 2000,
-        showConfirmButton: false,
-      });
+      this.showSuccess('Welcome, student!');
       void this.router.navigate(['/student-dashboard']);
       return;
     }
 
-    // teacher accounts (managed by admin)
-    const teacher = this.teacherAccounts.getByCredentials(trimmedUID, trimmedPassword);
+    // 3. Teacher accounts
+    const teacher = this.teacherAccounts.getByCredentials(uid, pwd);
     if (teacher) {
       this.auth.setCurrentUser({
         role: 'teacher',
         name: `${teacher.firstname} ${teacher.lastname}`.trim(),
         teacherID: teacher.teacherID,
       });
-      Swal.fire({
-        icon: 'success',
-        title : 'Login successful',
-        text: 'Welcome, teacher!',
-        timer: 2000,
-        showConfirmButton: false,
-      });
+      this.showSuccess('Welcome, teacher!');
       void this.router.navigate(['/teacher-dashboard']);
       return;
     }
 
-    Swal.fire({
-      icon: 'error',
-      title: 'Error',
-      text: 'Invalid UID or password.',
-    });
+    Swal.fire({ icon: 'error', title: 'Error', text: 'Invalid UID or password.' });
+  }
 
+  private showSuccess(text: string): void {
+    Swal.fire({
+      icon: 'success',
+      title: 'Login successful',
+      text,
+      timer: 2000,
+      showConfirmButton: false,
+    });
   }
 }

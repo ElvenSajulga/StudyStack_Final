@@ -43,8 +43,6 @@ export class StudentActivity implements OnInit, OnDestroy {
   }
 
   private async loadActivities(): Promise<void> {
-    // For now, all activities are visible to all students.
-    // You can later filter by course/section.
     const sid = this.studentID;
     let nextActivities: Activity[] = [];
     try {
@@ -68,13 +66,10 @@ export class StudentActivity implements OnInit, OnDestroy {
       subs = [];
     }
 
-    // Update submissions but never overwrite draft when the user has entered something.
     for (const sub of subs) {
       this.submissions[sub.activityId] = sub;
       const currentDraft = (this.draftContent[sub.activityId] ?? '').trim();
-      if (currentDraft.length > 0) {
-        this.draftContent[sub.activityId] = this.draftContent[sub.activityId] ?? '';
-      } else {
+      if (currentDraft.length === 0) {
         this.draftContent[sub.activityId] = sub.content ?? '';
       }
     }

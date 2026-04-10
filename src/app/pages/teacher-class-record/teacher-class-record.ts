@@ -44,6 +44,7 @@ export class TeacherClassRecord implements OnInit {
       this.cdr.detectChanges();
       return;
     }
+
     await this.studentService.reloadFromServer();
     this.activities = await this.activityService.getActivitiesForTeacher(id);
     this.students = this.studentService.getAll();

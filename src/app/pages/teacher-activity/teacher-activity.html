@@ -73,7 +73,7 @@
             <td>{{ a.closeAt | date: 'short' }}</td>
             <td>{{ a.maxPoints ?? '-' }}</td>
             <td>
-              <button type="button" (click)="deleteActivity(a.id)">Delete</button>
+              <button type="button" (click)="a.id && deleteActivity(a.id)">Delete</button>
             </td>
           </tr>
         </tbody>

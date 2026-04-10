@@ -1,190 +1,145 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, map } from 'rxjs';
+import { Observable, from, map } from 'rxjs';
+import { FirestoreService } from './firestore.service';
 
 export interface TeacherAccount {
-    id?: string;
-    UID: string;
-    name: string;
-    teacherID: string;
-    password: string;
-    email: string;
-    status: string;
-    lastname: string;
-    firstname: string;
-    middlename: string;
+  id?: string;
+  UID: string;
+  name: string;
+  teacherID: string;
+  password: string;
+  email: string;
+  status: string;
+  lastname: string;
+  firstname: string;
+  middlename: string;
 }
 
 @Injectable({
-    providedIn: 'root'
+  providedIn: 'root',
 })
 export class TeacherAccountService {
-    private readonly STORAGE_KEY = 'teacherAccounts';
-    private readonly API_URL = 'http://localhost:3000/teachers';
-    private teachers: TeacherAccount[] = [];
+  private readonly STORAGE_KEY = 'teacherAccounts';
+  private readonly API_URL = 'http://localhost:3000/teachers';
+  private readonly COLLECTION = 'teachers';
+  private teachers: TeacherAccount[] = [];
+  private useFirestore = true;
 
-    constructor(private http: HttpClient) {
-        this.teachers = this.loadFromStorage();
-        // seed a default teacher account when none exist yet
-        if (this.teachers.length === 0) {
-            const defaultTeacher: TeacherAccount = {
-                UID: 'teacher',
-                name: 'Demo Teacher',
-                teacherID: 'T-0001',
-                password: 'teacher123',
-                email: 'teacher@example.com',
-                status: 'active',
-                lastname: 'Teacher',
-                firstname: 'Demo',
-                middlename: '',
-            };
-            this.teachers.push(defaultTeacher);
-            this.saveToStorage();
-        }
+  constructor(
+    private readonly http: HttpClient,
+    private readonly firestoreService: FirestoreService,
+  ) {
+    this.teachers = this.loadFromStorage();
+    void this.syncFromFirestore();
+  }
 
-        this.syncWithServer();
-    }
+  // ─── Storage helpers ──────────────────────────────────────────────────────
 
-    private loadFromStorage(): TeacherAccount[] {
-        if (typeof localStorage === 'undefined') return [];
+  private loadFromStorage(): TeacherAccount[] {
+    if (typeof localStorage === 'undefined') return [];
+    const raw = localStorage.getItem(this.STORAGE_KEY);
+    if (!raw) return [];
+    try { return JSON.parse(raw) as TeacherAccount[]; } catch { return []; }
+  }
 
-        const raw = localStorage.getItem(this.STORAGE_KEY);
-        if (!raw) return [];
+  private saveToStorage(): void {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.teachers));
+  }
 
-        try {
-            return JSON.parse(raw) as TeacherAccount[];
-        } catch {
-            return [];
-        }
-    }
+  // ─── Firestore sync ───────────────────────────────────────────────────────
 
-    private saveToStorage(): void {
-        if (typeof localStorage === 'undefined') return;
-        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.teachers));
-    }
-
-    private syncWithServer(): void {
-        this.http.get<TeacherAccount[] | undefined>(this.API_URL).subscribe({
-            next: (serverTeachers) => {
-                const serverList = serverTeachers ?? [];
-                const hasServer = serverList.length > 0;
-                const hasLocal = this.teachers.length > 0;
-
-                // If the server already has data, always treat it as the source of truth
-                // so that accounts defined in db.json (e.g. teacher1, teacher2) are used
-                // for login and admin pages.
-                if (hasServer) {
-                    this.teachers = serverList;
-                    this.saveToStorage();
-                } else if (!hasServer && hasLocal) {
-                    this.teachers.forEach((teacher) => {
-                        const payload: TeacherAccount = {
-                            ...teacher,
-                            id: teacher.id ?? teacher.UID,
-                        };
-                        this.http.post<TeacherAccount>(this.API_URL, payload).subscribe({
-                            // eslint-disable-next-line @typescript-eslint/no-empty-function
-                            next: () => {},
-                            // eslint-disable-next-line @typescript-eslint/no-empty-function
-                            error: () => {},
-                        });
-                    });
-                }
-            },
-            // eslint-disable-next-line @typescript-eslint/no-empty-function
-            error: () => {},
-        });
-    }
-
-    /**
-     * Force a fresh reload of teacher accounts from json-server so that
-     * admin pages and dashboards always see the latest records without
-     * requiring a manual browser refresh.
-     */
-    async reloadFromServer(): Promise<void> {
-        try {
-            const serverTeachers = await this.http
-                .get<TeacherAccount[] | undefined>(this.API_URL)
-                .toPromise();
-            const list = serverTeachers ?? [];
-            this.teachers = list.map(teacher => ({
-                ...teacher,
-                id: teacher.id ?? teacher.UID,
-            }));
-            this.saveToStorage();
-        } catch {
-            // keep existing local copy if server is unreachable
-        }
-    }
-
-    getAll(): TeacherAccount[] {
-        return [...this.teachers];
-    }
-
-    getByUID(uid: string): TeacherAccount | undefined {
-        return this.teachers.find(t => t.UID === uid);
-    }
-
-    getByCredentials(uid: string, password: string): TeacherAccount | undefined {
-        return this.teachers.find(
-            t => t.UID === uid && t.password === password
-        );
-    }
-
-    add(teacher: TeacherAccount): Observable<void> {
-        const existing = this.getByUID(teacher.UID);
-        if (existing) {
-            throw new Error('A teacher with this UID already exists.');
-        }
-
-        const withId: TeacherAccount = {
-            ...teacher,
-            id: teacher.id ?? teacher.UID,
-        };
-
-        this.teachers.push(withId);
+  private async syncFromFirestore(): Promise<void> {
+    try {
+      const list = await this.firestoreService.getAll<TeacherAccount>(this.COLLECTION);
+      if (list.length > 0) {
+        this.teachers = list;
         this.saveToStorage();
-
-        return this.http.post<TeacherAccount>(this.API_URL, withId).pipe(
-            map(() => undefined)
-        );
+        this.useFirestore = true;
+        return;
+      }
+    } catch {
+      this.useFirestore = false;
     }
+    await this.syncFromJsonServer();
+  }
 
-    update(uid: string, changes: Partial<TeacherAccount>): void {
-        const index = this.teachers.findIndex(t => t.UID === uid);
-        if (index === -1) return;
-
-        this.teachers[index] = { ...this.teachers[index], ...changes };
+  private async syncFromJsonServer(): Promise<void> {
+    try {
+      const list = await this.http
+        .get<TeacherAccount[]>(this.API_URL)
+        .toPromise();
+      if (list && list.length > 0) {
+        this.teachers = list;
         this.saveToStorage();
+      }
+    } catch { /* keep local */ }
+  }
 
-        const id = this.teachers[index].id ?? uid;
-        const payload: Partial<TeacherAccount> = {
-            ...changes,
-            id,
-            UID: this.teachers[index].UID,
-        };
+  // ─── Public API ───────────────────────────────────────────────────────────
 
-        this.http.patch<TeacherAccount>(`${this.API_URL}/${encodeURIComponent(id)}`, payload).subscribe({
-            // eslint-disable-next-line @typescript-eslint/no-empty-function
-            next: () => {},
-            // eslint-disable-next-line @typescript-eslint/no-empty-function
-            error: () => {},
-        });
+  async reloadFromServer(): Promise<void> {
+    await this.syncFromFirestore();
+  }
+
+  getAll(): TeacherAccount[] { return [...this.teachers]; }
+
+  getByUID(uid: string): TeacherAccount | undefined {
+    return this.teachers.find(t => t.UID === uid);
+  }
+
+  getByCredentials(uid: string, password: string): TeacherAccount | undefined {
+    return this.teachers.find(t => t.UID === uid && t.password === password);
+  }
+
+  getCount(): number { return this.teachers.length; }
+
+  add(teacher: TeacherAccount): Observable<void> {
+    if (this.getByUID(teacher.UID)) {
+      throw new Error('A teacher with this UID already exists.');
     }
 
-    remove(uid: string): Observable<void> {
-        const toRemove = this.teachers.find(t => t.UID === uid);
-        this.teachers = this.teachers.filter(t => t.UID !== uid);
-        this.saveToStorage();
+    const withId: TeacherAccount = { ...teacher, id: teacher.UID };
+    this.teachers.push(withId);
+    this.saveToStorage();
 
-        const id = toRemove?.id ?? uid;
-        return this.http.delete<void>(`${this.API_URL}/${encodeURIComponent(id)}`).pipe(
-            map(() => undefined)
-        );
+    if (this.useFirestore) {
+      return from(
+        this.firestoreService.set(this.COLLECTION, withId.UID, { ...withId })
+      ).pipe(map(() => undefined));
     }
 
-    getCount(): number {
-        return this.teachers.length;
+    return from(
+      this.http.post<TeacherAccount>(this.API_URL, withId).toPromise()
+    ).pipe(map(() => undefined));
+  }
+
+  update(uid: string, changes: Partial<TeacherAccount>): void {
+    const index = this.teachers.findIndex(t => t.UID === uid);
+    if (index === -1) return;
+    this.teachers[index] = { ...this.teachers[index], ...changes };
+    this.saveToStorage();
+
+    if (this.useFirestore) {
+      void this.firestoreService.update(this.COLLECTION, uid, changes);
+    } else {
+      this.http.patch(`${this.API_URL}/${encodeURIComponent(uid)}`, changes)
+        .subscribe({ error: () => {} });
     }
+  }
+
+  remove(uid: string): Observable<void> {
+    this.teachers = this.teachers.filter(t => t.UID !== uid);
+    this.saveToStorage();
+
+    if (this.useFirestore) {
+      return from(this.firestoreService.delete(this.COLLECTION, uid))
+        .pipe(map(() => undefined));
+    }
+
+    return from(
+      this.http.delete<void>(`${this.API_URL}/${encodeURIComponent(uid)}`).toPromise()
+    ).pipe(map(() => undefined));
+  }
 }
-
