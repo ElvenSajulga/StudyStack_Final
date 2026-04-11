@@ -1,55 +1,59 @@
 <div class="login-page">
-    <!--Top-Left Logo-->
-    <div class="toplogo">
-        <img src="/stacklogo.png" alt="StudyStack Logo"/>
-        <h2>
-            <span class="Study">Study</span><span class="Stack">Stack</span>
-        </h2>
-    </div>
+  <div class="login-card">
 
-    <!--Bottom-Left Text-->
-    <div class="tagline">
-        <h1>Manage, Learn, Stay Connected</h1>
+    <!-- Left green panel -->
+    <div class="login-left">
+      <div class="brand">
+        <img src="/stacklogo.png" alt="StudyStack Logo" />
+        <span class="brand-name">
+          <span class="Study">Study</span><span class="Stack">Stack</span>
+        </span>
+      </div>
+
+      <div class="tagline">
+        <h1>"Manage. Learn. Stay connected."</h1>
         <p>
-            An online classroom management system <br>
-            that keeps records, activites, attendance, and<br>
-            announements in one place.
+          An online classroom management system that keeps records,
+          activities, attendance, and announcements in one place.
         </p>
+      </div>
     </div>
 
-    <!--Login card-->
-    <div class="login-container">
+    <!-- Right form panel -->
+    <div class="login-right">
+      <h2>Welcome Back to StudyStack!</h2>
+      <p class="subtitle">Track your class records with StudyStack</p>
 
-        <h2>Welcome back to StudyStack!</h2>
-        <p class="subtitle"> Please enter your credentials to log in. </p>
+      <form (ngSubmit)="login()">
+        <input
+          id="UID"
+          name="UID"
+          class="form-control"
+          [(ngModel)]="UID"
+          required
+          placeholder="UID"
+        />
 
-        <form (ngSubmit)="login()">
-            <input 
-                id="UID" 
-                name="UID" 
-                class="form-control" 
-                [(ngModel)]="UID"
-                required
-                placeholder="Enter UID"
-            />
+        <input
+          type="password"
+          id="password"
+          name="password"
+          class="form-control"
+          [(ngModel)]="password"
+          required
+          placeholder="Password"
+        />
 
+        <button type="submit" class="login-button">Login</button>
 
-            <div>
-                <input 
-                    type="password" 
-                    id="password" name="password" 
-                    class="form-control" 
-                    [(ngModel)]="password" 
-                    required
-                    placeholder="Password"
-                 />
-            </div>
-
-            <button type="submit" class="login-button">Login</button>
-        </form>
-
-        <div class="forgot">
-            <a>Forgot Password?</a>
+        <div class="form-footer">
+          <a class="forgot">Forgot Password?</a>
+          <label class="remember">
+            <input type="checkbox" /> Remember sign in details
+          </label>
         </div>
+      </form>
     </div>
+
+  </div>
 </div>

@@ -33,6 +33,19 @@
       "lastname": "Santos",
       "firstname": "Maria",
       "middlename": "L"
+    },
+    {
+      "id": "student3",
+      "UID": "student3",
+      "name": "",
+      "course": "BSIT",
+      "studentID": "S-003",
+      "password": "student3",
+      "email": "student3@example.com",
+      "status": "active",
+      "lastname": "Sajulga",
+      "firstname": "John Elven",
+      "middlename": "L."
     }
   ],
   "teachers": [
@@ -59,18 +72,6 @@
       "lastname": "Lopez",
       "firstname": "Ana",
       "middlename": "M"
-    },
-    {
-      "id": "teacher3",
-      "UID": "teacher3",
-      "name": "",
-      "teacherID": "12345",
-      "password": "teacher1",
-      "email": "michelle@gmail.com",
-      "status": "active",
-      "lastname": "Smith",
-      "firstname": "Michelle",
-      "middlename": "James"
     }
   ],
   "announcements": [
