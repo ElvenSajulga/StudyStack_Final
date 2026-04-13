@@ -16,6 +16,8 @@
         <span class="user-name" *ngIf="auth.getCurrentUser() as user">
           {{ user.name || 'User' }}
         </span>
+        <!-- add this import to app.ts first -->
+        <app-notification-panel *ngIf="auth.isStudent()"></app-notification-panel>
         <button type="button" class="logout-btn" (click)="logout()">
           Logout
         </button>

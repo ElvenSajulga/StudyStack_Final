@@ -14,29 +14,38 @@ export interface Activity {
   deadline: string;
   closeAt: string;
   maxPoints?: number;
+  scoresReleased?: boolean;
 }
 
 export type AttendanceStatus = 'present' | 'late' | 'absent';
+
+export interface SubmissionLink {
+  label: string;
+  url: string;
+}
 
 export interface ActivitySubmission {
   id: string;
   activityId: string;
   studentID: string;
+  studentUID: string;
   submittedAt: string;
   lastEditedAt: string;
   content: string;
+  links?: SubmissionLink[];
+  quizAnswers?: Record<string, string>;
   score?: number;
+  feedback?: string;
+  graded?: boolean;
+  submitted?: boolean;
 }
 
-@Injectable({
-  providedIn: 'root',
-})
+@Injectable({ providedIn: 'root' })
 export class ActivityService {
   private readonly ACTIVITIES_URL = 'http://localhost:3000/activities';
   private readonly SUBMISSIONS_URL = 'http://localhost:3000/activitySubmissions';
   private readonly ACT_COLLECTION = 'activities';
   private readonly SUB_COLLECTION = 'activitySubmissions';
-  private useFirestore = true;
 
   constructor(
     private readonly http: HttpClient,
@@ -48,18 +57,22 @@ export class ActivityService {
   async getAllActivities(): Promise<Activity[]> {
     try {
       const list = await this.firestoreService.getAll<Activity>(this.ACT_COLLECTION);
-      this.useFirestore = true;
-      return list.sort(
-        (a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
-      );
-    } catch {
-      this.useFirestore = false;
+      if (list.length >= 0) {
+        return list.sort(
+          (a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
+        );
+      }
+    } catch (e) {
+      console.warn('Firestore getAllActivities failed, falling back:', e);
     }
-
-    const list = await this.http
-      .get<Activity[]>(`${this.ACTIVITIES_URL}?_sort=deadline`)
-      .toPromise();
-    return list ?? [];
+    try {
+      const list = await this.http
+        .get<Activity[]>(`${this.ACTIVITIES_URL}?_sort=deadline`)
+        .toPromise();
+      return list ?? [];
+    } catch {
+      return [];
+    }
   }
 
   async getActivitiesForTeacher(teacherID: string): Promise<Activity[]> {
@@ -71,25 +84,27 @@ export class ActivityService {
       return list.sort(
         (a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
       );
-    } catch {
-      this.useFirestore = false;
+    } catch (e) {
+      console.warn('Firestore getActivitiesForTeacher failed, falling back:', e);
     }
-
-    const list = await this.http
-      .get<Activity[]>(
-        `${this.ACTIVITIES_URL}?teacherID=${encodeURIComponent(teacherID)}&_sort=deadline`
-      )
-      .toPromise();
-    return list ?? [];
+    try {
+      const list = await this.http
+        .get<Activity[]>(
+          `${this.ACTIVITIES_URL}?teacherID=${encodeURIComponent(teacherID)}&_sort=deadline`
+        )
+        .toPromise();
+      return list ?? [];
+    } catch {
+      return [];
+    }
   }
 
   async getActivityById(id: string): Promise<Activity | undefined> {
     try {
       return await this.firestoreService.getById<Activity>(this.ACT_COLLECTION, id);
-    } catch {
-      // fallback
+    } catch (e) {
+      console.warn('Firestore getActivityById failed, falling back:', e);
     }
-
     try {
       const a = await this.http
         .get<Activity>(`${this.ACTIVITIES_URL}/${encodeURIComponent(id)}`)
@@ -104,65 +119,65 @@ export class ActivityService {
     const id = crypto.randomUUID
       ? crypto.randomUUID()
       : `${Date.now()}-${Math.random()}`;
+    const newActivity: Activity = { ...activity, id, scoresReleased: false };
 
-    const newActivity: Activity = { ...activity, id };
-
-    if (this.useFirestore) {
-      try {
-        await this.firestoreService.set(this.ACT_COLLECTION, id, { ...newActivity });
-        return newActivity;
-      } catch {
-        this.useFirestore = false;
-      }
+    try {
+      await this.firestoreService.set(this.ACT_COLLECTION, id, { ...newActivity });
+      return newActivity;
+    } catch (e) {
+      console.warn('Firestore createActivity failed, falling back:', e);
     }
-
-    const created = await this.http
-      .post<Activity>(this.ACTIVITIES_URL, newActivity)
-      .toPromise();
-    return created ?? newActivity;
+    try {
+      const created = await this.http
+        .post<Activity>(this.ACTIVITIES_URL, newActivity)
+        .toPromise();
+      return created ?? newActivity;
+    } catch {
+      return newActivity;
+    }
   }
 
   async updateActivity(id: string, changes: Partial<Activity>): Promise<void> {
-    if (this.useFirestore) {
-      try {
-        await this.firestoreService.update(this.ACT_COLLECTION, id, changes);
-        return;
-      } catch {
-        this.useFirestore = false;
-      }
+    try {
+      await this.firestoreService.update(this.ACT_COLLECTION, id, changes);
+      return;
+    } catch (e) {
+      console.warn('Firestore updateActivity failed, falling back:', e);
     }
-
-    await this.http
-      .patch<void>(`${this.ACTIVITIES_URL}/${encodeURIComponent(id)}`, changes)
-      .toPromise();
+    try {
+      await this.http
+        .patch<void>(`${this.ACTIVITIES_URL}/${encodeURIComponent(id)}`, changes)
+        .toPromise();
+    } catch { /* silent */ }
   }
 
   async deleteActivity(id: string): Promise<void> {
-    // Delete related submissions first
     const subs = await this.getSubmissionsForActivity(id);
-
-    if (this.useFirestore) {
-      try {
-        await Promise.all(
-          subs.map(s => this.firestoreService.delete(this.SUB_COLLECTION, s.id))
-        );
-        await this.firestoreService.delete(this.ACT_COLLECTION, id);
-        return;
-      } catch {
-        this.useFirestore = false;
-      }
+    try {
+      await Promise.all(
+        subs.map(s => this.firestoreService.delete(this.SUB_COLLECTION, s.id))
+      );
+      await this.firestoreService.delete(this.ACT_COLLECTION, id);
+      return;
+    } catch (e) {
+      console.warn('Firestore deleteActivity failed, falling back:', e);
     }
+    try {
+      await Promise.all(
+        subs.map(s =>
+          this.http
+            .delete<void>(`${this.SUBMISSIONS_URL}/${encodeURIComponent(s.id)}`)
+            .toPromise()
+        )
+      );
+      await this.http
+        .delete<void>(`${this.ACTIVITIES_URL}/${encodeURIComponent(id)}`)
+        .toPromise();
+    } catch { /* silent */ }
+  }
 
-    await Promise.all(
-      subs.map(s =>
-        this.http
-          .delete<void>(`${this.SUBMISSIONS_URL}/${encodeURIComponent(s.id)}`)
-          .toPromise()
-      )
-    );
-    await this.http
-      .delete<void>(`${this.ACTIVITIES_URL}/${encodeURIComponent(id)}`)
-      .toPromise();
+  async releaseScores(activityId: string): Promise<void> {
+    await this.updateActivity(activityId, { scoresReleased: true });
   }
 
   // ─── Submissions ──────────────────────────────────────────────────────────
@@ -173,14 +188,19 @@ export class ActivityService {
         this.SUB_COLLECTION,
         [where('activityId', '==', activityId)]
       );
-    } catch { /* fallback */ }
-
-    const list = await this.http
-      .get<ActivitySubmission[]>(
-        `${this.SUBMISSIONS_URL}?activityId=${encodeURIComponent(activityId)}`
-      )
-      .toPromise();
-    return list ?? [];
+    } catch (e) {
+      console.warn('Firestore getSubmissionsForActivity failed, falling back:', e);
+    }
+    try {
+      const list = await this.http
+        .get<ActivitySubmission[]>(
+          `${this.SUBMISSIONS_URL}?activityId=${encodeURIComponent(activityId)}`
+        )
+        .toPromise();
+      return list ?? [];
+    } catch {
+      return [];
+    }
   }
 
   async getSubmission(
@@ -196,14 +216,19 @@ export class ActivityService {
         ]
       );
       return list.length > 0 ? list[0] : undefined;
-    } catch { /* fallback */ }
-
-    const list = await this.http
-      .get<ActivitySubmission[]>(
-        `${this.SUBMISSIONS_URL}?activityId=${encodeURIComponent(activityId)}&studentID=${encodeURIComponent(studentID)}`
-      )
-      .toPromise();
-    return list && list.length > 0 ? list[0] : undefined;
+    } catch (e) {
+      console.warn('Firestore getSubmission failed, falling back:', e);
+    }
+    try {
+      const list = await this.http
+        .get<ActivitySubmission[]>(
+          `${this.SUBMISSIONS_URL}?activityId=${encodeURIComponent(activityId)}&studentID=${encodeURIComponent(studentID)}`
+        )
+        .toPromise();
+      return list && list.length > 0 ? list[0] : undefined;
+    } catch {
+      return undefined;
+    }
   }
 
   async getSubmissionsForStudent(studentID: string): Promise<ActivitySubmission[]> {
@@ -212,38 +237,51 @@ export class ActivityService {
         this.SUB_COLLECTION,
         [where('studentID', '==', studentID)]
       );
-    } catch { /* fallback */ }
-
-    const list = await this.http
-      .get<ActivitySubmission[]>(
-        `${this.SUBMISSIONS_URL}?studentID=${encodeURIComponent(studentID)}`
-      )
-      .toPromise();
-    return list ?? [];
+    } catch (e) {
+      console.warn('Firestore getSubmissionsForStudent failed, falling back:', e);
+    }
+    try {
+      const list = await this.http
+        .get<ActivitySubmission[]>(
+          `${this.SUBMISSIONS_URL}?studentID=${encodeURIComponent(studentID)}`
+        )
+        .toPromise();
+      return list ?? [];
+    } catch {
+      return [];
+    }
   }
 
   async getSubmissionsForActivities(activityIds: string[]): Promise<ActivitySubmission[]> {
     if (activityIds.length === 0) return [];
-
-    // Firestore doesn't support OR queries easily, so we fetch all and filter
     try {
       const all = await this.firestoreService.getAll<ActivitySubmission>(this.SUB_COLLECTION);
       return all.filter(s => activityIds.includes(s.activityId));
-    } catch { /* fallback */ }
-
-    const query = activityIds
-      .map(id => `activityId=${encodeURIComponent(id)}`)
-      .join('&');
-    const list = await this.http
-      .get<ActivitySubmission[]>(`${this.SUBMISSIONS_URL}?${query}`)
-      .toPromise();
-    return list ?? [];
+    } catch (e) {
+      console.warn('Firestore getSubmissionsForActivities failed, falling back:', e);
+    }
+    try {
+      const q = activityIds.map(id => `activityId=${encodeURIComponent(id)}`).join('&');
+      const list = await this.http
+        .get<ActivitySubmission[]>(`${this.SUBMISSIONS_URL}?${q}`)
+        .toPromise();
+      return list ?? [];
+    } catch {
+      return [];
+    }
   }
 
   async submitOrUpdateSubmission(
     activityId: string,
     studentID: string,
-    content: string
+    studentUID: string,
+    content: string,
+    extra?: {
+      links?: SubmissionLink[];
+      quizAnswers?: Record<string, string>;
+      score?: number;
+      graded?: boolean;
+    }
   ): Promise<ActivitySubmission> {
     const nowIso = new Date().toISOString();
     const existing = await this.getSubmission(activityId, studentID);
@@ -252,87 +290,125 @@ export class ActivityService {
       const id = crypto.randomUUID
         ? crypto.randomUUID()
         : `${Date.now()}-${Math.random()}`;
-
       const submission: ActivitySubmission = {
         id,
         activityId,
         studentID,
+        studentUID,
         content,
         submittedAt: nowIso,
         lastEditedAt: nowIso,
+        submitted: true,
+        links: extra?.links ?? [],
+        quizAnswers: extra?.quizAnswers ?? {},
+        score: extra?.score ?? 0,
+        graded: extra?.graded ?? false,
       };
-
-      if (this.useFirestore) {
-        try {
-          await this.firestoreService.set(this.SUB_COLLECTION, id, { ...submission });
-          return submission;
-        } catch {
-          this.useFirestore = false;
-        }
+      try {
+        await this.firestoreService.set(this.SUB_COLLECTION, id, { ...submission });
+        return submission;
+      } catch (e) {
+        console.warn('Firestore submitOrUpdate (new) failed, falling back:', e);
       }
-
-      const created = await this.http
-        .post<ActivitySubmission>(this.SUBMISSIONS_URL, submission)
-        .toPromise();
-      return created ?? submission;
+      try {
+        const created = await this.http
+          .post<ActivitySubmission>(this.SUBMISSIONS_URL, submission)
+          .toPromise();
+        return created ?? submission;
+      } catch {
+        return submission;
+      }
     }
 
-    // Update existing
     const updated: ActivitySubmission = {
       ...existing,
       content,
       lastEditedAt: nowIso,
+      submitted: true,
+      links: extra?.links ?? existing.links ?? [],
+      quizAnswers: extra?.quizAnswers ?? existing.quizAnswers ?? {},
+      score: extra?.score ?? existing.score ?? 0,
+      graded: extra?.graded ?? existing.graded ?? false,
     };
 
-    if (this.useFirestore) {
-      try {
-        await this.firestoreService.update(this.SUB_COLLECTION, existing.id, {
-          content,
-          lastEditedAt: nowIso,
-        });
-        return updated;
-      } catch {
-        this.useFirestore = false;
-      }
+    try {
+      await this.firestoreService.update(this.SUB_COLLECTION, existing.id, {
+        content,
+        lastEditedAt: nowIso,
+        submitted: true,
+        links: updated.links,
+        quizAnswers: updated.quizAnswers,
+        score: updated.score,
+        graded: updated.graded,
+      });
+      return updated;
+    } catch (e) {
+      console.warn('Firestore submitOrUpdate (existing) failed, falling back:', e);
     }
-
-    await this.http
-      .patch<void>(
-        `${this.SUBMISSIONS_URL}/${encodeURIComponent(existing.id)}`,
-        { content, lastEditedAt: nowIso }
-      )
-      .toPromise();
+    try {
+      await this.http
+        .patch<void>(`${this.SUBMISSIONS_URL}/${encodeURIComponent(existing.id)}`, {
+          content, lastEditedAt: nowIso, submitted: true,
+        })
+        .toPromise();
+    } catch { /* silent */ }
     return updated;
   }
 
-  async gradeSubmission(submissionId: string, score: number): Promise<void> {
-    if (this.useFirestore) {
-      try {
-        await this.firestoreService.update(this.SUB_COLLECTION, submissionId, { score });
-        return;
-      } catch {
-        this.useFirestore = false;
-      }
+  async unsubmitSubmission(submissionId: string): Promise<void> {
+    try {
+      await this.firestoreService.update(this.SUB_COLLECTION, submissionId, {
+        submitted: false,
+        lastEditedAt: new Date().toISOString(),
+      });
+      return;
+    } catch (e) {
+      console.warn('Firestore unsubmit failed, falling back:', e);
     }
-
-    await this.http
-      .patch<void>(`${this.SUBMISSIONS_URL}/${encodeURIComponent(submissionId)}`, { score })
-      .toPromise();
+    try {
+      await this.http
+        .patch<void>(`${this.SUBMISSIONS_URL}/${encodeURIComponent(submissionId)}`, {
+          submitted: false,
+        })
+        .toPromise();
+    } catch { /* silent */ }
   }
 
-  // ─── Attendance logic ─────────────────────────────────────────────────────
+  async gradeSubmission(
+    submissionId: string,
+    score: number,
+    feedback: string
+  ): Promise<void> {
+    try {
+      await this.firestoreService.update(this.SUB_COLLECTION, submissionId, {
+        score,
+        feedback,
+        graded: true,
+      });
+      return;
+    } catch (e) {
+      console.warn('Firestore gradeSubmission failed, falling back:', e);
+    }
+    try {
+      await this.http
+        .patch<void>(`${this.SUBMISSIONS_URL}/${encodeURIComponent(submissionId)}`, {
+          score, feedback, graded: true,
+        })
+        .toPromise();
+    } catch { /* silent */ }
+  }
+
+  // ─── Attendance ───────────────────────────────────────────────────────────
 
   getAttendanceStatus(
     activity: Activity,
     submission?: ActivitySubmission
   ): AttendanceStatus {
-    if (!submission) return 'absent';
-
+    if (!submission || !submission.submitted) return 'absent';
     const deadline = new Date(activity.deadline);
     const closeAt = new Date(activity.closeAt);
     const submittedAt = new Date(submission.submittedAt);
     const lastEditedAt = new Date(submission.lastEditedAt);
-
     const submittedOnTime = submittedAt.getTime() <= deadline.getTime();
     const editedAfterDeadline =
       lastEditedAt.getTime() > deadline.getTime() &&
@@ -340,7 +416,6 @@ export class ActivityService {
     const submittedLate =
       submittedAt.getTime() > deadline.getTime() &&
       submittedAt.getTime() <= closeAt.getTime();
-
     if (submittedOnTime && !editedAfterDeadline) return 'present';
     if (submittedLate || editedAfterDeadline) return 'late';
     return 'absent';
@@ -354,17 +429,5 @@ export class ActivityService {
     if (!activity) return 'absent';
     const submission = await this.getSubmission(activityId, studentID);
     return this.getAttendanceStatus(activity, submission);
-  }
-
-  async getAttendanceSummary(
-    activityId: string
-  ): Promise<{ studentID: string; status: AttendanceStatus }[]> {
-    const activity = await this.getActivityById(activityId);
-    if (!activity) return [];
-    const subs = await this.getSubmissionsForActivity(activityId);
-    return subs.map(sub => ({
-      studentID: sub.studentID,
-      status: this.getAttendanceStatus(activity, sub),
-    }));
   }
 }

@@ -1,48 +1,224 @@
-<div class="student-activity">
-  <header>
-    <h2 class="page-title">Activities</h2>
-    <p class="page-subtitle">
-      View all activities assigned to you and submit your answers before the deadline.
-    </p>
-  </header>
+<div class="sa-page">
 
-  <section class="activity-list" *ngIf="activities.length > 0; else emptyState">
-    <article class="activity-card" *ngFor="let a of activities">
-      <header>
-        <h3>{{ a.title }}</h3>
-        <span class="badge">{{ a.type }}</span>
-      </header>
+  <!-- ══ LIST VIEW ════════════════════════════════════════════════════ -->
+  <ng-container *ngIf="view === 'list'">
+    <header>
+      <h2 class="page-title">Activities</h2>
+      <p class="page-subtitle">View and submit your activities before the deadline.</p>
+    </header>
 
-      <p class="description">{{ a.description }}</p>
-
-      <p class="meta">
-        <span>Deadline: {{ a.deadline | date: 'short' }}</span>
-        <span>Closes: {{ a.closeAt | date: 'short' }}</span>
-        <span *ngIf="a.maxPoints != null">Max points: {{ a.maxPoints }}</span>
-      </p>
-
-      <p class="status">
-        Attendance status:
-        <strong>{{ getAttendanceStatus(a) }}</strong>
-      </p>
-
-      <section class="submission">
-        <h4>Your answer / output</h4>
-        <textarea
-          rows="4"
-          [(ngModel)]="draftContent[a.id || '']"
-          placeholder="Write your quiz answers or attach your output description here."
-        ></textarea>
-        <button type="button" (click)="submit(a)">
-          Submit / Update
-        </button>
-      </section>
-    </article>
-  </section>
-
-  <ng-template #emptyState>
-    <section class="empty-card">
-      <p class="empty-text">No activities available yet.</p>
+    <section *ngIf="activities.length > 0; else emptyState" class="activity-list">
+      <article
+        class="activity-card"
+        *ngFor="let a of activities"
+        (click)="openActivity(a)"
+        tabindex="0"
+        (keyup.enter)="openActivity(a)"
+      >
+        <div class="ac-icon" [class.quiz]="a.type === 'quiz'" [class.output]="a.type === 'output'">
+          {{ a.type === 'quiz' ? '📝' : '📁' }}
+        </div>
+        <div class="ac-body">
+          <h3 class="ac-title">{{ a.title }}</h3>
+          <p class="ac-meta">
+            Due {{ a.deadline | date:'MMM d, y · h:mm a' }}
+            <span *ngIf="a.maxPoints"> · {{ a.maxPoints }} pts</span>
+          </p>
+        </div>
+        <div class="ac-right">
+          <span class="status-chip" [ngClass]="getStatusClass(a)">
+            {{ getStatusLabel(a) }}
+          </span>
+          <span class="closed-chip" *ngIf="isClosed(a)">Closed</span>
+        </div>
+      </article>
     </section>
-  </ng-template>
+
+    <ng-template #emptyState>
+      <div class="empty-card"><p>No activities yet. Check back later.</p></div>
+    </ng-template>
+  </ng-container>
+
+  <!-- ══ DETAIL VIEW ══════════════════════════════════════════════════ -->
+  <ng-container *ngIf="view === 'detail' && selectedActivity">
+    <div class="detail-layout">
+
+      <!-- Left: activity content -->
+      <main class="detail-main">
+        <button class="back-btn" (click)="backToList()">← All activities</button>
+
+        <div class="detail-header">
+          <div class="dh-icon" [class.quiz]="selectedActivity.type === 'quiz'" [class.output]="selectedActivity.type === 'output'">
+            {{ selectedActivity.type === 'quiz' ? '📝' : '📁' }}
+          </div>
+          <div>
+            <h2 class="detail-title">{{ selectedActivity.title }}</h2>
+            <p class="detail-meta">
+              <span *ngIf="selectedActivity.maxPoints">{{ selectedActivity.maxPoints }} points</span>
+              <span class="sep" *ngIf="selectedActivity.maxPoints">·</span>
+              Due {{ selectedActivity.deadline | date:'MMMM d, y h:mm a' }}
+            </p>
+          </div>
+        </div>
+
+        <p class="detail-desc" *ngIf="selectedActivity.description">
+          {{ selectedActivity.description }}
+        </p>
+
+        <hr class="divider" />
+
+        <!-- ── QUIZ ── -->
+        <ng-container *ngIf="selectedActivity.type === 'quiz'">
+          <div *ngIf="quizQuestions.length === 0" class="empty-quiz">
+            <p>No questions have been added to this quiz yet.</p>
+          </div>
+
+          <div *ngIf="quizQuestions.length > 0" class="quiz-form">
+            <div class="question-block" *ngFor="let q of quizQuestions; let i = index; trackBy: trackByQId">
+              <div class="qb-header">
+                <span class="q-num">{{ i + 1 }}</span>
+                <p class="qb-text">{{ q.question }}</p>
+                <span class="qb-pts">{{ q.points }} pt{{ q.points !== 1 ? 's' : '' }}</span>
+              </div>
+
+              <!-- Multiple choice -->
+              <div *ngIf="q.type === 'multiple-choice'" class="options">
+                <label class="option" *ngFor="let c of q.choices">
+                  <input
+                    type="radio"
+                    [name]="'q-' + q.id"
+                    [value]="c.id"
+                    [(ngModel)]="quizAnswers[q.id]"
+                    [disabled]="!!selectedSubmission?.submitted && isClosed(selectedActivity)"
+                  />
+                  <span>{{ c.text }}</span>
+                </label>
+              </div>
+
+              <!-- True/False -->
+              <div *ngIf="q.type === 'true-false'" class="options">
+                <label class="option" *ngFor="let c of q.choices">
+                  <input
+                    type="radio"
+                    [name]="'q-' + q.id"
+                    [value]="c.id"
+                    [(ngModel)]="quizAnswers[q.id]"
+                    [disabled]="!!selectedSubmission?.submitted && isClosed(selectedActivity)"
+                  />
+                  <span>{{ c.text }}</span>
+                </label>
+              </div>
+
+              <!-- Short answer -->
+              <div *ngIf="q.type === 'short-answer'" class="short-ans">
+                <input
+                  type="text"
+                  [(ngModel)]="quizAnswers[q.id]"
+                  placeholder="Your answer"
+                  [disabled]="!!selectedSubmission?.submitted && isClosed(selectedActivity)"
+                />
+              </div>
+            </div>
+          </div>
+        </ng-container>
+
+        <!-- ── OUTPUT ── -->
+        <ng-container *ngIf="selectedActivity.type === 'output'">
+          <div class="output-form">
+            <label class="field-label">Your work / response</label>
+            <textarea
+              rows="6"
+              [(ngModel)]="outputText"
+              placeholder="Describe your work, write your response, or paste a summary here..."
+              [disabled]="!!selectedSubmission?.submitted && isClosed(selectedActivity)"
+            ></textarea>
+
+            <div class="links-section">
+              <h4 class="links-title">Submit links (Google Drive, GitHub, etc.)</h4>
+
+              <div class="existing-links" *ngIf="outputLinks.length > 0">
+                <div class="link-row" *ngFor="let l of outputLinks; let i = index">
+                  <span class="link-icon">🔗</span>
+                  <a [href]="l.url" target="_blank" class="link-text">{{ l.label || l.url }}</a>
+                  <button class="remove-link" (click)="removeLink(i)"
+                    [disabled]="selectedSubmission?.submitted && isClosed(selectedActivity)">✕</button>
+                </div>
+              </div>
+
+              <div class="add-link-form" *ngIf="!(selectedSubmission?.submitted && isClosed(selectedActivity))">
+                <input type="text" [(ngModel)]="newLinkLabel" placeholder="Label (optional)" class="link-label-input" />
+                <input type="url" [(ngModel)]="newLinkUrl" placeholder="https://..." class="link-url-input" />
+                <button class="btn-add-link" (click)="addLink()">Add link</button>
+              </div>
+            </div>
+          </div>
+        </ng-container>
+      </main>
+
+      <!-- Right: submission panel -->
+      <aside class="submission-panel">
+        <div class="sp-header">
+          <h4 class="sp-title">Your work</h4>
+          <span class="sp-status" [ngClass]="getStatusClass(selectedActivity)">
+            {{ getStatusLabel(selectedActivity) }}
+          </span>
+        </div>
+
+        <!-- Score (only when released) -->
+        <div class="score-box" *ngIf="showScore()">
+          <span class="score-label">Your score</span>
+          <span class="score-value">
+            {{ selectedSubmission?.score ?? 0 }} / {{ selectedActivity.maxPoints }}
+          </span>
+          <p class="feedback-text" *ngIf="selectedSubmission?.feedback">
+            {{ selectedSubmission?.feedback }}
+          </p>
+        </div>
+
+        <div class="sp-deadline">
+          <p><strong>Due</strong> {{ selectedActivity.deadline | date:'MMM d, y · h:mm a' }}</p>
+          <p><strong>Closes</strong> {{ selectedActivity.closeAt | date:'MMM d, y · h:mm a' }}</p>
+          <p *ngIf="selectedActivity.maxPoints"><strong>Points</strong> {{ selectedActivity.maxPoints }}</p>
+        </div>
+
+        <div class="sp-actions">
+          <!-- Unsubmit -->
+          <button
+            class="sp-btn unsubmit"
+            *ngIf="selectedSubmission?.submitted"
+            (click)="unsubmit()"
+            [disabled]="!canUnsubmit()"
+            [title]="isClosed(selectedActivity) ? 'Activity is closed' : 'Unsubmit your work'"
+          >
+            Unsubmit
+          </button>
+
+          <!-- Submit quiz -->
+          <button
+            class="sp-btn submit"
+            *ngIf="selectedActivity.type === 'quiz' && (!selectedSubmission?.submitted)"
+            (click)="submitQuiz()"
+            [disabled]="!canSubmit() || saving"
+          >
+            {{ saving ? 'Submitting...' : 'Submit quiz' }}
+          </button>
+
+          <!-- Submit output -->
+          <button
+            class="sp-btn submit"
+            *ngIf="selectedActivity.type === 'output' && (!selectedSubmission?.submitted)"
+            (click)="submitOutput()"
+            [disabled]="!canSubmit() || saving"
+          >
+            {{ saving ? 'Submitting...' : 'Submit' }}
+          </button>
+
+          <p class="closed-note" *ngIf="isClosed(selectedActivity)">
+            This activity is closed. No more submissions are accepted.
+          </p>
+        </div>
+      </aside>
+    </div>
+  </ng-container>
+
 </div>

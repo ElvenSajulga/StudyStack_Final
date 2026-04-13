@@ -3,11 +3,12 @@ import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/rou
 import { CommonModule } from '@angular/common';
 import { AuthService } from './services/auth.service';
 import Swal from 'sweetalert2';
+import { NotificationPanel } from './components/notification-panel/notification-panel';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive, NotificationPanel],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })

@@ -1,0 +1,136 @@
+.notif-wrapper {
+  position: relative;
+}
+
+.notif-bell {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.2rem;
+  padding: 6px;
+  border-radius: 8px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  transition: background 0.15s;
+
+  &:hover { background: rgba(255,255,255,0.1); }
+  &.has-unread { animation: bell-shake 0.5s ease; }
+}
+
+@keyframes bell-shake {
+  0%, 100% { transform: rotate(0); }
+  20% { transform: rotate(-15deg); }
+  40% { transform: rotate(15deg); }
+  60% { transform: rotate(-10deg); }
+  80% { transform: rotate(10deg); }
+}
+
+.badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  background: #ef4444;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  min-width: 17px;
+  height: 17px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+  border: 2px solid #0f172a;
+}
+
+.notif-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 320px;
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+  z-index: 100;
+  overflow: hidden;
+}
+
+.np-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.np-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.np-mark-all {
+  background: none;
+  border: none;
+  font-size: 0.78rem;
+  color: #2563eb;
+  cursor: pointer;
+  padding: 0;
+  &:hover { text-decoration: underline; }
+}
+
+.np-list {
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.np-empty {
+  padding: 24px 16px;
+  text-align: center;
+  font-size: 0.875rem;
+  color: #9ca3af;
+}
+
+.np-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid #f9fafb;
+  transition: background 0.1s;
+
+  &:hover { background: #f9fafb; }
+  &.unread { background: #f0fdf4; }
+  &:last-child { border-bottom: none; }
+}
+
+.np-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #0a7a45;
+  flex-shrink: 0;
+  margin-top: 5px;
+}
+
+.np-content { flex: 1; min-width: 0; }
+
+.np-msg-title {
+  margin: 0 0 2px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.np-msg {
+  margin: 0 0 4px;
+  font-size: 0.82rem;
+  color: #374151;
+  line-height: 1.4;
+}
+
+.np-time {
+  font-size: 0.75rem;
+  color: #9ca3af;
+}

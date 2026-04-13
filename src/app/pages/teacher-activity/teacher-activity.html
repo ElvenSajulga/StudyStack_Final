@@ -1,89 +1,284 @@
-<div class="teacher-activity">
-  <header>
-    <h2 class="page-title">Activities</h2>
-    <p class="page-subtitle">
-      Create and manage activities that will be shown on the student activity page.
-    </p>
-  </header>
+<div class="ta-page">
 
-  <section class="form-section">
-    <h3>Create new activity</h3>
+  <!-- ══ LIST VIEW ══════════════════════════════════════════════════════ -->
+  <ng-container *ngIf="view === 'list'">
+    <header class="page-header">
+      <div>
+        <h2 class="page-title">Activities</h2>
+        <p class="page-subtitle">Create and manage activities for your students.</p>
+      </div>
+      <button class="btn primary" (click)="showCreate()">+ New activity</button>
+    </header>
 
-    <form (ngSubmit)="createActivity()" #activityForm="ngForm">
+    <section *ngIf="activities.length > 0; else emptyActivities" class="activity-list">
+      <article class="activity-card" *ngFor="let a of activities">
+        <div class="ac-left">
+          <span class="badge" [class.quiz]="a.type === 'quiz'" [class.output]="a.type === 'output'">
+            {{ a.type }}
+          </span>
+          <div>
+            <h3 class="ac-title">{{ a.title }}</h3>
+            <p class="ac-meta">
+              Deadline: {{ a.deadline | date:'MMM d, y h:mm a' }} &nbsp;·&nbsp;
+              Closes: {{ a.closeAt | date:'MMM d, y h:mm a' }}
+              <span *ngIf="a.maxPoints"> &nbsp;·&nbsp; {{ a.maxPoints }} pts</span>
+            </p>
+            <p class="ac-desc" *ngIf="a.description">{{ a.description }}</p>
+          </div>
+        </div>
+        <div class="ac-actions">
+          <span class="score-badge" *ngIf="a.scoresReleased">Scores released</span>
+          <button class="btn outline" (click)="openGrading(a)">View submissions</button>
+          <button class="btn outline" *ngIf="a.type === 'quiz'" (click)="openQuizBuilder(a)">Edit quiz</button>
+          <button class="btn danger" (click)="deleteActivity(a)">Delete</button>
+        </div>
+      </article>
+    </section>
+
+    <ng-template #emptyActivities>
+      <div class="empty-card">
+        <p>No activities yet. Click <strong>+ New activity</strong> to get started.</p>
+      </div>
+    </ng-template>
+  </ng-container>
+
+  <!-- ══ CREATE VIEW ════════════════════════════════════════════════════ -->
+  <ng-container *ngIf="view === 'create'">
+    <header class="page-header">
+      <div>
+        <button class="back-btn" (click)="backToList()">← Back</button>
+        <h2 class="page-title">New activity</h2>
+      </div>
+    </header>
+
+    <div class="form-card">
       <div class="form-grid">
-        <label>
-          <span>Title</span>
-          <input type="text" name="title" [(ngModel)]="form.title" required />
+        <label class="field full">
+          <span class="field-label">Title *</span>
+          <input type="text" [(ngModel)]="form.title" placeholder="e.g. Quiz 1: Basics" />
         </label>
 
-        <label>
-          <span>Type</span>
-          <select name="type" [(ngModel)]="form.type">
+        <label class="field full">
+          <span class="field-label">Description</span>
+          <textarea rows="3" [(ngModel)]="form.description" placeholder="Instructions or notes for students"></textarea>
+        </label>
+
+        <label class="field">
+          <span class="field-label">Activity type *</span>
+          <select [(ngModel)]="form.type">
             <option value="quiz">Quiz</option>
             <option value="output">Output-based</option>
           </select>
         </label>
 
-        <label class="full-width">
-          <span>Description</span>
-          <textarea name="description" rows="3" [(ngModel)]="form.description"></textarea>
+        <label class="field" *ngIf="form.type === 'output'">
+          <span class="field-label">Max points</span>
+          <input type="number" [(ngModel)]="form.maxPoints" min="1" placeholder="e.g. 100" />
         </label>
 
-        <label>
-          <span>Deadline</span>
-          <input type="datetime-local" name="deadline" [(ngModel)]="form.deadline" required />
+        <label class="field">
+          <span class="field-label">Deadline *</span>
+          <input type="datetime-local" [(ngModel)]="form.deadline" />
         </label>
 
-        <label>
-          <span>Close time</span>
-          <input type="datetime-local" name="closeAt" [(ngModel)]="form.closeAt" required />
-        </label>
-
-        <label>
-          <span>Max points</span>
-          <input type="number" name="maxPoints" [(ngModel)]="form.maxPoints" min="0" />
+        <label class="field">
+          <span class="field-label">Close time *</span>
+          <input type="datetime-local" [(ngModel)]="form.closeAt" />
         </label>
       </div>
 
       <div class="form-actions">
-        <button type="submit">Create activity</button>
+        <button class="btn subtle" (click)="backToList()">Cancel</button>
+        <button class="btn primary" (click)="createActivity()">
+          {{ form.type === 'quiz' ? 'Next: Build quiz →' : 'Create activity' }}
+        </button>
       </div>
-    </form>
-  </section>
-
-  <section class="list-section" *ngIf="activities.length > 0; else emptyState">
-    <h3>Existing activities</h3>
-    <div class="table-wrapper">
-      <table>
-        <thead>
-          <tr>
-            <th>Title</th>
-            <th>Type</th>
-            <th>Deadline</th>
-            <th>Closes</th>
-            <th>Max points</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let a of activities">
-            <td>{{ a.title }}</td>
-            <td>{{ a.type }}</td>
-            <td>{{ a.deadline | date: 'short' }}</td>
-            <td>{{ a.closeAt | date: 'short' }}</td>
-            <td>{{ a.maxPoints ?? '-' }}</td>
-            <td>
-              <button type="button" (click)="a.id && deleteActivity(a.id)">Delete</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
     </div>
-  </section>
+  </ng-container>
 
-  <ng-template #emptyState>
-    <section class="empty-card">
-      <p class="empty-text">No activities created yet.</p>
-    </section>
-  </ng-template>
+  <!-- ══ QUIZ BUILDER ═══════════════════════════════════════════════════ -->
+  <ng-container *ngIf="view === 'quiz-builder'">
+    <header class="page-header">
+      <div>
+        <button class="back-btn" (click)="backToList()">← Back to activities</button>
+        <h2 class="page-title">Quiz builder — {{ selectedActivity?.title }}</h2>
+        <p class="page-subtitle">Total: {{ totalQuizPoints }} pts across {{ questions.length }} question(s)</p>
+      </div>
+      <button class="btn primary" (click)="saveQuiz()" [disabled]="savingQuiz">
+        {{ savingQuiz ? 'Saving...' : 'Save quiz' }}
+      </button>
+    </header>
+
+    <div class="questions-list">
+      <div class="question-card" *ngFor="let q of questions; let i = index; trackBy: trackByQId">
+        <div class="qc-header">
+          <span class="q-num">Q{{ i + 1 }}</span>
+          <div class="qc-controls">
+            <button class="icon-btn" (click)="moveUp(i)" [disabled]="i === 0" title="Move up">▲</button>
+            <button class="icon-btn" (click)="moveDown(i)" [disabled]="i === questions.length - 1" title="Move down">▼</button>
+            <select [(ngModel)]="q.type" (ngModelChange)="onTypeChange(q)">
+              <option value="multiple-choice">Multiple choice</option>
+              <option value="true-false">True / False</option>
+              <option value="short-answer">Short answer</option>
+            </select>
+            <label class="pts-label">
+              <input type="number" [(ngModel)]="q.points" min="1" class="pts-input" /> pts
+            </label>
+            <button class="icon-btn danger" (click)="removeQuestion(i)" title="Delete question">✕</button>
+          </div>
+        </div>
+
+        <textarea
+          class="q-text"
+          rows="2"
+          [(ngModel)]="q.question"
+          placeholder="Type your question here...">
+        </textarea>
+
+        <!-- Multiple choice choices -->
+        <div *ngIf="q.type === 'multiple-choice'" class="choices">
+          <div class="choice-row" *ngFor="let c of q.choices; trackBy: trackByCId">
+            <input type="radio" [name]="'correct-' + q.id" [value]="c.id" [(ngModel)]="q.correctAnswer" />
+            <input type="text" class="choice-input" [(ngModel)]="c.text" placeholder="Choice text" />
+            <button class="icon-btn danger sm" (click)="removeChoice(q, c.id)" [disabled]="q.choices.length <= 2">✕</button>
+          </div>
+          <button class="btn ghost sm" (click)="addChoice(q)">+ Add choice</button>
+          <p class="hint">Select the radio button next to the correct answer.</p>
+        </div>
+
+        <!-- True / False -->
+        <div *ngIf="q.type === 'true-false'" class="choices">
+          <div class="choice-row" *ngFor="let c of q.choices; trackBy: trackByCId">
+            <input type="radio" [name]="'correct-' + q.id" [value]="c.id" [(ngModel)]="q.correctAnswer" />
+            <span class="choice-label">{{ c.text }}</span>
+          </div>
+          <p class="hint">Select the correct answer.</p>
+        </div>
+
+        <!-- Short answer -->
+        <div *ngIf="q.type === 'short-answer'" class="short-answer-area">
+          <label class="field-label">Correct answer (exact match)</label>
+          <input type="text" [(ngModel)]="q.correctAnswer" placeholder="Type the expected answer" />
+          <p class="hint">Student's answer must match exactly (case-insensitive).</p>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn outline add-q-btn" (click)="addQuestion()">+ Add question</button>
+  </ng-container>
+
+  <!-- ══ GRADING VIEW ═══════════════════════════════════════════════════ -->
+  <ng-container *ngIf="view === 'grade'">
+    <header class="page-header">
+      <div>
+        <button class="back-btn" (click)="backToList()">← Back</button>
+        <h2 class="page-title">{{ gradingActivity?.title }}</h2>
+        <p class="page-subtitle">
+          {{ gradingActivity?.type | titlecase }} &nbsp;·&nbsp;
+          {{ submissions.length }} submission(s)
+          <span *ngIf="gradingActivity?.maxPoints"> &nbsp;·&nbsp; {{ gradingActivity?.maxPoints }} pts</span>
+        </p>
+      </div>
+      <button
+        class="btn primary"
+        (click)="releaseScores()"
+        [disabled]="releasingScores || gradingActivity?.scoresReleased"
+      >
+        {{ gradingActivity?.scoresReleased ? 'Scores released ✓' : releasingScores ? 'Releasing...' : 'Release scores' }}
+      </button>
+    </header>
+
+    <div class="grade-layout">
+      <!-- Student list sidebar -->
+      <aside class="student-sidebar">
+        <h4 class="sidebar-title">Submissions</h4>
+        <div *ngIf="submissions.length === 0" class="sidebar-empty">No submissions yet.</div>
+        <button
+          class="student-item"
+          *ngFor="let sub of submissions"
+          [class.active]="selectedSubmission?.id === sub.id"
+          (click)="selectSubmission(sub)"
+        >
+          <span class="si-name">{{ getStudentName(sub) }}</span>
+          <div class="si-meta">
+            <span class="status-dot" [class.graded]="sub.graded" [class.submitted]="sub.submitted && !sub.graded"></span>
+            <span class="si-score" *ngIf="sub.graded">{{ sub.score }} pts</span>
+            <span class="si-status" *ngIf="!sub.submitted">Unsubmitted</span>
+          </div>
+        </button>
+      </aside>
+
+      <!-- Main grading panel -->
+      <main class="grade-panel" *ngIf="selectedSubmission; else noSelection">
+
+        <!-- Quiz grading -->
+        <ng-container *ngIf="gradingActivity?.type === 'quiz'">
+          <div class="grade-section">
+            <h4 class="section-title">Student answers</h4>
+            <div class="quiz-review" *ngFor="let q of gradingQuestions; let i = index">
+              <div class="qr-header">
+                <span class="q-num">Q{{ i + 1 }}</span>
+                <span class="qr-pts">{{ q.points }} pt{{ q.points !== 1 ? 's' : '' }}</span>
+                <span class="result-badge correct" *ngIf="isCorrect(q, selectedSubmission)">Correct ✓</span>
+                <span class="result-badge wrong" *ngIf="!isCorrect(q, selectedSubmission)">Wrong ✗</span>
+              </div>
+              <p class="qr-question">{{ q.question }}</p>
+              <p class="qr-answer student">
+                <strong>Student:</strong> {{ getStudentAnswerText(q, selectedSubmission) }}
+              </p>
+              <p class="qr-answer correct-ans" *ngIf="!isCorrect(q, selectedSubmission)">
+                <strong>Correct:</strong> {{ getCorrectAnswerText(q) }}
+              </p>
+            </div>
+          </div>
+
+          <div class="grade-section auto-score">
+            <p>Auto-graded score: <strong>{{ selectedSubmission.score ?? 0 }} / {{ totalMaxPoints() }}</strong></p>
+          </div>
+        </ng-container>
+
+        <!-- Output grading -->
+        <ng-container *ngIf="gradingActivity?.type === 'output'">
+          <div class="grade-section">
+            <h4 class="section-title">Student submission</h4>
+            <p class="submission-text">{{ selectedSubmission.content || 'No text submitted.' }}</p>
+
+            <div *ngIf="selectedSubmission.links && selectedSubmission.links.length > 0" class="links-list">
+              <h5 class="section-title sm">Submitted links</h5>
+              <a
+                *ngFor="let l of selectedSubmission.links"
+                [href]="l.url" target="_blank"
+                class="link-item"
+              >{{ l.label || l.url }}</a>
+            </div>
+          </div>
+
+          <div class="grade-section">
+            <h4 class="section-title">Grade this submission</h4>
+            <label class="field">
+              <span class="field-label">Score (out of {{ gradingActivity?.maxPoints }})</span>
+              <input type="number" [(ngModel)]="gradeScore" min="0" [max]="gradingActivity?.maxPoints ?? 100" />
+            </label>
+            <label class="field" style="margin-top: 12px;">
+              <span class="field-label">Feedback (optional)</span>
+              <textarea rows="3" [(ngModel)]="gradeFeedback" placeholder="Write feedback for the student..."></textarea>
+            </label>
+            <button class="btn primary" style="margin-top: 12px;" (click)="saveGrade()">Save grade</button>
+          </div>
+        </ng-container>
+
+        <p class="submitted-at">
+          Submitted: {{ selectedSubmission.submittedAt | date:'MMM d, y h:mm a' }}
+          <span *ngIf="!selectedSubmission.submitted"> (Unsubmitted)</span>
+        </p>
+      </main>
+
+      <ng-template #noSelection>
+        <main class="grade-panel empty-panel">
+          <p>Select a student from the list to view their submission.</p>
+        </main>
+      </ng-template>
+    </div>
+  </ng-container>
+
 </div>

@@ -1,0 +1,32 @@
+<div class="notif-wrapper">
+  <button class="notif-bell" (click)="togglePanel()" [class.has-unread]="unreadCount > 0">
+    🔔
+    <span class="badge" *ngIf="unreadCount > 0">{{ unreadCount > 9 ? '9+' : unreadCount }}</span>
+  </button>
+
+  <div class="notif-panel" *ngIf="isOpen">
+    <div class="np-header">
+      <span class="np-title">Notifications</span>
+      <button class="np-mark-all" (click)="markAllRead()" *ngIf="unreadCount > 0">Mark all read</button>
+    </div>
+
+    <div class="np-list">
+      <div *ngIf="notifications.length === 0" class="np-empty">
+        No notifications yet.
+      </div>
+
+      <div
+        class="np-item"
+        *ngFor="let n of notifications"
+        [class.unread]="!n.read"
+      >
+        <div class="np-dot" *ngIf="!n.read"></div>
+        <div class="np-content">
+          <p class="np-msg-title">{{ n.title }}</p>
+          <p class="np-msg">{{ n.message }}</p>
+          <span class="np-time">{{ formatTime(n.createdAt) }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

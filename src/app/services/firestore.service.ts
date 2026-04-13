@@ -11,18 +11,18 @@ import {
   deleteDoc,
   query,
   where,
-  orderBy,
   DocumentData,
   QueryConstraint,
 } from '@angular/fire/firestore';
 
-@Injectable({
-  providedIn: 'root',
-})
+@Injectable({ providedIn: 'root' })
 export class FirestoreService {
   constructor(private readonly firestore: Firestore) {}
 
-  // ─── Generic helpers ───────────────────────────────────────────────────────
+  /** Strip undefined values — Firestore rejects them */
+  private clean(data: DocumentData): DocumentData {
+    return JSON.parse(JSON.stringify(data));
+  }
 
   async getAll<T>(
     collectionName: string,
@@ -57,26 +57,22 @@ export class FirestoreService {
     return this.getAll<T>(collectionName, constraints);
   }
 
-  /** Set a document with a known ID (overwrites). */
   async set(collectionName: string, id: string, data: DocumentData): Promise<void> {
     const ref = doc(this.firestore, collectionName, id);
-    await setDoc(ref, data);
+    await setDoc(ref, this.clean(data));
   }
 
-  /** Add a document with auto-generated ID, returns the new ID. */
   async add(collectionName: string, data: DocumentData): Promise<string> {
     const ref = collection(this.firestore, collectionName);
-    const docRef = await addDoc(ref, data);
+    const docRef = await addDoc(ref, this.clean(data));
     return docRef.id;
   }
 
-  /** Partial update. */
   async update(collectionName: string, id: string, data: Partial<DocumentData>): Promise<void> {
     const ref = doc(this.firestore, collectionName, id);
-    await updateDoc(ref, data);
+    await updateDoc(ref, this.clean(data));
   }
 
-  /** Delete a document. */
   async delete(collectionName: string, id: string): Promise<void> {
     const ref = doc(this.firestore, collectionName, id);
     await deleteDoc(ref);
