@@ -13,6 +13,9 @@ import { TeacherSettings } from './pages/teacher-settings/teacher-settings';
 
 import { AdminStudents } from './pages/admin-students/admin-students';
 import { AdminTeachers } from './pages/admin-teachers/admin-teachers';
+import { AdminFaculties } from './pages/admin-faculties/admin-faculties';
+import { AdminSubjects } from './pages/admin-subjects/admin-subjects';
+import { AdminEnrollments } from './pages/admin-enrollments/admin-enrollments';
 import { StudentActivity } from './pages/student-activity/student-activity';
 import { StudentAnnouncement } from './pages/student-announcement/student-announcement';
 import { StudentAttendance } from './pages/student-attendance/student-attendance';
@@ -34,6 +37,9 @@ export const routes: Routes = [
     { path: 'admin-settings', component: AdminSettings},
     { path: 'admin-students', component: AdminStudents},
     { path: 'admin-teachers', component: AdminTeachers},
+    { path: 'admin-faculties', component: AdminFaculties },
+    { path: 'admin-subjects', component: AdminSubjects },
+    { path: 'admin-enrollments', component: AdminEnrollments },
 
     //student routes
     { path: 'student-dashboard', component: StudentDashboard},

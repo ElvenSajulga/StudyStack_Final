@@ -14,6 +14,7 @@ export interface TeacherAccount {
   lastname: string;
   firstname: string;
   middlename: string;
+  facultyId: string;
 }
 
 @Injectable({

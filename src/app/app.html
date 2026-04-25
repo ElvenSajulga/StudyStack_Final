@@ -1,5 +1,4 @@
 <div class="app-shell">
-  <!-- When logged in, show topbar + sidebar layout -->
   <ng-container *ngIf="auth.isLoggedIn(); else authRoutes">
     <header class="topbar">
       <div class="topbar-left">
@@ -16,7 +15,6 @@
         <span class="user-name" *ngIf="auth.getCurrentUser() as user">
           {{ user.name || 'User' }}
         </span>
-        <!-- add this import to app.ts first -->
         <app-notification-panel *ngIf="auth.isStudent()"></app-notification-panel>
         <button type="button" class="logout-btn" (click)="logout()">
           Logout
@@ -26,12 +24,32 @@
 
     <div class="layout">
       <nav class="sidebar">
+
         <!-- Admin links -->
         <ng-container *ngIf="auth.isAdmin()">
           <h3 class="sidebar-title">Admin</h3>
           <a routerLink="/admin-dashboard" routerLinkActive="active">Dashboard</a>
           <a routerLink="/admin-students" routerLinkActive="active">Students</a>
           <a routerLink="/admin-teachers" routerLinkActive="active">Teachers</a>
+
+          <!-- Academic Management collapsible group -->
+          <div class="sidebar-group">
+            <button
+              type="button"
+              class="sidebar-group-toggle"
+              (click)="toggleAcademic()"
+              [class.open]="academicOpen"
+            >
+              <span>Academic</span>
+              <span class="toggle-arrow">{{ academicOpen ? '▾' : '▸' }}</span>
+            </button>
+            <div class="sidebar-group-links" [class.expanded]="academicOpen">
+              <a routerLink="/admin-faculties" routerLinkActive="active">Faculties &amp; Courses</a>
+              <a routerLink="/admin-subjects" routerLinkActive="active">Subjects</a>
+              <a routerLink="/admin-enrollments" routerLinkActive="active">Enrollments</a>
+            </div>
+          </div>
+
           <a routerLink="/admin-profile" routerLinkActive="active">Profile</a>
           <a routerLink="/admin-settings" routerLinkActive="active">Settings</a>
         </ng-container>
@@ -59,6 +77,7 @@
           <a routerLink="/student-profile" routerLinkActive="active">Profile</a>
           <a routerLink="/student-settings" routerLinkActive="active">Settings</a>
         </ng-container>
+
       </nav>
 
       <main class="content">
@@ -67,7 +86,6 @@
     </div>
   </ng-container>
 
-  <!-- For login and other public routes -->
   <ng-template #authRoutes>
     <router-outlet></router-outlet>
   </ng-template>

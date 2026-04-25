@@ -87,6 +87,7 @@ export class Login implements OnInit {
         role: 'student',
         name: `${student.firstname} ${student.lastname}`.trim(),
         studentID: student.studentID,
+        UID: student.UID,   
       });
       this.showSuccess('Welcome, student!');
       void this.router.navigate(['/student-dashboard']);
@@ -100,6 +101,7 @@ export class Login implements OnInit {
         role: 'teacher',
         name: `${teacher.firstname} ${teacher.lastname}`.trim(),
         teacherID: teacher.teacherID,
+        UID: teacher.UID,   
       });
       this.showSuccess('Welcome, teacher!');
       void this.router.navigate(['/teacher-dashboard']);

@@ -4,7 +4,6 @@
       <h2 class="page-title">Teacher Accounts</h2>
       <p class="page-subtitle">Create and manage teacher accounts for the portal.</p>
     </div>
-
     <div class="metric-pill">
       <span class="metric-label">Total teachers</span>
       <span class="metric-value">{{ totalTeachers }}</span>
@@ -12,6 +11,8 @@
   </header>
 
   <section class="content-grid">
+
+    <!-- Add form -->
     <article class="card form-card">
       <header class="card-header">
         <h3>Create new teacher</h3>
@@ -24,44 +25,52 @@
         <div class="form-grid">
           <label class="field">
             <span class="field-label">UID</span>
-            <input type="text" name="UID" [(ngModel)]="form.UID" required />
+            <input type="text" name="UID" [(ngModel)]="addForm.UID" required />
           </label>
 
           <label class="field">
             <span class="field-label">Password</span>
-            <input type="password" name="password" [(ngModel)]="form.password" required />
+            <input type="password" name="password" [(ngModel)]="addForm.password" required />
           </label>
 
           <label class="field">
             <span class="field-label">Teacher ID</span>
-            <input type="text" name="teacherID" [(ngModel)]="form.teacherID" required />
-          </label>
-
-          <label class="field">
-            <span class="field-label">Lastname</span>
-            <input type="text" name="lastname" [(ngModel)]="form.lastname" required />
-          </label>
-
-          <label class="field">
-            <span class="field-label">Firstname</span>
-            <input type="text" name="firstname" [(ngModel)]="form.firstname" required />
-          </label>
-
-          <label class="field">
-            <span class="field-label">Middlename</span>
-            <input type="text" name="middlename" [(ngModel)]="form.middlename" />
+            <input type="text" name="teacherID" [(ngModel)]="addForm.teacherID" required />
           </label>
 
           <label class="field">
             <span class="field-label">Email</span>
-            <input type="email" name="email" [(ngModel)]="form.email" />
+            <input type="email" name="email" [(ngModel)]="addForm.email" />
+          </label>
+
+          <label class="field">
+            <span class="field-label">Lastname</span>
+            <input type="text" name="lastname" [(ngModel)]="addForm.lastname" required />
+          </label>
+
+          <label class="field">
+            <span class="field-label">Firstname</span>
+            <input type="text" name="firstname" [(ngModel)]="addForm.firstname" required />
+          </label>
+
+          <label class="field">
+            <span class="field-label">Middlename</span>
+            <input type="text" name="middlename" [(ngModel)]="addForm.middlename" />
           </label>
 
           <label class="field">
             <span class="field-label">Status</span>
-            <select name="status" [(ngModel)]="form.status">
+            <select name="status" [(ngModel)]="addForm.status">
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span class="field-label">Faculty</span>
+            <select name="facultyId" [(ngModel)]="addForm.facultyId">
+              <option value="">— Select faculty —</option>
+              <option *ngFor="let f of faculties" [value]="f.id">{{ f.name }}</option>
             </select>
           </label>
         </div>
@@ -74,13 +83,13 @@
       </form>
     </article>
 
+    <!-- Teacher list -->
     <article class="card table-card">
       <header class="card-header">
         <div>
           <h3>Teacher list</h3>
           <p class="card-description">Overview of all registered teachers.</p>
         </div>
-
         <p class="muted" *ngIf="teachers.length">Showing {{ teachers.length }} teachers</p>
       </header>
 
@@ -92,6 +101,7 @@
                 <th>UID</th>
                 <th>Teacher ID</th>
                 <th>Name</th>
+                <th>Faculty</th>
                 <th>Email</th>
                 <th>Status</th>
                 <th></th>
@@ -102,16 +112,16 @@
                 <td>{{ t.UID }}</td>
                 <td>{{ t.teacherID }}</td>
                 <td>{{ t.lastname }}, {{ t.firstname }} {{ t.middlename }}</td>
-                <td>{{ t.email }}</td>
+                <td>{{ facultyName(t.facultyId) }}</td>
+                <td>{{ t.email || '—' }}</td>
                 <td>
                   <span class="status-chip" [class.inactive]="t.status === 'inactive'">
                     {{ t.status }}
                   </span>
                 </td>
                 <td class="actions">
-                  <button type="button" class="btn subtle" (click)="removeTeacher(t.UID)">
-                    Remove
-                  </button>
+                  <button type="button" class="btn subtle" (click)="openEdit(t)">Edit</button>
+                  <button type="button" class="btn subtle danger" (click)="removeTeacher(t.UID)">Remove</button>
                 </td>
               </tr>
             </tbody>
@@ -127,4 +137,67 @@
       </ng-template>
     </article>
   </section>
+
+  <!-- Edit modal -->
+  <div class="modal-overlay" *ngIf="showEditModal" (click)="closeEdit()">
+    <div class="modal-card" (click)="$event.stopPropagation()">
+      <header class="modal-header">
+        <h3>Edit teacher</h3>
+        <button class="modal-close" (click)="closeEdit()">✕</button>
+      </header>
+
+      <div class="form-grid">
+        <label class="field">
+          <span class="field-label">Firstname</span>
+          <input type="text" [(ngModel)]="editForm.firstname" />
+        </label>
+
+        <label class="field">
+          <span class="field-label">Lastname</span>
+          <input type="text" [(ngModel)]="editForm.lastname" />
+        </label>
+
+        <label class="field">
+          <span class="field-label">Middlename</span>
+          <input type="text" [(ngModel)]="editForm.middlename" />
+        </label>
+
+        <label class="field">
+          <span class="field-label">Teacher ID</span>
+          <input type="text" [(ngModel)]="editForm.teacherID" />
+        </label>
+
+        <label class="field">
+          <span class="field-label">Email</span>
+          <input type="email" [(ngModel)]="editForm.email" />
+        </label>
+
+        <label class="field">
+          <span class="field-label">Password</span>
+          <input type="password" [(ngModel)]="editForm.password" />
+        </label>
+
+        <label class="field">
+          <span class="field-label">Faculty</span>
+          <select [(ngModel)]="editForm.facultyId">
+            <option value="">— Select faculty —</option>
+            <option *ngFor="let f of faculties" [value]="f.id">{{ f.name }}</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span class="field-label">Status</span>
+          <select [(ngModel)]="editForm.status">
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn subtle" (click)="closeEdit()">Cancel</button>
+        <button class="btn primary" (click)="saveEdit()">Save changes</button>
+      </div>
+    </div>
+  </div>
 </div>

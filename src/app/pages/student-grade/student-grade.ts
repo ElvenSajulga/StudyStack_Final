@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, inject, PLATFORM_ID, ChangeDetectorRef } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject, PLATFORM_ID, ChangeDetectorRef, NgZone } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { Activity, ActivityService, ActivitySubmission } from '../../services/activity.service';
 import { AuthService } from '../../services/auth.service';
@@ -15,26 +15,32 @@ export class StudentGrade implements OnInit, OnDestroy {
   submissions: ActivitySubmission[] = [];
   private submissionsByActivityId: Record<string, ActivitySubmission | undefined> = {};
   private readonly platformId = inject(PLATFORM_ID);
-  private refreshTimer?: number;
+  private refreshTimer?: ReturnType<typeof setInterval>;
+
   private readonly onVisibility = () => {
-    if (document.visibilityState === 'visible') void this.loadData();
+    if (document.visibilityState === 'visible') {
+      this.zone.run(() => void this.loadData());
+    }
   };
 
   constructor(
     private readonly activityService: ActivityService,
     private readonly auth: AuthService,
     private readonly cdr: ChangeDetectorRef,
-  ) {
-    if (isPlatformBrowser(this.platformId)) {
-      document.addEventListener('visibilitychange', this.onVisibility);
-      this.refreshTimer = window.setInterval(() => {
-        void this.loadData();
-      }, 1000);
-    }
-  }
+    private readonly zone: NgZone,
+  ) {}
 
   ngOnInit(): void {
     void this.loadData();
+
+    if (isPlatformBrowser(this.platformId)) {
+      document.addEventListener('visibilitychange', this.onVisibility);
+      this.zone.runOutsideAngular(() => {
+        this.refreshTimer = setInterval(() => {
+          this.zone.run(() => void this.loadData());
+        }, 30000);
+      });
+    }
   }
 
   private get studentID(): string | undefined {
@@ -89,7 +95,7 @@ export class StudentGrade implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     if (isPlatformBrowser(this.platformId)) {
-      if (this.refreshTimer != null) window.clearInterval(this.refreshTimer);
+      if (this.refreshTimer != null) clearInterval(this.refreshTimer);
       document.removeEventListener('visibilitychange', this.onVisibility);
     }
   }

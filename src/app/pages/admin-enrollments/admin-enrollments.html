@@ -1,0 +1,129 @@
+<div class="admin-page">
+  <header class="page-header">
+    <div>
+      <h2 class="page-title">Enrollments</h2>
+      <p class="page-subtitle">
+        Assign students to subjects. The teacher is automatically set from the subject.
+      </p>
+    </div>
+    <button type="button" class="btn primary" (click)="openForm()">
+      + Enroll student
+    </button>
+  </header>
+
+  <!-- Enroll form -->
+  <section class="card form-card" *ngIf="showForm">
+    <h3>Enroll a student</h3>
+
+    <div class="form-grid">
+      <label class="field">
+        <span class="field-label">Student</span>
+        <select [(ngModel)]="form.studentUID">
+          <option value="">— Select student —</option>
+          <option *ngFor="let s of students" [value]="s.UID">
+            {{ s.lastname }}, {{ s.firstname }} ({{ s.studentID }})
+          </option>
+        </select>
+      </label>
+
+      <label class="field">
+        <span class="field-label">Subject</span>
+        <select [(ngModel)]="form.subjectId" (ngModelChange)="onSubjectChange()">
+          <option value="">— Select subject —</option>
+          <option *ngFor="let s of subjects" [value]="s.id">
+            {{ s.name }} — {{ s.semester }}
+          </option>
+        </select>
+      </label>
+
+      <!-- Teacher auto-filled info -->
+      <div class="field info-field" *ngIf="selectedSubject">
+        <span class="field-label">Assigned teacher</span>
+        <span class="info-value">{{ teacherForSubject(selectedSubject.id) }}</span>
+      </div>
+
+      <label class="field" *ngIf="selectedSubject">
+        <span class="field-label">Section <span class="optional">(optional)</span></span>
+        <select [(ngModel)]="form.sectionId">
+          <option value="">— No section —</option>
+          <option *ngFor="let sec of sectionsForSelectedSubject" [value]="sec.id">
+            {{ sec.name }}
+          </option>
+        </select>
+      </label>
+    </div>
+
+    <div class="form-actions">
+      <button type="button" class="btn subtle" (click)="cancelForm()">Cancel</button>
+      <button type="button" class="btn primary" (click)="enroll()">Enroll</button>
+    </div>
+  </section>
+
+  <!-- Filters -->
+  <section class="filter-bar" *ngIf="!showForm && enrollments.length > 0">
+    <label class="field">
+      <span class="field-label">Filter by subject</span>
+      <select [(ngModel)]="filterSubjectId">
+        <option value="">All subjects</option>
+        <option *ngFor="let s of subjects" [value]="s.id">{{ s.name }}</option>
+      </select>
+    </label>
+
+    <label class="field">
+      <span class="field-label">Filter by teacher</span>
+      <select [(ngModel)]="filterTeacherUID">
+        <option value="">All teachers</option>
+        <option *ngFor="let t of teachers" [value]="t.UID">
+          {{ t.lastname }}, {{ t.firstname }}
+        </option>
+      </select>
+    </label>
+
+    <span class="muted count">{{ filteredRows.length }} enrollment(s)</span>
+  </section>
+
+  <!-- Loading -->
+  <p class="muted" *ngIf="loading">Loading…</p>
+
+  <!-- Empty -->
+  <section class="card empty-state" *ngIf="!loading && !showForm && enrollments.length === 0">
+    <p>No enrollments yet. Click <strong>+ Enroll student</strong> to get started.</p>
+  </section>
+
+  <!-- Table -->
+  <section class="card table-card" *ngIf="!loading && !showForm && enrollments.length > 0">
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Student ID</th>
+            <th>Student name</th>
+            <th>Subject</th>
+            <th>Teacher</th>
+            <th>Section</th>
+            <th>Enrolled</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let r of filteredRows">
+            <td>{{ r.studentID }}</td>
+            <td>{{ r.studentName }}</td>
+            <td>{{ r.subjectName }}</td>
+            <td>{{ r.teacherName }}</td>
+            <td>{{ r.sectionName }}</td>
+            <td>{{ r.enrollment.enrolledAt | date: 'mediumDate' }}</td>
+            <td class="actions">
+              <button
+                class="btn small danger"
+                (click)="removeEnrollment(r.enrollment.id, r.studentName, r.subjectName)"
+              >
+                Remove
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>

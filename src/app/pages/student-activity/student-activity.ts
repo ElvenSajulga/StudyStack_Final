@@ -1,13 +1,25 @@
-import { Component, OnInit, OnDestroy, inject, PLATFORM_ID, ChangeDetectorRef } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject, PLATFORM_ID, ChangeDetectorRef, NgZone } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Activity, ActivityService, ActivitySubmission, SubmissionLink } from '../../services/activity.service';
-import { QuizQuestion, QuizService } from '../../services/quiz.service';
+import {
+  Activity, ActivityService, ActivitySubmission, AttendanceStatus
+} from '../../services/activity.service';
 import { AuthService } from '../../services/auth.service';
-import { StudentAccountService } from '../../services/student-account.service';
-import Swal from 'sweetalert2';
+import { AcademicService, Subject } from '../../services/academic.service';
+import { TeacherAccountService } from '../../services/teacher-account.service';
+import { QuizService, QuizQuestion } from '../../services/quiz.service';
 
-type StudentView = 'list' | 'detail';
+const CARD_COLORS = [
+  '#1e7e34', '#1565c0', '#e65100', '#6a1b9a',
+  '#00695c', '#c62828', '#2e7d32', '#283593',
+];
+
+interface CourseCard {
+  subject: Subject;
+  activities: Activity[];
+  color: string;
+  pendingCount: number;
+}
 
 @Component({
   selector: 'app-student-activity',
@@ -17,45 +29,51 @@ type StudentView = 'list' | 'detail';
   styleUrl: './student-activity.scss',
 })
 export class StudentActivity implements OnInit, OnDestroy {
-  view: StudentView = 'list';
-  activities: Activity[] = [];
-  submissions: Record<string, ActivitySubmission | undefined> = {};
-
-  // Detail view
+  // ── view state ────────────────────────────────────────────────────────────
+  view: 'cards' | 'stream' | 'detail' = 'cards';
+  selectedCard: CourseCard | null = null;
   selectedActivity: Activity | null = null;
-  selectedSubmission: ActivitySubmission | null = null;
+
+  // ── data ──────────────────────────────────────────────────────────────────
+  courseCards: CourseCard[] = [];
+  submissions: Record<string, ActivitySubmission | undefined> = {};
+  draftContent: Record<string, string> = {};
+
+  // ── quiz ──────────────────────────────────────────────────────────────────
   quizQuestions: QuizQuestion[] = [];
   quizAnswers: Record<string, string> = {};
+  quizSubmitted = false;
+  quizLoading = false;
 
-  // Output submission
-  outputText = '';
-  outputLinks: SubmissionLink[] = [];
-  newLinkLabel = '';
-  newLinkUrl = '';
-
-  saving = false;
-
+  private enrolledTeacherUIDs: string[] = [];
   private readonly platformId = inject(PLATFORM_ID);
-  private refreshTimer?: number;
+  private refreshTimer?: ReturnType<typeof setInterval>;
+
+  private readonly onVisibility = () => {
+    if (document.visibilityState === 'visible') {
+      this.zone.run(() => void this.loadAll());
+    }
+  };
 
   constructor(
     private readonly activityService: ActivityService,
-    private readonly quizService: QuizService,
     private readonly auth: AuthService,
-    private readonly studentService: StudentAccountService,
+    private readonly academic: AcademicService,
+    private readonly teacherService: TeacherAccountService,
+    private readonly quizService: QuizService,
     private readonly cdr: ChangeDetectorRef,
+    private readonly zone: NgZone,
   ) {}
 
   ngOnInit(): void {
-    void this.loadActivities();
+    void this.init();
     if (isPlatformBrowser(this.platformId)) {
-      this.refreshTimer = window.setInterval(() => void this.loadActivities(), 15000);
-    }
-  }
-
-  ngOnDestroy(): void {
-    if (isPlatformBrowser(this.platformId) && this.refreshTimer != null) {
-      window.clearInterval(this.refreshTimer);
+      document.addEventListener('visibilitychange', this.onVisibility);
+      this.zone.runOutsideAngular(() => {
+        this.refreshTimer = setInterval(() => {
+          this.zone.run(() => void this.loadAll());
+        }, 30000);
+      });
     }
   }
 
@@ -63,213 +81,212 @@ export class StudentActivity implements OnInit, OnDestroy {
     return this.auth.getCurrentUser()?.studentID;
   }
 
-  private get studentUID(): string | undefined {
-    return this.auth.getCurrentUser() ? this.findStudentUID() : undefined;
-  }
-
-  private findStudentUID(): string {
-    const sid = this.studentID;
-    const all = this.studentService.getAll();
-    return all.find(s => s.studentID === sid)?.UID ?? '';
-  }
-
-  async loadActivities(): Promise<void> {
-    try {
-      this.activities = await this.activityService.getAllActivities();
-    } catch {
-      this.activities = [];
-    }
-
-    const sid = this.studentID;
+  private async init(): Promise<void> {
+    const user = this.auth.getCurrentUser();
+    if (!user) return;
+    const sid = user.studentID;
+    const sUID = user.UID;
     if (sid) {
-      const subs = await this.activityService.getSubmissionsForStudent(sid);
-      this.submissions = {};
-      for (const sub of subs) {
-        this.submissions[sub.activityId] = sub;
-      }
+      const enrollments = await this.academic.getEnrollments();
+      const myEnrollments = enrollments.filter(e =>
+        e.studentID === sid || (sUID && e.studentUID === sUID)
+      );
+      this.enrolledTeacherUIDs = [...new Set(myEnrollments.map(e => e.teacherUID))];
     }
+    await this.loadAll();
+  }
+
+  private async loadAll(): Promise<void> {
+    const sid = this.studentID;
+
+    if (sid) {
+      try {
+        const subs = await this.activityService.getSubmissionsForStudent(sid);
+        for (const sub of subs) {
+          this.submissions[sub.activityId] = sub;
+          const draft = (this.draftContent[sub.activityId] ?? '').trim();
+          if (!draft) this.draftContent[sub.activityId] = sub.content ?? '';
+        }
+      } catch { /* silent */ }
+    }
+
+    const allSubjects = await this.academic.getSubjects();
+    const enrolledSubjects = allSubjects.filter(s =>
+      this.enrolledTeacherUIDs.includes(s.teacherUID)
+    );
+
+    await this.teacherService.reloadFromServer();
+    const allTeachers = this.teacherService.getAll();
+
+    const cards: CourseCard[] = [];
+    for (let i = 0; i < enrolledSubjects.length; i++) {
+      const subject = enrolledSubjects[i];
+      const teacher = allTeachers.find(t => t.UID === subject.teacherUID);
+      const teacherIDValue = teacher?.teacherID ?? subject.teacherUID;
+
+      let activities: Activity[] = [];
+      try {
+        activities = await this.activityService.getActivitiesForTeacher(teacherIDValue);
+      } catch { /* silent */ }
+
+      for (const a of activities) {
+        this.draftContent[a.id] = this.draftContent[a.id] ?? '';
+      }
+
+      const pendingCount = activities.filter(a => {
+        const sub = this.submissions[a.id];
+        return !sub || !sub.submitted;
+      }).length;
+
+      cards.push({
+        subject,
+        activities,
+        color: CARD_COLORS[i % CARD_COLORS.length],
+        pendingCount,
+      });
+    }
+
+    this.courseCards = cards;
+
+    if (this.selectedCard) {
+      const refreshed = this.courseCards.find(
+        c => c.subject.id === this.selectedCard!.subject.id
+      );
+      if (refreshed) this.selectedCard = refreshed;
+    }
+
+    this.cdr.detectChanges();
+  }
+
+  // ── navigation ────────────────────────────────────────────────────────────
+
+  openCourse(card: CourseCard): void {
+    this.selectedCard = card;
+    this.view = 'stream';
     this.cdr.detectChanges();
   }
 
   async openActivity(activity: Activity): Promise<void> {
     this.selectedActivity = activity;
-    this.selectedSubmission = this.submissions[activity.id] ?? null;
+    this.quizQuestions = [];
+    this.quizAnswers = {};
+    this.quizSubmitted = false;
 
     if (activity.type === 'quiz') {
-      this.quizQuestions = await this.quizService.getQuestionsForActivity(activity.id);
-      // Pre-fill answers if already submitted
-      if (this.selectedSubmission?.quizAnswers) {
-        this.quizAnswers = { ...this.selectedSubmission.quizAnswers };
-      } else {
-        this.quizAnswers = {};
-      }
-    } else {
-      this.outputText = this.selectedSubmission?.content ?? '';
-      this.outputLinks = this.selectedSubmission?.links ? [...this.selectedSubmission.links] : [];
+      this.quizLoading = true;
+      this.cdr.detectChanges();
+      try {
+        this.quizQuestions = await this.quizService.getQuestionsForActivity(activity.id);
+        // Pre-fill answers if already submitted
+        const sub = this.submissions[activity.id];
+        if (sub?.quizAnswers) {
+          this.quizAnswers = { ...sub.quizAnswers };
+          this.quizSubmitted = !!sub.submitted;
+        }
+      } catch { /* silent */ }
+      this.quizLoading = false;
     }
 
     this.view = 'detail';
     this.cdr.detectChanges();
   }
 
-  backToList(): void {
-    this.view = 'list';
+  goBackToCards(): void {
+    this.selectedCard = null;
     this.selectedActivity = null;
-    this.selectedSubmission = null;
-    this.quizQuestions = [];
-    this.quizAnswers = {};
-    this.outputText = '';
-    this.outputLinks = [];
-  }
-
-  // ── Link management ───────────────────────────────────────────────────────
-
-  addLink(): void {
-    const url = this.newLinkUrl.trim();
-    if (!url) { alert('Please enter a URL.'); return; }
-    this.outputLinks.push({ label: this.newLinkLabel.trim() || url, url });
-    this.newLinkLabel = '';
-    this.newLinkUrl = '';
+    this.view = 'cards';
     this.cdr.detectChanges();
   }
 
-  removeLink(index: number): void {
-    this.outputLinks.splice(index, 1);
+  goBackToStream(): void {
+    this.selectedActivity = null;
+    this.view = 'stream';
     this.cdr.detectChanges();
   }
 
-  // ── Submit ────────────────────────────────────────────────────────────────
+  // ── helpers ───────────────────────────────────────────────────────────────
 
-  async submitQuiz(): Promise<void> {
-    const sid = this.studentID;
-    const uid = this.studentUID;
-    if (!sid || !this.selectedActivity) return;
-
-    // Check all answered
-    const unanswered = this.quizQuestions.filter(q => q.type !== 'short-answer' && !this.quizAnswers[q.id]);
-    if (unanswered.length > 0) {
-      const res = await Swal.fire({
-        icon: 'warning',
-        title: 'Unanswered questions',
-        text: `You have ${unanswered.length} unanswered question(s). Submit anyway?`,
-        showCancelButton: true,
-        confirmButtonText: 'Submit anyway',
-        confirmButtonColor: '#0a7a45',
-      });
-      if (!res.isConfirmed) return;
-    }
-
-    this.saving = true;
-    const result = this.quizService.gradeQuiz(this.quizQuestions, this.quizAnswers);
-
-    const sub = await this.activityService.submitOrUpdateSubmission(
-      this.selectedActivity.id, sid, uid ?? '',
-      'Quiz submission',
-      {
-        quizAnswers: { ...this.quizAnswers },
-        score: result.totalScore,
-        graded: true,
-      }
-    );
-
-    this.selectedSubmission = sub;
-    this.submissions[this.selectedActivity.id] = sub;
-    this.saving = false;
-
-    Swal.fire({
-      icon: 'success',
-      title: 'Submitted!',
-      text: `Your quiz has been submitted.`,
-      timer: 2000,
-      showConfirmButton: false,
-    });
-    this.cdr.detectChanges();
+  getAttendanceStatus(activity: Activity): AttendanceStatus {
+    const sub = this.submissions[activity.id];
+    return this.activityService.getAttendanceStatus(activity, sub);
   }
 
-  async submitOutput(): Promise<void> {
-    const sid = this.studentID;
-    const uid = this.studentUID;
-    if (!sid || !this.selectedActivity) return;
-
-    if (!this.outputText.trim() && this.outputLinks.length === 0) {
-      alert('Please add some text or at least one link before submitting.');
-      return;
-    }
-
-    this.saving = true;
-    const sub = await this.activityService.submitOrUpdateSubmission(
-      this.selectedActivity.id, sid, uid ?? '',
-      this.outputText.trim(),
-      { links: [...this.outputLinks] }
-    );
-
-    this.selectedSubmission = sub;
-    this.submissions[this.selectedActivity.id] = sub;
-    this.saving = false;
-
-    Swal.fire({ icon: 'success', title: 'Submitted!', timer: 1800, showConfirmButton: false });
-    this.cdr.detectChanges();
-  }
-
-  async unsubmit(): Promise<void> {
-    if (!this.selectedSubmission || !this.selectedActivity) return;
-
-    const res = await Swal.fire({
-      icon: 'question',
-      title: 'Unsubmit?',
-      text: 'You can edit and resubmit before the deadline.',
-      showCancelButton: true,
-      confirmButtonText: 'Unsubmit',
-      confirmButtonColor: '#f59e0b',
-    });
-    if (!res.isConfirmed) return;
-
-    await this.activityService.unsubmitSubmission(this.selectedSubmission.id);
-    this.selectedSubmission = { ...this.selectedSubmission, submitted: false };
-    this.submissions[this.selectedActivity.id] = this.selectedSubmission;
-    this.cdr.detectChanges();
-  }
-
-  // ── Status helpers ────────────────────────────────────────────────────────
-
-  isSubmitted(activity: Activity): boolean {
-    return this.submissions[activity.id]?.submitted === true;
+  statusClass(activity: Activity): string {
+    const s = this.getAttendanceStatus(activity);
+    if (s === 'present') return 'present';
+    if (s === 'late') return 'late';
+    return 'absent';
   }
 
   isClosed(activity: Activity): boolean {
     return new Date() > new Date(activity.closeAt);
   }
 
-  isPastDeadline(activity: Activity): boolean {
-    return new Date() > new Date(activity.deadline);
+  get currentSubmission(): ActivitySubmission | undefined {
+    return this.selectedActivity
+      ? this.submissions[this.selectedActivity.id]
+      : undefined;
   }
 
-  getStatusLabel(activity: Activity): string {
-    const sub = this.submissions[activity.id];
-    if (!sub || !sub.submitted) return this.isClosed(activity) ? 'Missed' : 'Not submitted';
-    return this.isPastDeadline(activity) ? 'Submitted late' : 'Submitted';
+  // ── submit output ─────────────────────────────────────────────────────────
+
+  async submitOutput(): Promise<void> {
+    const activity = this.selectedActivity;
+    const user = this.auth.getCurrentUser();
+    const sid = user?.studentID;
+    const sUID = user?.UID ?? sid ?? '';
+    if (!activity || !sid) return;
+
+    const content = this.draftContent[activity.id] ?? '';
+    if (!content.trim()) { alert('Please enter your answer before submitting.'); return; }
+    if (this.isClosed(activity)) { alert('This activity is already closed.'); return; }
+
+    const submission = await this.activityService.submitOrUpdateSubmission(
+      activity.id, sid, sUID, content,
+    );
+    this.submissions[activity.id] = submission;
+    await this.loadAll();
+    this.cdr.detectChanges();
   }
 
-  getStatusClass(activity: Activity): string {
-    const sub = this.submissions[activity.id];
-    if (!sub || !sub.submitted) return this.isClosed(activity) ? 'missed' : 'pending';
-    return this.isPastDeadline(activity) ? 'late' : 'submitted';
+  // ── submit quiz ───────────────────────────────────────────────────────────
+
+  async submitQuiz(): Promise<void> {
+    const activity = this.selectedActivity;
+    const user = this.auth.getCurrentUser();
+    const sid = user?.studentID;
+    const sUID = user?.UID ?? sid ?? '';
+    if (!activity || !sid) return;
+    if (this.isClosed(activity)) { alert('This activity is already closed.'); return; }
+
+    // Check all questions answered
+    const unanswered = this.quizQuestions.filter(
+      q => q.type !== 'short-answer' && !this.quizAnswers[q.id]
+    );
+    if (unanswered.length > 0) {
+      alert(`Please answer all questions. ${unanswered.length} question(s) remaining.`);
+      return;
+    }
+
+    // Auto-grade
+    const result = this.quizService.gradeQuiz(this.quizQuestions, this.quizAnswers);
+
+    const submission = await this.activityService.submitOrUpdateSubmission(
+      activity.id, sid, sUID,
+      JSON.stringify(this.quizAnswers),
+      { quizAnswers: this.quizAnswers, score: result.totalScore, graded: true },
+    );
+
+    this.submissions[activity.id] = submission;
+    this.quizSubmitted = true;
+    await this.loadAll();
+    this.cdr.detectChanges();
   }
 
-  canSubmit(): boolean {
-    if (!this.selectedActivity) return false;
-    return !this.isClosed(this.selectedActivity);
+  ngOnDestroy(): void {
+    if (isPlatformBrowser(this.platformId)) {
+      if (this.refreshTimer != null) clearInterval(this.refreshTimer);
+      document.removeEventListener('visibilitychange', this.onVisibility);
+    }
   }
-
-  canUnsubmit(): boolean {
-    if (!this.selectedActivity || !this.selectedSubmission?.submitted) return false;
-    return !this.isClosed(this.selectedActivity);
-  }
-
-  showScore(): boolean {
-    if (!this.selectedActivity || !this.selectedSubmission) return false;
-    return !!this.selectedActivity.scoresReleased && this.selectedSubmission.graded === true;
-  }
-
-  trackByQId(_: number, q: QuizQuestion): string { return q.id; }
 }

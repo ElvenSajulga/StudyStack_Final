@@ -2,8 +2,8 @@ import { Component } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { AuthService } from './services/auth.service';
-import Swal from 'sweetalert2';
 import { NotificationPanel } from './components/notification-panel/notification-panel';
+import Swal from 'sweetalert2';
 
 @Component({
   selector: 'app-root',
@@ -13,10 +13,16 @@ import { NotificationPanel } from './components/notification-panel/notification-
   styleUrl: './app.scss'
 })
 export class App {
+  academicOpen = false;
+
   constructor(
     public readonly auth: AuthService,
     private readonly router: Router,
   ) {}
+
+  toggleAcademic(): void {
+    this.academicOpen = !this.academicOpen;
+  }
 
   async logout(): Promise<void> {
     const res = await Swal.fire({

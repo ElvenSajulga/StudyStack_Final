@@ -78,6 +78,7 @@
   display: grid;
   grid-template-columns: 240px minmax(0, 1fr);
   min-height: 0;
+  align-items: flex-start;
 }
 
 .sidebar {
@@ -89,6 +90,9 @@
   gap: 8px;
   border-right: 1px solid #111827;
   position: sticky;
+  top: 56px;
+  height: calc(100vh - 56px);
+  overflow: auto;
 }
 
 .sidebar-title {
@@ -97,7 +101,6 @@
   letter-spacing: 0.08em;
   color: #6b7280;
   margin: 0 0 8px 8px;
-  position: sticky;
 }
 
 .sidebar a {
@@ -108,8 +111,6 @@
   color: #e5e7eb;
   text-decoration: none;
   transition: background 0.15s ease, color 0.15s ease, transform 0.05s ease;
-  position: sticky;
-
 }
 
 .sidebar a:hover {
@@ -126,7 +127,6 @@
   background: #f3f4f6;
   padding: 20px 24px;
   overflow: auto;
-  position: sticky;
 }
 
 @media (max-width: 900px) {
@@ -143,4 +143,68 @@
   .sidebar {
     display: none;
   }
+}
+
+/* ── Academic Management sidebar group ─────────────────────────── */
+
+.sidebar-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-group-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  color: #e5e7eb;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  transition: background 0.15s ease;
+}
+
+.sidebar-group-toggle:hover {
+  background: #0f172a;
+}
+
+.sidebar-group-toggle.open {
+  color: #93c5fd;
+}
+
+.toggle-arrow {
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+
+.sidebar-group-links {
+  display: none;
+  flex-direction: column;
+  padding-left: 12px;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.sidebar-group-links.expanded {
+  display: flex;
+}
+
+.sidebar-group-links a {
+  font-size: 0.85rem;
+  padding: 6px 10px;
+  color: #9ca3af;
+}
+
+.sidebar-group-links a:hover {
+  color: #e5e7eb;
+  background: #0f172a;
+}
+
+.sidebar-group-links a.active {
+  background: #2563eb;
+  color: #f9fafb;
 }
