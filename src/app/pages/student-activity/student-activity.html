@@ -1,282 +1,160 @@
-<div class="sa-page">
+<div class="student-activity">
 
-  <!-- ── CARDS VIEW ──────────────────────────────────────────────────────── -->
+  <!-- ── Cards view ── -->
   <ng-container *ngIf="view === 'cards'">
     <header>
-      <h2 class="page-title">My Courses</h2>
+      <h2 class="page-title">My Activities</h2>
       <p class="page-subtitle">Select a course to view its activities.</p>
     </header>
 
-    <div class="course-grid" *ngIf="courseCards.length > 0; else emptyCards">
-      <article
+    <p class="muted" *ngIf="loading">Loading…</p>
+
+    <section class="course-grid" *ngIf="!loading">
+      <div
         class="course-card"
         *ngFor="let card of courseCards"
         (click)="openCourse(card)"
-        (keyup.enter)="openCourse(card)"
-        tabindex="0"
       >
-        <div class="cc-header" [style.background]="card.color">
-          <h3 class="cc-title">{{ card.subject.name }}</h3>
-          <p class="cc-semester">{{ card.subject.semester }}</p>
-          <p class="cc-teacher">{{ card.subject.teacherName }}</p>
+        <div class="course-card-header">
+          <span class="course-card-name">{{ card.course.name }}</span>
+          <span class="course-card-sem">{{ card.course.semester }}</span>
         </div>
-        <div class="cc-footer">
-          <span class="cc-pending" *ngIf="card.pendingCount > 0">
+        <div class="course-card-body">
+          <span class="units-badge">{{ card.course.units }} units</span>
+          <span class="pending-badge" *ngIf="card.pendingCount > 0">
             {{ card.pendingCount }} pending
           </span>
-          <span class="cc-done" *ngIf="card.pendingCount === 0">
-            All done ✓
-          </span>
-          <span class="cc-count">{{ card.activities.length }} activity/ies</span>
         </div>
-      </article>
-    </div>
-
-    <ng-template #emptyCards>
-      <div class="empty-card">
-        <p>You are not enrolled in any courses yet.</p>
-        <p class="empty-sub">Ask your administrator to enroll you in a course.</p>
       </div>
-    </ng-template>
+
+      <div class="empty-card" *ngIf="courseCards.length === 0">
+        <p class="empty-text">You are not enrolled in any courses yet.</p>
+      </div>
+    </section>
   </ng-container>
 
-  <!-- ── STREAM VIEW ─────────────────────────────────────────────────────── -->
+  <!-- ── Stream view ── -->
   <ng-container *ngIf="view === 'stream' && selectedCard">
+    <header class="stream-header">
+      <button class="back-btn" (click)="goBack()">← Back</button>
+      <div>
+        <h2 class="page-title">{{ selectedCard.course.name }}</h2>
+        <p class="page-subtitle">{{ selectedCard.course.semester }}</p>
+      </div>
+    </header>
 
-    <div class="course-banner" [style.background]="selectedCard.color">
-      <button class="back-btn" (click)="goBackToCards()">← Back to courses</button>
-      <h2 class="banner-title">{{ selectedCard.subject.name }}</h2>
-      <p class="banner-sub">
-        {{ selectedCard.subject.semester }} · {{ selectedCard.subject.teacherName }}
-      </p>
-    </div>
+    <p class="muted" *ngIf="loading">Loading activities…</p>
 
-    <div class="stream">
-      <div class="stream-empty" *ngIf="selectedCard.activities.length === 0">
-        <p>No activities posted yet for this course.</p>
+    <section class="stream-list" *ngIf="!loading">
+      <div
+        class="stream-item"
+        *ngFor="let a of streamActivities"
+        (click)="openActivity(a)"
+      >
+        <div class="stream-item-left">
+          <span class="stream-type-badge">{{ a.type }}</span>
+          <div>
+            <p class="stream-title">{{ a.title }}</p>
+            <p class="stream-meta">
+              Deadline: {{ a.deadline | date: 'mediumDate' }} &nbsp;·&nbsp;
+              {{ getAttendanceStatus(a) | titlecase }}
+            </p>
+          </div>
+        </div>
+        <span class="stream-arrow">›</span>
       </div>
 
-      <article
-        class="stream-card"
-        *ngFor="let a of selectedCard.activities"
-        (click)="openActivity(a)"
-        (keyup.enter)="openActivity(a)"
-        tabindex="0"
-      >
-        <div class="sc-icon" [class]="a.type">
-          {{ a.type === 'quiz' ? '📝' : '📁' }}
-        </div>
-
-        <div class="sc-body">
-          <div class="sc-top">
-            <h3 class="sc-title">{{ a.title }}</h3>
-            <span class="sc-badge" [class]="statusClass(a)">
-              {{ getAttendanceStatus(a) }}
-            </span>
-          </div>
-          <p class="sc-meta">
-            <span>Deadline: <strong>{{ a.deadline | date: 'MMM d, y, h:mm a' }}</strong></span>
-            <span class="sep">·</span>
-            <span *ngIf="a.maxPoints != null">
-              Max: <strong>{{ a.maxPoints }} pts</strong>
-            </span>
-            <span class="closed-chip" *ngIf="isClosed(a)">Closed</span>
-          </p>
-          <p class="sc-desc" *ngIf="a.description">{{ a.description }}</p>
-        </div>
-
-        <div class="sc-arrow">›</div>
-      </article>
-    </div>
+      <div class="empty-card" *ngIf="streamActivities.length === 0">
+        <p class="empty-text">No activities posted yet for this course.</p>
+      </div>
+    </section>
   </ng-container>
 
-  <!-- ── DETAIL VIEW ─────────────────────────────────────────────────────── -->
-  <ng-container *ngIf="view === 'detail' && selectedActivity && selectedCard">
+  <!-- ── Detail view ── -->
+  <ng-container *ngIf="view === 'detail' && selectedActivity">
+    <header class="stream-header">
+      <button class="back-btn" (click)="goBack()">← Back</button>
+      <div>
+        <h2 class="page-title">{{ selectedActivity.title }}</h2>
+        <p class="page-subtitle">{{ selectedCard?.course?.name }}</p>
+      </div>
+    </header>
 
-    <!-- Header -->
-    <div class="detail-header-bar" [style.background]="selectedCard.color">
-      <button class="back-btn" (click)="goBackToStream()">← Back to stream</button>
-      <h2 class="banner-title">{{ selectedActivity.title }}</h2>
-      <p class="banner-sub">
-        {{ selectedCard.subject.name }} · {{ selectedCard.subject.teacherName }}
-      </p>
-    </div>
-
-    <div class="detail-layout">
-
-      <!-- Left: instructions -->
-      <div class="detail-main">
-        <div class="detail-meta-row">
-          <span class="type-chip" [class]="selectedActivity.type">
-            {{ selectedActivity.type === 'quiz' ? '📝 Quiz' : '📁 Output' }}
+    <section class="detail-grid">
+      <!-- Activity info -->
+      <article class="detail-card">
+        <div class="detail-meta">
+          <span class="badge">{{ selectedActivity.type }}</span>
+          <span *ngIf="selectedActivity.maxPoints != null">
+            Max: {{ selectedActivity.maxPoints }} pts
           </span>
-          <span class="sc-badge" [class]="statusClass(selectedActivity)">
-            {{ getAttendanceStatus(selectedActivity) }}
-          </span>
-          <span class="closed-chip" *ngIf="isClosed(selectedActivity)">Closed</span>
         </div>
 
-        <p class="detail-desc" *ngIf="selectedActivity.description">
-          {{ selectedActivity.description }}
-        </p>
+        <p class="detail-description">{{ selectedActivity.description }}</p>
 
         <div class="detail-dates">
-          <div class="date-row">
+          <div class="date-item">
             <span class="date-label">Deadline</span>
-            <span class="date-value">{{ selectedActivity.deadline | date: 'MMMM d, y, h:mm a' }}</span>
+            <span class="date-value">
+              {{ selectedActivity.deadline | date: 'medium' }}
+            </span>
           </div>
-          <div class="date-row">
+          <div class="date-item">
             <span class="date-label">Closes</span>
-            <span class="date-value">{{ selectedActivity.closeAt | date: 'MMMM d, y, h:mm a' }}</span>
-          </div>
-          <div class="date-row" *ngIf="selectedActivity.maxPoints != null">
-            <span class="date-label">Max points</span>
-            <span class="date-value">{{ selectedActivity.maxPoints }}</span>
+            <span class="date-value">
+              {{ selectedActivity.closeAt | date: 'medium' }}
+            </span>
           </div>
         </div>
+      </article>
 
-        <hr class="divider" />
+      <!-- Submission panel -->
+      <article class="submission-panel">
+        <h4>Your submission</h4>
 
-        <!-- ── QUIZ ── -->
-        <ng-container *ngIf="selectedActivity.type === 'quiz'">
-          <div class="loading-quiz" *ngIf="quizLoading">Loading questions…</div>
-
-          <div class="quiz-submitted-box" *ngIf="quizSubmitted && currentSubmission">
-            <p class="qs-label">✓ Quiz submitted</p>
-            <p class="qs-score" *ngIf="currentSubmission.graded">
-              Score: <strong>{{ currentSubmission.score }} / {{ selectedActivity.maxPoints }}</strong>
-            </p>
-            <p class="qs-feedback" *ngIf="currentSubmission.feedback">
-              Feedback: {{ currentSubmission.feedback }}
-            </p>
-          </div>
-
-          <div class="quiz-form" *ngIf="!quizLoading && quizQuestions.length > 0">
-            <div
-              class="question-block"
-              *ngFor="let q of quizQuestions; let i = index"
-            >
-              <div class="qb-header">
-                <span class="q-num">{{ i + 1 }}</span>
-                <p class="qb-text">{{ q.question }}</p>
-                <span class="qb-pts">{{ q.points }} pt(s)</span>
-              </div>
-
-              <!-- Multiple choice -->
-              <div class="options" *ngIf="q.type === 'multiple-choice' || q.type === 'true-false'">
-                <label
-                  class="option"
-                  *ngFor="let c of q.choices"
-                  [class.selected]="quizAnswers[q.id] === c.id"
-                  [class.disabled]="quizSubmitted || isClosed(selectedActivity)"
-                >
-                  <input
-                    type="radio"
-                    [name]="q.id"
-                    [value]="c.id"
-                    [(ngModel)]="quizAnswers[q.id]"
-                    [disabled]="quizSubmitted || isClosed(selectedActivity)"
-                  />
-                  {{ c.text }}
-                </label>
-              </div>
-
-              <!-- Short answer -->
-              <div class="short-ans" *ngIf="q.type === 'short-answer'">
-                <input
-                  type="text"
-                  [(ngModel)]="quizAnswers[q.id]"
-                  [disabled]="quizSubmitted || isClosed(selectedActivity)"
-                  placeholder="Type your answer here…"
-                />
-              </div>
-            </div>
-
-            <div class="quiz-actions" *ngIf="!quizSubmitted && !isClosed(selectedActivity)">
-              <button class="submit-btn" (click)="submitQuiz()">
-                Submit quiz
-              </button>
-            </div>
-
-            <p class="closed-note" *ngIf="isClosed(selectedActivity) && !quizSubmitted">
-              This activity is closed and you did not submit.
-            </p>
-          </div>
-
-          <div class="empty-quiz" *ngIf="!quizLoading && quizQuestions.length === 0">
-            <p>No questions have been added to this quiz yet.</p>
-          </div>
-        </ng-container>
-
-        <!-- ── OUTPUT ── -->
-        <ng-container *ngIf="selectedActivity.type === 'output'">
-          <div class="output-form">
-            <label class="field-label">Your answer / output</label>
-            <textarea
-              rows="6"
-              [(ngModel)]="draftContent[selectedActivity.id]"
-              [disabled]="isClosed(selectedActivity)"
-              placeholder="Describe your output or paste your link here…"
-            ></textarea>
-
-            <div class="output-actions" *ngIf="!isClosed(selectedActivity)">
-              <button class="submit-btn" (click)="submitOutput()">
-                {{ currentSubmission?.submitted ? 'Update submission' : 'Submit' }}
-              </button>
-            </div>
-
-            <div class="submitted-box" *ngIf="currentSubmission?.submitted">
-              <p class="qs-label">✓ Submitted</p>
-              <p class="qs-score" *ngIf="currentSubmission?.graded">
-                Score: <strong>{{ currentSubmission?.score }} / {{ selectedActivity.maxPoints }}</strong>
-              </p>
-              <p class="qs-feedback" *ngIf="currentSubmission?.feedback">
-                Feedback: {{ currentSubmission?.feedback }}
-              </p>
-            </div>
-
-            <p class="closed-note" *ngIf="isClosed(selectedActivity) && !currentSubmission?.submitted">
-              This activity is closed and you did not submit.
-            </p>
-          </div>
-        </ng-container>
-
-      </div>
-
-      <!-- Right: submission status panel -->
-      <div class="submission-panel">
-        <div class="sp-header">
-          <p class="sp-title">Your work</p>
-          <span class="sp-status" [class]="statusClass(selectedActivity)">
-            {{ getAttendanceStatus(selectedActivity) }}
+        <div class="status-row">
+          <span class="status-label">Status:</span>
+          <span class="status-value"
+            [class.present]="getAttendanceStatus(selectedActivity) === 'present'"
+            [class.late]="getAttendanceStatus(selectedActivity) === 'late'"
+            [class.absent]="getAttendanceStatus(selectedActivity) === 'absent'"
+          >
+            {{ getAttendanceStatus(selectedActivity) | titlecase }}
           </span>
         </div>
 
-        <div class="sp-body">
-          <div class="sp-row">
-            <span class="sp-label">Type</span>
-            <span class="sp-value">{{ selectedActivity.type }}</span>
-          </div>
-          <div class="sp-row">
-            <span class="sp-label">Deadline</span>
-            <span class="sp-value">{{ selectedActivity.deadline | date: 'MMM d, y' }}</span>
-          </div>
-          <div class="sp-row" *ngIf="selectedActivity.maxPoints != null">
-            <span class="sp-label">Max points</span>
-            <span class="sp-value">{{ selectedActivity.maxPoints }}</span>
-          </div>
-          <div class="sp-row" *ngIf="currentSubmission?.graded">
-            <span class="sp-label">Your score</span>
-            <span class="sp-value score-highlight">{{ currentSubmission?.score }}</span>
-          </div>
-          <div class="sp-row" *ngIf="currentSubmission?.submittedAt">
-            <span class="sp-label">Submitted</span>
-            <span class="sp-value">{{ currentSubmission?.submittedAt | date: 'MMM d, h:mm a' }}</span>
-          </div>
+        <div class="score-row" *ngIf="submissions[selectedActivity.id]?.score != null">
+          <span class="score-label">Score:</span>
+          <span class="score-value">
+            {{ submissions[selectedActivity.id]?.score }}
+            <span *ngIf="selectedActivity.maxPoints != null">
+              / {{ selectedActivity.maxPoints }}
+            </span>
+          </span>
         </div>
-      </div>
 
-    </div>
+        <ng-container *ngIf="isOpen(selectedActivity)">
+          <textarea
+            rows="6"
+            [(ngModel)]="draftContent[selectedActivity.id]"
+            placeholder="Write your answer or paste your output link here."
+          ></textarea>
+          <button
+            type="button"
+            class="submit-btn"
+            (click)="submit(selectedActivity)"
+          >
+            {{ hasSubmission(selectedActivity) ? 'Update submission' : 'Submit' }}
+          </button>
+        </ng-container>
+
+        <p class="closed-notice" *ngIf="!isOpen(selectedActivity)">
+          This activity is closed.
+          <span *ngIf="submissions[selectedActivity.id]">
+            Your answer was recorded.
+          </span>
+        </p>
+      </article>
+    </section>
   </ng-container>
-
 </div>

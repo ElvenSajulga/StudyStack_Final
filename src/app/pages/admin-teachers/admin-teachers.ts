@@ -39,7 +39,7 @@ export class AdminTeachers implements OnInit {
       UID: '',
       name: '',
       teacherID: '',
-      password: '',
+      password: '', 
       email: '',
       status: 'active' as const,
       lastname: '',

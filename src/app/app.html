@@ -28,9 +28,16 @@
         <!-- Admin links -->
         <ng-container *ngIf="auth.isAdmin()">
           <h3 class="sidebar-title">Admin</h3>
-          <a routerLink="/admin-dashboard" routerLinkActive="active">Dashboard</a>
-          <a routerLink="/admin-students" routerLinkActive="active">Students</a>
-          <a routerLink="/admin-teachers" routerLinkActive="active">Teachers</a>
+            <a routerLink="/admin-dashboard" routerLinkActive="active">
+              <i class="ti ti-layout-dashboard" aria-hidden="true"></i> Dashboard
+            </a>
+            <a routerLink="/admin-students" routerLinkActive="active">
+              <i class="ti ti-users" aria-hidden="true"></i> Students
+            </a>
+            <a routerLink="/admin-teachers" routerLinkActive="active">
+              <i class="ti ti-school" aria-hidden="true"></i> Teachers
+            </a>
+
 
           <!-- Academic Management collapsible group -->
           <div class="sidebar-group">
@@ -44,8 +51,9 @@
               <span class="toggle-arrow">{{ academicOpen ? '▾' : '▸' }}</span>
             </button>
             <div class="sidebar-group-links" [class.expanded]="academicOpen">
-              <a routerLink="/admin-faculties" routerLinkActive="active">Faculties &amp; Courses</a>
-              <a routerLink="/admin-subjects" routerLinkActive="active">Subjects</a>
+              <a routerLink="/admin-faculties" routerLinkActive="active">Programs &amp; Faculties</a>
+              <a routerLink="/admin-sections" routerLinkActive="active">Sections</a>
+              <a routerLink="/admin-courses" routerLinkActive="active">Courses</a>
               <a routerLink="/admin-enrollments" routerLinkActive="active">Enrollments</a>
             </div>
           </div>
@@ -57,25 +65,53 @@
         <!-- Teacher links -->
         <ng-container *ngIf="auth.isTeacher()">
           <h3 class="sidebar-title">Teacher</h3>
-          <a routerLink="/teacher-dashboard" routerLinkActive="active">Dashboard</a>
-          <a routerLink="/teacher-activity" routerLinkActive="active">Activities</a>
-          <a routerLink="/teacher-attendance" routerLinkActive="active">Attendance</a>
-          <a routerLink="/teacher-class-record" routerLinkActive="active">Class record</a>
-          <a routerLink="/teacher-announcement" routerLinkActive="active">Announcements</a>
-          <a routerLink="/teacher-profile" routerLinkActive="active">Profile</a>
-          <a routerLink="/teacher-settings" routerLinkActive="active">Settings</a>
+          <a routerLink="/teacher-dashboard" routerLinkActive="active">
+            <i class="ti ti-layout-dashboard" aria-hidden="true"></i> Dashboard
+          </a>
+          <a routerLink="/teacher-activity" routerLinkActive="active">
+            <i class="ti ti-clipboard-list" aria-hidden="true"></i> Activities
+          </a>
+          <a routerLink="/teacher-attendance" routerLinkActive="active">
+            <i class="ti ti-calendar-check" aria-hidden="true"></i> Attendance
+          </a>
+          <a routerLink="/teacher-class-record" routerLinkActive="active">
+            <i class="ti ti-book" aria-hidden="true"></i> Class record
+          </a>
+          <a routerLink="/teacher-announcement" routerLinkActive="active">
+            <i class="ti ti-speakerphone" aria-hidden="true"></i> Announcements
+          </a>
+          <a routerLink="/teacher-profile" routerLinkActive="active">
+            <i class="ti ti-user" aria-hidden="true"></i> Profile
+          </a>
+          <a routerLink="/teacher-settings" routerLinkActive="active">
+            <i class="ti ti-settings" aria-hidden="true"></i> Settings
+          </a>
         </ng-container>
 
         <!-- Student links -->
         <ng-container *ngIf="auth.isStudent()">
           <h3 class="sidebar-title">Student</h3>
-          <a routerLink="/student-dashboard" routerLinkActive="active">Dashboard</a>
-          <a routerLink="/student-activity" routerLinkActive="active">Activities</a>
-          <a routerLink="/student-attendance" routerLinkActive="active">Attendance</a>
-          <a routerLink="/student-grade" routerLinkActive="active">Grades</a>
-          <a routerLink="/student-announcement" routerLinkActive="active">Announcements</a>
-          <a routerLink="/student-profile" routerLinkActive="active">Profile</a>
-          <a routerLink="/student-settings" routerLinkActive="active">Settings</a>
+            <a routerLink="/student-dashboard" routerLinkActive="active">
+              <i class="ti ti-layout-dashboard" aria-hidden="true"></i> Dashboard
+            </a>
+            <a routerLink="/student-activity" routerLinkActive="active">
+              <i class="ti ti-clipboard-list" aria-hidden="true"></i> Activities
+            </a>
+            <a routerLink="/student-attendance" routerLinkActive="active">
+              <i class="ti ti-calendar-check" aria-hidden="true"></i> Attendance
+            </a>
+            <a routerLink="/student-grade" routerLinkActive="active">
+              <i class="ti ti-chart-bar" aria-hidden="true"></i> Grades
+            </a>
+            <a routerLink="/student-announcement" routerLinkActive="active">
+              <i class="ti ti-speakerphone" aria-hidden="true"></i> Announcements
+            </a>
+            <a routerLink="/student-profile" routerLinkActive="active">
+              <i class="ti ti-user" aria-hidden="true"></i> Profile
+            </a>
+            <a routerLink="/student-settings" routerLinkActive="active">
+              <i class="ti ti-settings" aria-hidden="true"></i> Settings
+            </a>
         </ng-container>
 
       </nav>

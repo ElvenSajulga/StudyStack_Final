@@ -2,25 +2,37 @@
   <h2 class="page-title">My dashboard</h2>
 
   <section class="stats-grid">
-    <article class="stat-card primary">
+    <article class="stat-card">
+      <div class="stat-icon" style="background:#E1F5EE">
+        <i class="ti ti-check" style="color:#0F6E56" aria-hidden="true"></i>
+      </div>
       <h3>Present</h3>
       <p class="stat-number">{{ presentCount }}</p>
       <p class="stat-caption">On-time submissions</p>
     </article>
 
     <article class="stat-card">
+      <div class="stat-icon" style="background:#FAEEDA">
+        <i class="ti ti-clock" style="color:#854F0B" aria-hidden="true"></i>
+      </div>
       <h3>Late</h3>
       <p class="stat-number">{{ lateCount }}</p>
       <p class="stat-caption">Submitted after deadline</p>
     </article>
 
     <article class="stat-card">
+      <div class="stat-icon" style="background:#FCEBEB">
+        <i class="ti ti-x" style="color:#A32D2D" aria-hidden="true"></i>
+      </div>
       <h3>Absent</h3>
       <p class="stat-number">{{ absentCount }}</p>
       <p class="stat-caption">No valid submission</p>
     </article>
 
     <article class="stat-card">
+      <div class="stat-icon" style="background:#E6F1FB">
+        <i class="ti ti-file-text" style="color:#185FA5" aria-hidden="true"></i>
+      </div>
       <h3>Open activities</h3>
       <p class="stat-number">{{ openActivities }}</p>
       <p class="stat-caption">Still accepting submissions</p>

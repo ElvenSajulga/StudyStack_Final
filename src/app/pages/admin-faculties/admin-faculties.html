@@ -1,152 +1,164 @@
 <div class="admin-page">
   <header class="page-header">
     <div>
-      <h2 class="page-title">Faculties, Courses &amp; Sections</h2>
+      <h2 class="page-title">Programs &amp; Faculties</h2>
       <p class="page-subtitle">
-        Manage the academic structure. Expand a faculty to see its courses, then expand a course to manage sections.
+        Manage programs, their faculty, and teacher assignments.
       </p>
     </div>
   </header>
 
-  <!-- Add faculty -->
+  <!-- Add program -->
   <section class="card">
-    <h3>Add new faculty</h3>
+    <h3>Add new program</h3>
     <div class="inline-form">
       <input
         type="text"
-        placeholder="e.g. IT Faculty"
-        [(ngModel)]="newFacultyName"
-        (keyup.enter)="addFaculty()"
+        placeholder="e.g. BSIT"
+        [(ngModel)]="newProgramName"
+        (keyup.enter)="addProgram()"
       />
-      <button type="button" class="btn primary" (click)="addFaculty()">
-        Add faculty
+      <button type="button" class="btn primary" (click)="addProgram()">
+        Add program
       </button>
     </div>
   </section>
 
-  <!-- Loading -->
-  <p class="muted" *ngIf="loading">Loading…</p>
+  <p class="muted center" *ngIf="loading">Loading…</p>
 
-  <!-- Empty -->
-  <section class="card empty-state" *ngIf="!loading && faculties.length === 0">
-    <p>No faculties yet. Add one above to get started.</p>
+  <section class="card empty-state" *ngIf="!loading && programs.length === 0">
+    <p>No programs yet. Add one above to get started.</p>
   </section>
 
-  <!-- Faculty tree -->
-  <section class="tree" *ngIf="!loading && faculties.length > 0">
-    <div class="faculty-block" *ngFor="let f of faculties">
+  <!-- Program list -->
+  <section class="tree" *ngIf="!loading && programs.length > 0">
+    <div class="program-block" *ngFor="let p of programs">
 
-      <!-- Faculty row -->
-      <div class="tree-row faculty-row">
-        <ng-container *ngIf="editingFacultyId === f.id; else facultyView">
+      <!-- Program row -->
+      <div class="tree-row program-row">
+        <ng-container *ngIf="editingProgramId === p.id; else programView">
           <input
             class="inline-input"
             type="text"
-            [(ngModel)]="editingFacultyName"
-            (keyup.enter)="saveEditFaculty(f.id)"
+            [(ngModel)]="editingProgramName"
+            (keyup.enter)="saveEditProgram(p.id)"
           />
-          <button class="btn small primary" (click)="saveEditFaculty(f.id)">Save</button>
-          <button class="btn small subtle" (click)="cancelEditFaculty()">Cancel</button>
+          <button class="btn small primary" (click)="saveEditProgram(p.id)">Save</button>
+          <button class="btn small subtle" (click)="cancelEditProgram()">Cancel</button>
         </ng-container>
-        <ng-template #facultyView>
-          <button class="expand-btn" (click)="toggleFaculty(f.id)">
-            {{ expandedFacultyId === f.id ? '▾' : '▸' }}
+
+        <ng-template #programView>
+          <button class="expand-btn" (click)="toggleProgram(p.id)">
+            {{ expandedProgramId === p.id ? '▾' : '▸' }}
           </button>
-          <span class="tree-label faculty-label">{{ f.name }}</span>
-          <span class="count-badge">{{ coursesFor(f.id).length }} course(s)</span>
+          <span class="tree-label program-label">{{ p.name }}</span>
           <div class="row-actions">
-            <button class="btn small subtle" (click)="startEditFaculty(f)">Edit</button>
-            <button class="btn small danger" (click)="deleteFaculty(f.id)">Delete</button>
+            <button class="btn small subtle" (click)="startEditProgram(p)">Edit</button>
+            <button class="btn small danger" (click)="deleteProgram(p)">Delete</button>
           </div>
         </ng-template>
       </div>
 
-      <!-- Courses under this faculty -->
-      <div class="course-block" *ngIf="expandedFacultyId === f.id">
+      <!-- Program expanded content -->
+      <div class="program-content" *ngIf="expandedProgramId === p.id">
 
-        <!-- Add course -->
-        <div class="inline-form indent">
-          <input
-            type="text"
-            placeholder="e.g. BSIT"
-            [(ngModel)]="newCourseName[f.id]"
-            (keyup.enter)="addCourse(f.id)"
-          />
-          <button type="button" class="btn small primary" (click)="addCourse(f.id)">
-            Add course
-          </button>
-        </div>
+        <ng-container *ngIf="facultyForProgram(p.id) as faculty; else noFaculty">
 
-        <p class="muted indent" *ngIf="coursesFor(f.id).length === 0">
-          No courses yet.
-        </p>
-
-        <div class="tree-row course-row indent" *ngFor="let c of coursesFor(f.id)">
-          <ng-container *ngIf="editingCourseId === c.id; else courseView">
-            <input
-              class="inline-input"
-              type="text"
-              [(ngModel)]="editingCourseName"
-              (keyup.enter)="saveEditCourse(c.id)"
-            />
-            <button class="btn small primary" (click)="saveEditCourse(c.id)">Save</button>
-            <button class="btn small subtle" (click)="cancelEditCourse()">Cancel</button>
-          </ng-container>
-          <ng-template #courseView>
-            <button class="expand-btn" (click)="toggleCourse(c.id)">
-              {{ expandedCourseId === c.id ? '▾' : '▸' }}
-            </button>
-            <span class="tree-label course-label">{{ c.name }}</span>
-            <span class="count-badge">{{ sectionsFor(c.id).length }} section(s)</span>
-            <div class="row-actions">
-              <button class="btn small subtle" (click)="startEditCourse(c)">Edit</button>
-              <button class="btn small danger" (click)="deleteCourse(c.id)">Delete</button>
+          <!-- Faculty card -->
+          <div class="faculty-card">
+            <div class="faculty-header">
+              <div class="faculty-title">
+                <span class="faculty-icon">👥</span>
+                <ng-container *ngIf="editingFacultyId === faculty.id; else facultyNameView">
+                  <input
+                    class="inline-input"
+                    type="text"
+                    [(ngModel)]="editingFacultyName"
+                    (keyup.enter)="saveEditFaculty(faculty.id)"
+                  />
+                  <button class="btn small primary" (click)="saveEditFaculty(faculty.id)">Save</button>
+                  <button class="btn small subtle" (click)="cancelEditFaculty()">Cancel</button>
+                </ng-container>
+                <ng-template #facultyNameView>
+                  <span class="faculty-name">{{ faculty.name }}</span>
+                  <button class="btn small subtle" (click)="startEditFaculty(faculty)">Edit</button>
+                  <button class="btn small danger" (click)="deleteFaculty(faculty)">Delete</button>
+                </ng-template>
+              </div>
             </div>
-          </ng-template>
 
-          <!-- Sections under this course -->
-          <div class="section-block" *ngIf="expandedCourseId === c.id">
+            <!-- Teachers in faculty -->
+            <div class="teacher-list">
+              <p class="teacher-list-label">Assigned teachers</p>
 
-            <!-- Add section -->
-            <div class="inline-form indent">
-              <input
-                type="text"
-                placeholder="e.g. BSIT 2B"
-                [(ngModel)]="newSectionName[c.id]"
-                (keyup.enter)="addSection(c.id)"
-              />
-              <button type="button" class="btn small primary" (click)="addSection(c.id)">
-                Add section
+              <p class="muted" *ngIf="teachersInFaculty(faculty.id).length === 0">
+                No teachers assigned yet.
+              </p>
+
+              <div
+                class="teacher-chip"
+                *ngFor="let ft of teachersInFaculty(faculty.id)"
+              >
+                <span>{{ teacherName(ft.teacherUID) }}</span>
+                <button
+                  class="chip-remove"
+                  (click)="removeTeacher(ft.id, teacherName(ft.teacherUID))"
+                  title="Remove from faculty"
+                >✕</button>
+              </div>
+
+              <!-- Add teacher row -->
+              <div class="add-teacher-row" *ngIf="addingTeacherFacultyId === faculty.id">
+                <select [(ngModel)]="selectedTeacherUID[faculty.id]">
+                  <option value="">— Select teacher —</option>
+                  <option
+                    *ngFor="let t of unassignedTeachers(faculty.id)"
+                    [value]="t.UID"
+                  >
+                    {{ t.lastname }}, {{ t.firstname }}
+                  </option>
+                </select>
+                <button class="btn small primary" (click)="assignTeacher(faculty.id)">
+                  Assign
+                </button>
+                <button class="btn small subtle" (click)="toggleAddTeacher(faculty.id)">
+                  Cancel
+                </button>
+              </div>
+
+              <button
+                class="btn small subtle add-teacher-btn"
+                *ngIf="addingTeacherFacultyId !== faculty.id"
+                (click)="toggleAddTeacher(faculty.id)"
+              >
+                + Assign teacher
               </button>
             </div>
-
-            <p class="muted indent" *ngIf="sectionsFor(c.id).length === 0">
-              No sections yet.
-            </p>
-
-            <div class="tree-row section-row indent" *ngFor="let s of sectionsFor(c.id)">
-              <ng-container *ngIf="editingSectionId === s.id; else sectionView">
-                <input
-                  class="inline-input"
-                  type="text"
-                  [(ngModel)]="editingSectionName"
-                  (keyup.enter)="saveEditSection(s.id)"
-                />
-                <button class="btn small primary" (click)="saveEditSection(s.id)">Save</button>
-                <button class="btn small subtle" (click)="cancelEditSection()">Cancel</button>
-              </ng-container>
-              <ng-template #sectionView>
-                <span class="section-dot">•</span>
-                <span class="tree-label">{{ s.name }}</span>
-                <div class="row-actions">
-                  <button class="btn small subtle" (click)="startEditSection(s)">Edit</button>
-                  <button class="btn small danger" (click)="deleteSection(s.id)">Delete</button>
-                </div>
-              </ng-template>
-            </div>
-
           </div>
-        </div>
+
+        </ng-container>
+
+        <!-- No faculty yet -->
+        <ng-template #noFaculty>
+          <div class="no-faculty">
+            <p class="muted">No faculty created yet for this program.</p>
+            <div class="inline-form">
+              <input
+                type="text"
+                placeholder="Faculty name e.g. IT Faculty"
+                [(ngModel)]="newFacultyName[p.id]"
+                (keyup.enter)="addFaculty(p.id)"
+              />
+              <button
+                type="button"
+                class="btn small primary"
+                (click)="addFaculty(p.id)"
+              >
+                Create faculty
+              </button>
+            </div>
+          </div>
+        </ng-template>
 
       </div>
     </div>

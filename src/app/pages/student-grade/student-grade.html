@@ -21,8 +21,21 @@
           <tr *ngFor="let a of activities">
             <td data-label="Activity">{{ a.title }}</td>
             <td data-label="Type">{{ a.type }}</td>
-            <td data-label="Score">{{ scoreForActivity(a) ?? '-' }}</td>
-            <td data-label="Max points">{{ a.maxPoints ?? '-' }}</td>
+            <td data-label="Score">
+              <strong>{{ scoreForActivity(a) ?? '—' }}</strong>
+            </td>
+            <td data-label="Max points">{{ a.maxPoints ?? '—' }}</td>
+            <td data-label="Grade">
+              <ng-container *ngIf="scoreForActivity(a) != null && a.maxPoints">
+                <span [ngClass]="{
+                  'pill-high': (scoreForActivity(a)! / a.maxPoints) >= 0.75,
+                  'pill-mid':  (scoreForActivity(a)! / a.maxPoints) >= 0.5 && (scoreForActivity(a)! / a.maxPoints) < 0.75,
+                  'pill-low':  (scoreForActivity(a)! / a.maxPoints) < 0.5
+                }">
+                  {{ ((scoreForActivity(a)! / a.maxPoints) * 100) | number:'1.0-0' }}%
+                </span>
+              </ng-container>
+            </td>
           </tr>
         </tbody>
       </table>

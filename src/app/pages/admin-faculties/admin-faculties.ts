@@ -3,11 +3,17 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
   AcademicService,
+  Program,
   Faculty,
-  Course,
-  Section,
+  FacultyTeacher,
 } from '../../services/academic.service';
+import { TeacherAccount, TeacherAccountService } from '../../services/teacher-account.service';
 import Swal from 'sweetalert2';
+
+interface FacultyRow {
+  faculty: Faculty;
+  assignments: FacultyTeacher[];
+}
 
 @Component({
   selector: 'app-admin-faculties',
@@ -17,28 +23,32 @@ import Swal from 'sweetalert2';
   styleUrl: './admin-faculties.scss',
 })
 export class AdminFaculties implements OnInit {
+  programs: Program[] = [];
   faculties: Faculty[] = [];
-  courses: Course[] = [];
-  sections: Section[] = [];
+  facultyTeachers: FacultyTeacher[] = [];
+  teachers: TeacherAccount[] = [];
 
-  expandedFacultyId: string | null = null;
-  expandedCourseId: string | null = null;
+  expandedProgramId: string | null = null;
 
+  // program form
+  newProgramName = '';
+  editingProgramId: string | null = null;
+  editingProgramName = '';
+
+  // faculty form (one per program)
+  newFacultyName: Record<string, string> = {};
   editingFacultyId: string | null = null;
   editingFacultyName = '';
-  editingCourseId: string | null = null;
-  editingCourseName = '';
-  editingSectionId: string | null = null;
-  editingSectionName = '';
 
-  newFacultyName = '';
-  newCourseName: Record<string, string> = {};
-  newSectionName: Record<string, string> = {};
+  // teacher assignment
+  addingTeacherFacultyId: string | null = null;
+  selectedTeacherUID: Record<string, string> = {};
 
   loading = false;
 
   constructor(
     private readonly academic: AcademicService,
+    private readonly teacherService: TeacherAccountService,
     private readonly cdr: ChangeDetectorRef,
   ) {}
 
@@ -46,59 +56,119 @@ export class AdminFaculties implements OnInit {
     void this.loadAll();
   }
 
+  private toast(icon: 'success' | 'error', title: string): void {
+    void Swal.fire({
+      toast: true, position: 'top-end', icon, title,
+      showConfirmButton: false, timer: 2000, timerProgressBar: true,
+    });
+  }
+
   private async loadAll(): Promise<void> {
     this.loading = true;
-    [this.faculties, this.courses, this.sections] = await Promise.all([
+    await this.teacherService.reloadFromServer();
+    this.teachers = this.teacherService.getAll();
+    [this.programs, this.faculties, this.facultyTeachers] = await Promise.all([
+      this.academic.getPrograms(),
       this.academic.getFaculties(),
-      this.academic.getCourses(),
-      this.academic.getSections(),
+      this.academic.getCourseSections().then(() => []).catch(() => []),
     ]);
+
+    // reload faculty teachers separately
+    const allFT: FacultyTeacher[] = [];
+    for (const f of this.faculties) {
+      const ft = await this.academic.getFacultyTeachers(f.id);
+      allFT.push(...ft);
+    }
+    this.facultyTeachers = allFT;
+
     this.loading = false;
     this.cdr.detectChanges();
   }
 
-  private toast(icon: 'success' | 'error', title: string): void {
-    void Swal.fire({
-      toast: true,
-      position: 'top-end',
-      icon,
-      title,
-      showConfirmButton: false,
-      timer: 2000,
-      timerProgressBar: true,
-    });
+  // ── helpers ──────────────────────────────────────────────────────────────────
+
+  toggleProgram(id: string): void {
+    this.expandedProgramId = this.expandedProgramId === id ? null : id;
   }
 
-  coursesFor(facultyId: string): Course[] {
-    return this.courses.filter(c => c.facultyId === facultyId);
+  facultyForProgram(programId: string): Faculty | null {
+    return this.faculties.find(f => f.programId === programId) ?? null;
   }
 
-  sectionsFor(courseId: string): Section[] {
-    return this.sections.filter(s => s.courseId === courseId);
+  teachersInFaculty(facultyId: string): FacultyTeacher[] {
+    return this.facultyTeachers.filter(ft => ft.facultyId === facultyId);
   }
 
-  toggleFaculty(id: string): void {
-    this.expandedFacultyId = this.expandedFacultyId === id ? null : id;
-    this.expandedCourseId = null;
+  teacherName(uid: string): string {
+    const t = this.teachers.find(t => t.UID === uid);
+    return t ? `${t.firstname} ${t.lastname}`.trim() : uid;
   }
 
-  toggleCourse(id: string): void {
-    this.expandedCourseId = this.expandedCourseId === id ? null : id;
+  unassignedTeachers(facultyId: string): TeacherAccount[] {
+    const assigned = this.teachersInFaculty(facultyId).map(ft => ft.teacherUID);
+    return this.teachers.filter(t => !assigned.includes(t.UID));
   }
 
-  // ── Faculty ───────────────────────────────────────────────────────────────
+  // ── programs ─────────────────────────────────────────────────────────────────
 
-  async addFaculty(): Promise<void> {
-    const name = this.newFacultyName.trim();
+  async addProgram(): Promise<void> {
+    const name = this.newProgramName.trim();
     if (!name) return;
     try {
-      await this.academic.addFaculty(name);
-      this.newFacultyName = '';
+      await this.academic.addProgram(name);
+      this.newProgramName = '';
       await this.loadAll();
-      this.toast('success', 'Faculty added');
-    } catch {
-      this.toast('error', 'Failed to add faculty');
-    }
+      this.toast('success', 'Program added');
+    } catch { this.toast('error', 'Failed to add program'); }
+  }
+
+  startEditProgram(p: Program): void {
+    this.editingProgramId = p.id;
+    this.editingProgramName = p.name;
+  }
+
+  async saveEditProgram(id: string): Promise<void> {
+    const name = this.editingProgramName.trim();
+    if (!name) return;
+    try {
+      await this.academic.updateProgram(id, name);
+      this.editingProgramId = null;
+      await this.loadAll();
+      this.toast('success', 'Program updated');
+    } catch { this.toast('error', 'Failed to update program'); }
+  }
+
+  cancelEditProgram(): void { this.editingProgramId = null; }
+
+  async deleteProgram(p: Program): Promise<void> {
+    const res = await Swal.fire({
+      icon: 'warning',
+      title: `Delete ${p.name}?`,
+      text: 'This will also delete its faculty, sections, courses, and enrollments.',
+      showCancelButton: true,
+      confirmButtonText: 'Delete',
+      confirmButtonColor: '#ef4444',
+    });
+    if (!res.isConfirmed) return;
+    try {
+      await this.academic.deleteProgram(p.id);
+      if (this.expandedProgramId === p.id) this.expandedProgramId = null;
+      await this.loadAll();
+      this.toast('success', 'Program deleted');
+    } catch { this.toast('error', 'Failed to delete program'); }
+  }
+
+  // ── faculty ──────────────────────────────────────────────────────────────────
+
+  async addFaculty(programId: string): Promise<void> {
+    const name = (this.newFacultyName[programId] ?? '').trim();
+    if (!name) return;
+    try {
+      await this.academic.addFaculty(name, programId);
+      this.newFacultyName[programId] = '';
+      await this.loadAll();
+      this.toast('success', 'Faculty created');
+    } catch { this.toast('error', 'Failed to create faculty'); }
   }
 
   startEditFaculty(f: Faculty): void {
@@ -114,152 +184,61 @@ export class AdminFaculties implements OnInit {
       this.editingFacultyId = null;
       await this.loadAll();
       this.toast('success', 'Faculty updated');
-    } catch {
-      this.toast('error', 'Failed to update faculty');
-    }
+    } catch { this.toast('error', 'Failed to update faculty'); }
   }
 
-  cancelEditFaculty(): void {
-    this.editingFacultyId = null;
-  }
+  cancelEditFaculty(): void { this.editingFacultyId = null; }
 
-  async deleteFaculty(id: string): Promise<void> {
-    const courseCount = this.coursesFor(id).length;
-    const msg = courseCount
-      ? `This faculty has ${courseCount} course(s). Deleting it will also remove all its courses and sections. Continue?`
-      : 'Delete this faculty?';
+  async deleteFaculty(f: Faculty): Promise<void> {
     const res = await Swal.fire({
       icon: 'warning',
-      title: 'Are you sure?',
-      text: msg,
+      title: `Delete ${f.name}?`,
+      text: 'All teacher assignments to this faculty will be removed.',
       showCancelButton: true,
       confirmButtonText: 'Delete',
       confirmButtonColor: '#ef4444',
     });
     if (!res.isConfirmed) return;
     try {
-      await this.academic.deleteFaculty(id);
-      if (this.expandedFacultyId === id) this.expandedFacultyId = null;
+      await this.academic.deleteFaculty(f.id);
       await this.loadAll();
       this.toast('success', 'Faculty deleted');
-    } catch {
-      this.toast('error', 'Failed to delete faculty');
-    }
+    } catch { this.toast('error', 'Failed to delete faculty'); }
   }
 
-  // ── Course ────────────────────────────────────────────────────────────────
+  // ── teacher assignments ───────────────────────────────────────────────────────
 
-  async addCourse(facultyId: string): Promise<void> {
-    const name = (this.newCourseName[facultyId] ?? '').trim();
-    if (!name) return;
+  toggleAddTeacher(facultyId: string): void {
+    this.addingTeacherFacultyId =
+      this.addingTeacherFacultyId === facultyId ? null : facultyId;
+    this.selectedTeacherUID[facultyId] = '';
+  }
+
+  async assignTeacher(facultyId: string): Promise<void> {
+    const uid = this.selectedTeacherUID[facultyId];
+    if (!uid) return;
     try {
-      await this.academic.addCourse(name, facultyId);
-      this.newCourseName[facultyId] = '';
+      await this.academic.assignTeacherToFaculty(facultyId, uid);
+      this.selectedTeacherUID[facultyId] = '';
+      this.addingTeacherFacultyId = null;
       await this.loadAll();
-      this.toast('success', 'Course added');
-    } catch {
-      this.toast('error', 'Failed to add course');
-    }
+      this.toast('success', 'Teacher assigned');
+    } catch { this.toast('error', 'Failed to assign teacher'); }
   }
 
-  startEditCourse(c: Course): void {
-    this.editingCourseId = c.id;
-    this.editingCourseName = c.name;
-  }
-
-  async saveEditCourse(id: string): Promise<void> {
-    const name = this.editingCourseName.trim();
-    if (!name) return;
-    try {
-      await this.academic.updateCourse(id, { name });
-      this.editingCourseId = null;
-      await this.loadAll();
-      this.toast('success', 'Course updated');
-    } catch {
-      this.toast('error', 'Failed to update course');
-    }
-  }
-
-  cancelEditCourse(): void {
-    this.editingCourseId = null;
-  }
-
-  async deleteCourse(id: string): Promise<void> {
-    const secCount = this.sectionsFor(id).length;
-    const msg = secCount
-      ? `This course has ${secCount} section(s). Deleting it will also remove all sections. Continue?`
-      : 'Delete this course?';
+  async removeTeacher(assignmentId: string, teacherName: string): Promise<void> {
     const res = await Swal.fire({
       icon: 'warning',
-      title: 'Are you sure?',
-      text: msg,
+      title: `Remove ${teacherName} from faculty?`,
       showCancelButton: true,
-      confirmButtonText: 'Delete',
+      confirmButtonText: 'Remove',
       confirmButtonColor: '#ef4444',
     });
     if (!res.isConfirmed) return;
     try {
-      await this.academic.deleteCourse(id);
-      if (this.expandedCourseId === id) this.expandedCourseId = null;
+      await this.academic.removeTeacherFromFaculty(assignmentId);
       await this.loadAll();
-      this.toast('success', 'Course deleted');
-    } catch {
-      this.toast('error', 'Failed to delete course');
-    }
-  }
-
-  // ── Section ───────────────────────────────────────────────────────────────
-
-  async addSection(courseId: string): Promise<void> {
-    const name = (this.newSectionName[courseId] ?? '').trim();
-    if (!name) return;
-    try {
-      await this.academic.addSection(name, courseId);
-      this.newSectionName[courseId] = '';
-      await this.loadAll();
-      this.toast('success', 'Section added');
-    } catch {
-      this.toast('error', 'Failed to add section');
-    }
-  }
-
-  startEditSection(s: Section): void {
-    this.editingSectionId = s.id;
-    this.editingSectionName = s.name;
-  }
-
-  async saveEditSection(id: string): Promise<void> {
-    const name = this.editingSectionName.trim();
-    if (!name) return;
-    try {
-      await this.academic.updateSection(id, { name });
-      this.editingSectionId = null;
-      await this.loadAll();
-      this.toast('success', 'Section updated');
-    } catch {
-      this.toast('error', 'Failed to update section');
-    }
-  }
-
-  cancelEditSection(): void {
-    this.editingSectionId = null;
-  }
-
-  async deleteSection(id: string): Promise<void> {
-    const res = await Swal.fire({
-      icon: 'warning',
-      title: 'Delete section?',
-      showCancelButton: true,
-      confirmButtonText: 'Delete',
-      confirmButtonColor: '#ef4444',
-    });
-    if (!res.isConfirmed) return;
-    try {
-      await this.academic.deleteSection(id);
-      await this.loadAll();
-      this.toast('success', 'Section deleted');
-    } catch {
-      this.toast('error', 'Failed to delete section');
-    }
+      this.toast('success', 'Teacher removed from faculty');
+    } catch { this.toast('error', 'Failed to remove teacher'); }
   }
 }

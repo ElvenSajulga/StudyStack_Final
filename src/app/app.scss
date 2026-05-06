@@ -10,9 +10,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #0f172a;
-  color: #f9fafb;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.4);
+  background: var(--color-background-primary);
+  border-bottom: 0.5px solid var(--color-border-tertiary);
   position: sticky;
   top: 0;
   z-index: 20;
@@ -39,12 +38,13 @@
 .brand-name {
   font-weight: 600;
   letter-spacing: 0.03em;
+  color: var(--color-text-primary);
 }
 
 .topbar-role {
   font-size: 0.8rem;
   text-transform: uppercase;
-  color: #9ca3af;
+  color: var(--color-text-tertiary);
 }
 
 .topbar-right {
@@ -55,22 +55,23 @@
 
 .user-name {
   font-size: 0.9rem;
+  color: var(--color-text-secondary);
 }
 
 .logout-btn {
   border: none;
-  border-radius: 999px;
+  border-radius: 8px;
   padding: 6px 14px;
   font-size: 0.85rem;
-  background: #ef4444;
-  color: #f9fafb;
+  background: var(--color-background-secondary);
+  color: var(--color-text-primary);
   cursor: pointer;
   transition: background 0.15s ease, transform 0.1s ease;
 }
 
 .logout-btn:hover {
   background: #b91c1c;
-  transform: translateY(-1px);
+  transform: none;
 }
 
 .layout {
@@ -82,13 +83,13 @@
 }
 
 .sidebar {
-  background: #020617;
-  color: #e5e7eb;
+  background: var(--color-background-primary);
+  color: var(--color-text-secondary);
   padding: 16px 12px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  border-right: 1px solid #111827;
+  gap: 2px;
+  border-right: 0.5px solid var(--color-border-tertiary);
   position: sticky;
   top: 56px;
   height: calc(100vh - 56px);
@@ -104,23 +105,26 @@
 }
 
 .sidebar a {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 10px;            
   padding: 8px 10px;
   border-radius: 8px;
-  font-size: 0.9rem;
-  color: #e5e7eb;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);  
   text-decoration: none;
-  transition: background 0.15s ease, color 0.15s ease, transform 0.05s ease;
+  transition: background 0.15s ease;
 }
 
 .sidebar a:hover {
-  background: #0f172a;
-  transform: translateX(1px);
+  background: var(--color-background-secondary);
+  transform: none;    
 }
 
 .sidebar a.active {
-  background: #2563eb;
-  color: #f9fafb;
+  background: #E1F5EE;      // soft green
+  color: #085041;
+  font-weight: 500;
 }
 
 .content {

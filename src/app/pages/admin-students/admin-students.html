@@ -19,64 +19,64 @@
         <p class="card-description">Fill in the fields below to register a new student account.</p>
       </header>
 
-      <form (ngSubmit)="addStudent()" #studentForm="ngForm" class="card-body">
+      <div class="card-body">
         <div class="form-grid">
           <label class="field">
             <span class="field-label">UID</span>
-            <input type="text" name="UID" [(ngModel)]="addForm.UID" required />
+            <input type="text" [(ngModel)]="addForm.UID" />
           </label>
 
           <label class="field">
             <span class="field-label">Password</span>
-            <input type="password" name="password" [(ngModel)]="addForm.password" required />
+            <input type="password" [(ngModel)]="addForm.password" />
           </label>
 
           <label class="field">
             <span class="field-label">Student ID</span>
-            <input type="text" name="studentID" [(ngModel)]="addForm.studentID" required />
+            <input type="text" [(ngModel)]="addForm.studentID" />
           </label>
 
           <label class="field">
             <span class="field-label">Email</span>
-            <input type="email" name="email" [(ngModel)]="addForm.email" />
+            <input type="email" [(ngModel)]="addForm.email" />
           </label>
 
           <label class="field">
             <span class="field-label">Lastname</span>
-            <input type="text" name="lastname" [(ngModel)]="addForm.lastname" required />
+            <input type="text" [(ngModel)]="addForm.lastname" />
           </label>
 
           <label class="field">
             <span class="field-label">Firstname</span>
-            <input type="text" name="firstname" [(ngModel)]="addForm.firstname" required />
+            <input type="text" [(ngModel)]="addForm.firstname" />
           </label>
 
           <label class="field">
             <span class="field-label">Middlename</span>
-            <input type="text" name="middlename" [(ngModel)]="addForm.middlename" />
+            <input type="text" [(ngModel)]="addForm.middlename" />
           </label>
 
           <label class="field">
             <span class="field-label">Status</span>
-            <select name="status" [(ngModel)]="addForm.status">
+            <select [(ngModel)]="addForm.status">
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
             </select>
           </label>
 
           <label class="field">
-            <span class="field-label">Course</span>
-            <select name="courseId" [(ngModel)]="addForm.courseId" (ngModelChange)="onAddCourseChange()">
-              <option value="">— Select course —</option>
-              <option *ngFor="let c of courses" [value]="c.id">{{ c.name }}</option>
+            <span class="field-label">Program</span>
+            <select [(ngModel)]="addForm.programId" (ngModelChange)="onAddProgramChange()">
+              <option value="">— Select program —</option>
+              <option *ngFor="let p of programs" [value]="p.id">{{ p.name }}</option>
             </select>
           </label>
 
           <label class="field">
-            <span class="field-label">Section</span>
-            <select name="sectionId" [(ngModel)]="addForm.sectionId" [disabled]="!addForm.courseId">
+            <span class="field-label">Section <span class="optional">(optional)</span></span>
+            <select [(ngModel)]="addForm.sectionId" [disabled]="!addForm.programId">
               <option value="">— Select section —</option>
-              <option *ngFor="let s of sectionsForCourse(addForm.courseId ?? '')" [value]="s.id">
+              <option *ngFor="let s of sectionsForProgram(addForm.programId ?? '')" [value]="s.id">
                 {{ s.name }}
               </option>
             </select>
@@ -84,11 +84,11 @@
         </div>
 
         <div class="form-actions">
-          <button type="submit" class="btn primary" [disabled]="studentForm.invalid">
+          <button type="button" class="btn primary" (click)="addStudent()">
             Add student
           </button>
         </div>
-      </form>
+      </div>
     </article>
 
     <!-- Student list -->
@@ -98,7 +98,7 @@
           <h3>Student list</h3>
           <p class="card-description">Overview of all registered students.</p>
         </div>
-        <p class="muted" *ngIf="students.length">Showing {{ students.length }} students</p>
+        <p class="muted" *ngIf="students.length">Showing {{ students.length }} student(s)</p>
       </header>
 
       <section class="card-body" *ngIf="students.length > 0; else emptyState">
@@ -109,7 +109,7 @@
                 <th>UID</th>
                 <th>Student ID</th>
                 <th>Name</th>
-                <th>Course</th>
+                <th>Program</th>
                 <th>Email</th>
                 <th>Status</th>
                 <th></th>
@@ -120,7 +120,7 @@
                 <td>{{ s.UID }}</td>
                 <td>{{ s.studentID }}</td>
                 <td>{{ s.lastname }}, {{ s.firstname }} {{ s.middlename }}</td>
-                <td>{{ s.course || '—' }}</td>
+                <td>{{ s.program || '—' }}</td>
                 <td>{{ s.email || '—' }}</td>
                 <td>
                   <span class="status-chip" [class.inactive]="s.status === 'inactive'">
@@ -139,7 +139,7 @@
 
       <ng-template #emptyState>
         <div class="empty-state">
-          <p>No students enrolled yet.</p>
+          <p>No students registered yet.</p>
           <p class="muted">Use the form on the left to create the first account.</p>
         </div>
       </ng-template>
@@ -186,18 +186,18 @@
         </label>
 
         <label class="field">
-          <span class="field-label">Course</span>
-          <select [(ngModel)]="editForm.courseId" (ngModelChange)="onEditCourseChange()">
-            <option value="">— Select course —</option>
-            <option *ngFor="let c of courses" [value]="c.id">{{ c.name }}</option>
+          <span class="field-label">Program</span>
+          <select [(ngModel)]="editForm.programId" (ngModelChange)="onEditProgramChange()">
+            <option value="">— Select program —</option>
+            <option *ngFor="let p of programs" [value]="p.id">{{ p.name }}</option>
           </select>
         </label>
 
         <label class="field">
-          <span class="field-label">Section</span>
-          <select [(ngModel)]="editForm.sectionId" [disabled]="!editForm.courseId">
+          <span class="field-label">Section <span class="optional">(optional)</span></span>
+          <select [(ngModel)]="editForm.sectionId" [disabled]="!editForm.programId">
             <option value="">— Select section —</option>
-            <option *ngFor="let s of sectionsForCourse(editForm.courseId ?? '')" [value]="s.id">
+            <option *ngFor="let s of sectionsForProgram(editForm.programId ?? '')" [value]="s.id">
               {{ s.name }}
             </option>
           </select>

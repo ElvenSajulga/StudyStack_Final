@@ -25,6 +25,8 @@ import { TeacherAnnouncement } from './pages/teacher-announcement/teacher-announ
 import { TeacherAttendance } from './pages/teacher-attendance/teacher-attendance';
 import { TeacherClassRecord } from './pages/teacher-class-record/teacher-class-record';
 import { MigrateComponent } from './migration/migration';
+import { AdminSections } from './pages/admin-sections/admin-sections';
+import { AdminCourses } from './pages/admin-courses/admin-courses';
 
 
 export const routes: Routes = [
@@ -40,6 +42,8 @@ export const routes: Routes = [
     { path: 'admin-faculties', component: AdminFaculties },
     { path: 'admin-subjects', component: AdminSubjects },
     { path: 'admin-enrollments', component: AdminEnrollments },
+    { path: 'admin-sections', component: AdminSections},
+    { path: 'admin-courses', component: AdminCourses},
 
     //student routes
     { path: 'student-dashboard', component: StudentDashboard},

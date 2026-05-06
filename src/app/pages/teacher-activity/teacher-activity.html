@@ -12,32 +12,57 @@
 
     <section *ngIf="activities.length > 0; else emptyActivities" class="activity-list">
       <article class="activity-card" *ngFor="let a of activities">
-        <div class="ac-left">
-          <span class="badge" [class.quiz]="a.type === 'quiz'" [class.output]="a.type === 'output'">
-            {{ a.type }}
-          </span>
-          <div>
-            <h3 class="ac-title">{{ a.title }}</h3>
-            <p class="ac-meta">
-              Deadline: {{ a.deadline | date:'MMM d, y h:mm a' }} &nbsp;·&nbsp;
-              Closes: {{ a.closeAt | date:'MMM d, y h:mm a' }}
-              <span *ngIf="a.maxPoints"> &nbsp;·&nbsp; {{ a.maxPoints }} pts</span>
-            </p>
-            <p class="ac-desc" *ngIf="a.description">{{ a.description }}</p>
+        <!-- top row: badges + menu -->
+        <div style="display:flex; justify-content:space-between; align-items:center">
+          <div style="display:flex; gap:6px">
+            <span class="badge" [class.quiz]="a.type==='quiz'" [class.output]="a.type==='output'">
+              {{ a.type }}
+            </span>
+            <span class="badge" style="background:#f3f4f6; color:#374151" *ngIf="isActivityClosed(a)">
+              Closed
+            </span>
           </div>
+          <span class="score-badge" *ngIf="a.scoresReleased">Scores released ✓</span>
         </div>
-        <div class="ac-actions">
-          <span class="score-badge" *ngIf="a.scoresReleased">Scores released</span>
-          <button class="btn outline" (click)="openGrading(a)">View submissions</button>
-          <button class="btn outline" *ngIf="a.type === 'quiz'" (click)="openQuizBuilder(a)">Edit quiz</button>
-          <button class="btn danger" (click)="deleteActivity(a)">Delete</button>
+
+        <!-- title + description -->
+        <h3 class="ac-title">{{ a.title }}</h3>
+        <p class="ac-desc" *ngIf="a.description">{{ a.description }}</p>
+
+        <!-- meta row -->
+        <p class="ac-meta" style="display:flex; gap:14px">
+          <span><i class="ti ti-calendar" aria-hidden="true"></i> {{ a.deadline | date:'MMM d, y' }}</span>
+          <span><i class="ti ti-clock" aria-hidden="true"></i> Closes {{ a.closeAt | date:'MMM d' }}</span>
+          <span *ngIf="a.maxPoints"><i class="ti ti-star" aria-hidden="true"></i> {{ a.maxPoints }} pts</span>
+        </p>
+
+        <!-- footer: actions -->
+        <div class="ac-actions" style="border-top:0.5px solid var(--color-border-tertiary); padding-top:10px; margin-top:4px">
+          <button class="btn outline" (click)="openGrading(a)">
+            <i class="ti ti-eye" aria-hidden="true"></i> View submissions
+          </button>
+          <button class="btn outline" *ngIf="a.type==='quiz'" (click)="openQuizBuilder(a)">
+            <i class="ti ti-edit" aria-hidden="true"></i> Edit quiz
+          </button>
+          <button class="btn danger" (click)="deleteActivity(a)">
+            <i class="ti ti-trash" aria-hidden="true"></i> Delete
+          </button>
         </div>
       </article>
     </section>
 
     <ng-template #emptyActivities>
-      <div class="empty-card">
-        <p>No activities yet. Click <strong>+ New activity</strong> to get started.</p>
+      <div class="empty-card" style="text-align:center; padding:48px 24px">
+        <div style="width:48px;height:48px;border-radius:12px;background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);display:flex;align-items:center;justify-content:center;margin:0 auto 14px">
+          <i class="ti ti-clipboard-list" style="font-size:22px;color:var(--color-text-secondary)" aria-hidden="true"></i>
+        </div>
+        <p style="font-size:0.95rem;font-weight:500;margin-bottom:6px">No activities yet</p>
+        <p style="font-size:0.875rem;color:var(--color-text-secondary);margin-bottom:16px">
+          Create your first activity to start tracking student submissions and grades.
+        </p>
+        <button class="btn primary" (click)="showCreate()">
+          <i class="ti ti-plus" aria-hidden="true"></i> New activity
+        </button>
       </div>
     </ng-template>
   </ng-container>
@@ -84,6 +109,10 @@
         <label class="field">
           <span class="field-label">Close time *</span>
           <input type="datetime-local" [(ngModel)]="form.closeAt" />
+          <span class="field-hint">
+            <i class="ti ti-info-circle" aria-hidden="true"></i>
+            Must be after the deadline. Students cannot submit after this time.
+          </span>
         </label>
       </div>
 

@@ -4,8 +4,11 @@ import { FormsModule } from '@angular/forms';
 import {
   AcademicService,
   Enrollment,
-  Subject,
+  Course,
   Section,
+  Program,
+  CourseSection,
+  YearLevel,
 } from '../../services/academic.service';
 import { StudentAccount, StudentAccountService } from '../../services/student-account.service';
 import { TeacherAccount, TeacherAccountService } from '../../services/teacher-account.service';
@@ -15,9 +18,10 @@ interface EnrollmentRow {
   enrollment: Enrollment;
   studentName: string;
   studentID: string;
-  subjectName: string;
-  teacherName: string;
+  courseName: string;
   sectionName: string;
+  teacherName: string;
+  programName: string;
 }
 
 @Component({
@@ -31,16 +35,24 @@ export class AdminEnrollments implements OnInit {
   enrollments: Enrollment[] = [];
   students: StudentAccount[] = [];
   teachers: TeacherAccount[] = [];
-  subjects: Subject[] = [];
+  programs: Program[] = [];
+  courses: Course[] = [];
   sections: Section[] = [];
+  courseSections: CourseSection[] = [];
+  yearLevels: YearLevel[] = [];
   rows: EnrollmentRow[] = [];
 
-  filterSubjectId = '';
-  filterTeacherUID = '';
+  filterProgramId = '';
+  filterCourseId = '';
 
   showForm = false;
-  form = { studentUID: '', subjectId: '', sectionId: '' };
-  selectedSubject: Subject | null = null;
+  form = {
+    studentUID: '',
+    programId: '',
+    courseId: '',
+    sectionId: '',
+    teacherUID: '',
+  };
 
   loading = false;
 
@@ -57,13 +69,8 @@ export class AdminEnrollments implements OnInit {
 
   private toast(icon: 'success' | 'error', title: string): void {
     void Swal.fire({
-      toast: true,
-      position: 'top-end',
-      icon,
-      title,
-      showConfirmButton: false,
-      timer: 2000,
-      timerProgressBar: true,
+      toast: true, position: 'top-end', icon, title,
+      showConfirmButton: false, timer: 2000, timerProgressBar: true,
     });
   }
 
@@ -75,11 +82,23 @@ export class AdminEnrollments implements OnInit {
     ]);
     this.students = this.studentService.getAll();
     this.teachers = this.teacherService.getAll();
-    [this.enrollments, this.subjects, this.sections] = await Promise.all([
+
+    [this.enrollments, this.programs, this.courses,
+      this.sections, this.courseSections] = await Promise.all([
       this.academic.getEnrollments(),
-      this.academic.getSubjects(),
+      this.academic.getPrograms(),
+      this.academic.getCourses(),
       this.academic.getSections(),
+      this.academic.getCourseSections(),
     ]);
+
+    const allYL: YearLevel[] = [];
+    for (const p of this.programs) {
+      const yl = await this.academic.getYearLevelsByProgram(p.id);
+      allYL.push(...yl);
+    }
+    this.yearLevels = allYL;
+
     this.buildRows();
     this.loading = false;
     this.cdr.detectChanges();
@@ -88,110 +107,143 @@ export class AdminEnrollments implements OnInit {
   private buildRows(): void {
     this.rows = this.enrollments.map(e => {
       const student = this.students.find(s => s.UID === e.studentUID);
-      const subject = this.subjects.find(s => s.id === e.subjectId);
-      const teacher = this.teachers.find(t => t.UID === e.teacherUID);
+      const course = this.courses.find(c => c.id === e.courseId);
       const section = this.sections.find(s => s.id === e.sectionId);
+      const teacher = this.teachers.find(t => t.UID === e.teacherUID);
+      const program = this.programs.find(p => p.id === course?.programId);
       return {
         enrollment: e,
         studentName: student
-          ? `${student.lastname}, ${student.firstname} ${student.middlename ?? ''}`.trim()
+          ? `${student.lastname}, ${student.firstname}`.trim()
           : e.studentUID,
         studentID: student?.studentID ?? e.studentID,
-        subjectName: subject?.name ?? '—',
+        courseName: course?.name ?? '—',
+        sectionName: section?.name ?? '—',
         teacherName: teacher
           ? `${teacher.firstname} ${teacher.lastname}`.trim()
           : '—',
-        sectionName: section?.name ?? '—',
+        programName: program?.name ?? '—',
       };
     });
   }
 
   get filteredRows(): EnrollmentRow[] {
     return this.rows.filter(r => {
-      const matchSubject = !this.filterSubjectId || r.enrollment.subjectId === this.filterSubjectId;
-      const matchTeacher = !this.filterTeacherUID || r.enrollment.teacherUID === this.filterTeacherUID;
-      return matchSubject && matchTeacher;
+      const course = this.courses.find(c => c.id === r.enrollment.courseId);
+      const matchProgram = !this.filterProgramId
+        || course?.programId === this.filterProgramId;
+      const matchCourse = !this.filterCourseId
+        || r.enrollment.courseId === this.filterCourseId;
+      return matchProgram && matchCourse;
     });
   }
 
-  get sectionsForSelectedSubject(): Section[] {
-    return this.sections;
+  // ── form helpers ──────────────────────────────────────────────────────────────
+
+  coursesForProgram(programId: string): Course[] {
+    return this.courses.filter(c => c.programId === programId);
   }
 
-  onSubjectChange(): void {
-    this.selectedSubject = this.subjects.find(s => s.id === this.form.subjectId) ?? null;
+  sectionsForCourse(courseId: string): Section[] {
+    return this.courseSections
+      .filter(cs => cs.courseId === courseId)
+      .map(cs => this.sections.find(s => s.id === cs.sectionId))
+      .filter((s): s is Section => !!s);
+  }
+
+  yearLevelName(yearLevelId: string): string {
+    return this.yearLevels.find(yl => yl.id === yearLevelId)?.name ?? '';
+  }
+
+  onProgramChange(): void {
+    this.form.courseId = '';
     this.form.sectionId = '';
+    this.form.teacherUID = '';
   }
 
-  teacherForSubject(subjectId: string): string {
-    const subject = this.subjects.find(s => s.id === subjectId);
-    if (!subject) return '—';
-    const teacher = this.teachers.find(t => t.UID === subject.teacherUID);
-    return teacher ? `${teacher.firstname} ${teacher.lastname}`.trim() : '—';
+  onCourseChange(): void {
+    this.form.sectionId = '';
+    this.form.teacherUID = '';
   }
 
-  alreadyEnrolled(studentUID: string, subjectId: string): boolean {
+  onSectionChange(): void {
+    // auto-fill teacher from courseSection assignment
+    const cs = this.courseSections.find(
+      cs => cs.courseId === this.form.courseId
+        && cs.sectionId === this.form.sectionId,
+    );
+    this.form.teacherUID = cs?.teacherUID ?? '';
+  }
+
+  teacherNameForUID(uid: string): string {
+    const t = this.teachers.find(t => t.UID === uid);
+    return t ? `${t.firstname} ${t.lastname}`.trim() : '—';
+  }
+
+  alreadyEnrolled(studentUID: string, courseId: string, sectionId: string): boolean {
     return this.enrollments.some(
-      e => e.studentUID === studentUID && e.subjectId === subjectId,
+      e => e.studentUID === studentUID
+        && e.courseId === courseId
+        && e.sectionId === sectionId,
     );
   }
 
   openForm(): void {
-    this.form = { studentUID: '', subjectId: '', sectionId: '' };
-    this.selectedSubject = null;
+    this.form = {
+      studentUID: '', programId: '',
+      courseId: '', sectionId: '', teacherUID: '',
+    };
     this.showForm = true;
   }
 
-  cancelForm(): void {
-    this.showForm = false;
-  }
+  cancelForm(): void { this.showForm = false; }
 
   async enroll(): Promise<void> {
-    const { studentUID, subjectId, sectionId } = this.form;
-    if (!studentUID || !subjectId) {
-      this.toast('error', 'Please select a student and a subject');
+    const { studentUID, courseId, sectionId, teacherUID } = this.form;
+    if (!studentUID || !courseId || !sectionId) {
+      this.toast('error', 'Please select a student, course, and section');
       return;
     }
-    if (this.alreadyEnrolled(studentUID, subjectId)) {
-      this.toast('error', 'Student is already enrolled in that subject');
+    if (!teacherUID) {
+      this.toast('error', 'No teacher assigned to this section for this course');
       return;
     }
-    const subject = this.subjects.find(s => s.id === subjectId);
+    if (this.alreadyEnrolled(studentUID, courseId, sectionId)) {
+      this.toast('error', 'Student is already enrolled in this course and section');
+      return;
+    }
+
     const student = this.students.find(s => s.UID === studentUID);
-    if (!subject || !student) return;
+    if (!student) return;
 
     try {
       await this.academic.enrollStudent({
         studentUID,
         studentID: student.studentID,
-        subjectId,
-        teacherUID: subject.teacherUID,
-        sectionId: sectionId || undefined,
+        courseId,
+        sectionId,
+        teacherUID,
       });
       this.showForm = false;
       await this.loadAll();
       this.toast('success', 'Student enrolled successfully');
-    } catch {
-      this.toast('error', 'Failed to enroll student');
-    }
+    } catch { this.toast('error', 'Failed to enroll student'); }
   }
 
-  async removeEnrollment(id: string, studentName: string, subjectName: string): Promise<void> {
+  async removeEnrollment(r: EnrollmentRow): Promise<void> {
     const res = await Swal.fire({
       icon: 'warning',
       title: 'Remove enrollment?',
-      text: `Remove ${studentName} from ${subjectName}?`,
+      text: `Remove ${r.studentName} from ${r.courseName} (${r.sectionName})?`,
       showCancelButton: true,
       confirmButtonText: 'Remove',
       confirmButtonColor: '#ef4444',
     });
     if (!res.isConfirmed) return;
     try {
-      await this.academic.removeEnrollment(id);
+      await this.academic.removeEnrollment(r.enrollment.id);
       await this.loadAll();
       this.toast('success', 'Enrollment removed');
-    } catch {
-      this.toast('error', 'Failed to remove enrollment');
-    }
+    } catch { this.toast('error', 'Failed to remove enrollment'); }
   }
 }

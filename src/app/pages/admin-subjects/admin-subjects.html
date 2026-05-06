@@ -1,114 +1,107 @@
 <div class="admin-page">
   <header class="page-header">
     <div>
-      <h2 class="page-title">Subjects</h2>
+      <h2 class="page-title">Courses</h2>
       <p class="page-subtitle">
-        Create and manage subjects, assign teachers, and set schedules.
+        Create and manage courses under each program.
       </p>
     </div>
     <button type="button" class="btn primary" (click)="openAddForm()">
-      + Add subject
+      + Add course
     </button>
   </header>
 
-  <!-- Add / Edit form -->
-  <section class="card form-card" *ngIf="showForm">
-    <h3>{{ editingId ? 'Edit subject' : 'New subject' }}</h3>
-
+  <!-- Form -->
+  <section class="card" *ngIf="showForm">
+    <h3>{{ editingId ? 'Edit course' : 'New course' }}</h3>
     <div class="form-grid">
+      <label class="field">
+        <span class="field-label">Course name <span class="req">*</span></span>
+        <input type="text" [(ngModel)]="form.name"
+          placeholder="e.g. Fundamentals of Databases" />
+      </label>
+
+      <label class="field">
+        <span class="field-label">Program <span class="req">*</span></span>
+        <select [(ngModel)]="form.programId">
+          <option value="">— Select program —</option>
+          <option *ngFor="let p of programs" [value]="p.id">{{ p.name }}</option>
+        </select>
+      </label>
+
+      <label class="field">
+        <span class="field-label">Units <span class="req">*</span></span>
+        <input type="number" [(ngModel)]="form.units" min="1" max="6" />
+      </label>
+
+      <label class="field">
+        <span class="field-label">Semester <span class="req">*</span></span>
+        <select [(ngModel)]="form.semester">
+          <option value="">— Select —</option>
+          <option value="1st Semester">1st Semester</option>
+          <option value="2nd Semester">2nd Semester</option>
+          <option value="Summer">Summer</option>
+        </select>
+      </label>
+
       <label class="field full-width">
-        <span class="field-label">Subject name</span>
-        <input type="text" [(ngModel)]="form.name" placeholder="e.g. Fundamentals of Databases" />
-      </label>
-
-      <label class="field">
-        <span class="field-label">Units</span>
-        <input type="number" [(ngModel)]="form.units" min="1" max="9" placeholder="3" />
-      </label>
-
-      <label class="field">
         <span class="field-label">Schedule</span>
-        <input type="text" [(ngModel)]="form.schedule" placeholder="e.g. MWF 8:00–9:00 AM" />
-      </label>
-
-      <label class="field">
-        <span class="field-label">Semester</span>
-        <input type="text" [(ngModel)]="form.semester" placeholder="e.g. 1st Semester 2025-2026" />
-      </label>
-
-      <label class="field">
-        <span class="field-label">Faculty</span>
-        <select [(ngModel)]="form.facultyId">
-          <option value="">— Select faculty —</option>
-          <option *ngFor="let f of faculties" [value]="f.id">{{ f.name }}</option>
-        </select>
-      </label>
-
-      <label class="field">
-        <span class="field-label">Assigned teacher</span>
-        <select [(ngModel)]="form.teacherUID">
-          <option value="">— Select teacher —</option>
-          <option *ngFor="let t of availableTeachers" [value]="t.UID">
-            {{ t.lastname }}, {{ t.firstname }}
-          </option>
-        </select>
+        <input type="text" [(ngModel)]="form.schedule"
+          placeholder="e.g. MWF 8:00–9:00 AM" />
       </label>
     </div>
-
     <div class="form-actions">
-      <button type="button" class="btn subtle" (click)="cancelForm()">Cancel</button>
-      <button type="button" class="btn primary" (click)="saveSubject()">
-        {{ editingId ? 'Save changes' : 'Create subject' }}
+      <button class="btn subtle" (click)="cancelForm()">Cancel</button>
+      <button class="btn primary" (click)="saveCourse()">
+        {{ editingId ? 'Save changes' : 'Create course' }}
       </button>
     </div>
   </section>
 
   <!-- Filter -->
-  <section class="filter-bar" *ngIf="!showForm && subjects.length > 0">
+  <div class="filter-bar" *ngIf="!showForm && courses.length > 0">
     <label class="field">
-      <span class="field-label">Filter by faculty</span>
-      <select [(ngModel)]="filterFacultyId">
-        <option value="">All faculties</option>
-        <option *ngFor="let f of faculties" [value]="f.id">{{ f.name }}</option>
+      <span class="field-label">Filter by program</span>
+      <select [(ngModel)]="filterProgramId">
+        <option value="">All programs</option>
+        <option *ngFor="let p of programs" [value]="p.id">{{ p.name }}</option>
       </select>
     </label>
-    <span class="muted">{{ filteredSubjects.length }} subject(s)</span>
-  </section>
+    <span class="muted">{{ filteredCourses.length }} course(s)</span>
+  </div>
 
-  <!-- Loading -->
   <p class="muted" *ngIf="loading">Loading…</p>
 
-  <!-- Empty -->
-  <section class="card empty-state" *ngIf="!loading && !showForm && subjects.length === 0">
-    <p>No subjects yet. Click <strong>+ Add subject</strong> to create one.</p>
+  <section class="card empty-state"
+    *ngIf="!loading && !showForm && courses.length === 0">
+    <p>No courses yet. Click <strong>+ Add course</strong> to get started.</p>
   </section>
 
-  <!-- Subject table -->
-  <section class="card table-card" *ngIf="!loading && !showForm && subjects.length > 0">
+  <!-- Table -->
+  <section class="card table-card"
+    *ngIf="!loading && !showForm && courses.length > 0">
     <div class="table-wrapper">
       <table>
         <thead>
           <tr>
-            <th>Subject</th>
+            <th>Course name</th>
+            <th>Program</th>
             <th>Units</th>
-            <th>Schedule</th>
             <th>Semester</th>
-            <th>Faculty</th>
-            <th>Teacher</th>
+            <th>Schedule</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let s of filteredSubjects">
+          <tr *ngFor="let s of filteredCourses">
             <td>{{ s.name }}</td>
+            <td>{{ programName(s.programId) }}</td>
             <td>{{ s.units }}</td>
-            <td>{{ s.schedule }}</td>
             <td>{{ s.semester }}</td>
-            <td>{{ facultyName(s.facultyId) }}</td>
-            <td>{{ teacherName(s.teacherUID) }}</td>
+            <td>{{ s.schedule || '—' }}</td>
             <td class="actions">
-              <button class="btn small subtle" (click)="openEditForm(s)">Edit</button>
-              <button class="btn small danger" (click)="deleteSubject(s.id)">Delete</button>
+              <button class="btn subtle small" (click)="openEditForm(s)">Edit</button>
+              <button class="btn danger small" (click)="deleteCourse(s.id)">Delete</button>
             </td>
           </tr>
         </tbody>

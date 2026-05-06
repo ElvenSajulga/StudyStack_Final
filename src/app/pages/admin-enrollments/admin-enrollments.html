@@ -3,7 +3,7 @@
     <div>
       <h2 class="page-title">Enrollments</h2>
       <p class="page-subtitle">
-        Assign students to subjects. The teacher is automatically set from the subject.
+        Enroll students into courses. Select a section to auto-fill the assigned teacher.
       </p>
     </div>
     <button type="button" class="btn primary" (click)="openForm()">
@@ -12,10 +12,10 @@
   </header>
 
   <!-- Enroll form -->
-  <section class="card form-card" *ngIf="showForm">
+  <section class="card" *ngIf="showForm">
     <h3>Enroll a student</h3>
-
     <div class="form-grid">
+
       <label class="field">
         <span class="field-label">Student</span>
         <select [(ngModel)]="form.studentUID">
@@ -27,80 +27,96 @@
       </label>
 
       <label class="field">
-        <span class="field-label">Subject</span>
-        <select [(ngModel)]="form.subjectId" (ngModelChange)="onSubjectChange()">
-          <option value="">— Select subject —</option>
-          <option *ngFor="let s of subjects" [value]="s.id">
-            {{ s.name }} — {{ s.semester }}
+        <span class="field-label">Program</span>
+        <select [(ngModel)]="form.programId" (ngModelChange)="onProgramChange()">
+          <option value="">— Select program —</option>
+          <option *ngFor="let p of programs" [value]="p.id">{{ p.name }}</option>
+        </select>
+      </label>
+
+      <label class="field">
+        <span class="field-label">Course</span>
+        <select [(ngModel)]="form.courseId"
+          (ngModelChange)="onCourseChange()"
+          [disabled]="!form.programId">
+          <option value="">— Select course —</option>
+          <option *ngFor="let c of coursesForProgram(form.programId)"
+            [value]="c.id">
+            {{ c.name }} — {{ c.semester }}
           </option>
         </select>
       </label>
 
-      <!-- Teacher auto-filled info -->
-      <div class="field info-field" *ngIf="selectedSubject">
+      <label class="field">
+        <span class="field-label">Section</span>
+        <select [(ngModel)]="form.sectionId"
+          (ngModelChange)="onSectionChange()"
+          [disabled]="!form.courseId">
+          <option value="">— Select section —</option>
+          <option *ngFor="let s of sectionsForCourse(form.courseId)"
+            [value]="s.id">
+            {{ yearLevelName(s.yearLevelId) }} — {{ s.name }}
+          </option>
+        </select>
+      </label>
+
+      <!-- Teacher auto-fill -->
+      <div class="field info-field" *ngIf="form.sectionId">
         <span class="field-label">Assigned teacher</span>
-        <span class="info-value">{{ teacherForSubject(selectedSubject.id) }}</span>
+        <span class="info-value" [class.no-teacher]="!form.teacherUID">
+          {{ form.teacherUID
+            ? teacherNameForUID(form.teacherUID)
+            : 'No teacher assigned to this section' }}
+        </span>
       </div>
 
-      <label class="field" *ngIf="selectedSubject">
-        <span class="field-label">Section <span class="optional">(optional)</span></span>
-        <select [(ngModel)]="form.sectionId">
-          <option value="">— No section —</option>
-          <option *ngFor="let sec of sectionsForSelectedSubject" [value]="sec.id">
-            {{ sec.name }}
-          </option>
-        </select>
-      </label>
     </div>
-
     <div class="form-actions">
-      <button type="button" class="btn subtle" (click)="cancelForm()">Cancel</button>
-      <button type="button" class="btn primary" (click)="enroll()">Enroll</button>
+      <button class="btn subtle" (click)="cancelForm()">Cancel</button>
+      <button class="btn primary" (click)="enroll()">Enroll</button>
     </div>
   </section>
 
   <!-- Filters -->
-  <section class="filter-bar" *ngIf="!showForm && enrollments.length > 0">
+  <div class="filter-bar"
+    *ngIf="!showForm && enrollments.length > 0">
     <label class="field">
-      <span class="field-label">Filter by subject</span>
-      <select [(ngModel)]="filterSubjectId">
-        <option value="">All subjects</option>
-        <option *ngFor="let s of subjects" [value]="s.id">{{ s.name }}</option>
+      <span class="field-label">Filter by program</span>
+      <select [(ngModel)]="filterProgramId">
+        <option value="">All programs</option>
+        <option *ngFor="let p of programs" [value]="p.id">{{ p.name }}</option>
       </select>
     </label>
-
     <label class="field">
-      <span class="field-label">Filter by teacher</span>
-      <select [(ngModel)]="filterTeacherUID">
-        <option value="">All teachers</option>
-        <option *ngFor="let t of teachers" [value]="t.UID">
-          {{ t.lastname }}, {{ t.firstname }}
-        </option>
+      <span class="field-label">Filter by course</span>
+      <select [(ngModel)]="filterCourseId">
+        <option value="">All courses</option>
+        <option *ngFor="let c of courses" [value]="c.id">{{ c.name }}</option>
       </select>
     </label>
+    <span class="muted">{{ filteredRows.length }} enrollment(s)</span>
+  </div>
 
-    <span class="muted count">{{ filteredRows.length }} enrollment(s)</span>
-  </section>
+  <p class="muted center" *ngIf="loading">Loading…</p>
 
-  <!-- Loading -->
-  <p class="muted" *ngIf="loading">Loading…</p>
-
-  <!-- Empty -->
-  <section class="card empty-state" *ngIf="!loading && !showForm && enrollments.length === 0">
+  <section class="card empty-state"
+    *ngIf="!loading && !showForm && enrollments.length === 0">
     <p>No enrollments yet. Click <strong>+ Enroll student</strong> to get started.</p>
   </section>
 
   <!-- Table -->
-  <section class="card table-card" *ngIf="!loading && !showForm && enrollments.length > 0">
+  <section class="card table-card"
+    *ngIf="!loading && !showForm && enrollments.length > 0">
     <div class="table-wrapper">
       <table>
         <thead>
           <tr>
             <th>Student ID</th>
             <th>Student name</th>
-            <th>Subject</th>
-            <th>Teacher</th>
+            <th>Program</th>
+            <th>Course</th>
             <th>Section</th>
+            <th>Teacher</th>
             <th>Enrolled</th>
             <th></th>
           </tr>
@@ -109,17 +125,14 @@
           <tr *ngFor="let r of filteredRows">
             <td>{{ r.studentID }}</td>
             <td>{{ r.studentName }}</td>
-            <td>{{ r.subjectName }}</td>
-            <td>{{ r.teacherName }}</td>
+            <td>{{ r.programName }}</td>
+            <td>{{ r.courseName }}</td>
             <td>{{ r.sectionName }}</td>
+            <td>{{ r.teacherName }}</td>
             <td>{{ r.enrollment.enrolledAt | date: 'mediumDate' }}</td>
             <td class="actions">
-              <button
-                class="btn small danger"
-                (click)="removeEnrollment(r.enrollment.id, r.studentName, r.subjectName)"
-              >
-                Remove
-              </button>
+              <button class="btn small danger"
+                (click)="removeEnrollment(r)">Remove</button>
             </td>
           </tr>
         </tbody>

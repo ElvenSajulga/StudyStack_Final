@@ -1,13 +1,14 @@
-import { Injectable } from '@angular/core';
+import { Injectable, EnvironmentInjector, runInInjectionContext, afterNextRender } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, from, map } from 'rxjs';
 import { FirestoreService } from './firestore.service';
+
 
 export interface StudentAccount {
   id?: string;
   UID: string;
   name: string;
-  course: string;
+  program: string;
   studentID: string;
   password: string;
   email: string;

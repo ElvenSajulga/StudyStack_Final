@@ -1,8 +1,7 @@
 import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { AcademicService, Faculty, Subject } from '../../services/academic.service';
-import { TeacherAccount, TeacherAccountService } from '../../services/teacher-account.service';
+import { AcademicService, Course, Program } from '../../services/academic.service';
 import Swal from 'sweetalert2';
 
 @Component({
@@ -13,12 +12,10 @@ import Swal from 'sweetalert2';
   styleUrl: './admin-subjects.scss',
 })
 export class AdminSubjects implements OnInit {
-  subjects: Subject[] = [];
-  faculties: Faculty[] = [];
-  teachers: TeacherAccount[] = [];
+  courses: Course[] = [];
+  programs: Program[] = [];
 
-  filterFacultyId = '';
-
+  filterProgramId = '';
   showForm = false;
   editingId: string | null = null;
 
@@ -27,15 +24,13 @@ export class AdminSubjects implements OnInit {
     units: number | null;
     schedule: string;
     semester: string;
-    facultyId: string;
-    teacherUID: string;
+    programId: string;
   } = this.emptyForm();
 
   loading = false;
 
   constructor(
     private readonly academic: AcademicService,
-    private readonly teacherService: TeacherAccountService,
     private readonly cdr: ChangeDetectorRef,
   ) {}
 
@@ -49,52 +44,34 @@ export class AdminSubjects implements OnInit {
       units: null as number | null,
       schedule: '',
       semester: '',
-      facultyId: '',
-      teacherUID: '',
+      programId: '',
     };
   }
 
   private toast(icon: 'success' | 'error', title: string): void {
     void Swal.fire({
-      toast: true,
-      position: 'top-end',
-      icon,
-      title,
-      showConfirmButton: false,
-      timer: 2000,
-      timerProgressBar: true,
+      toast: true, position: 'top-end', icon, title,
+      showConfirmButton: false, timer: 2000, timerProgressBar: true,
     });
   }
 
   private async loadAll(): Promise<void> {
     this.loading = true;
-    await this.teacherService.reloadFromServer();
-    [this.subjects, this.faculties] = await Promise.all([
-      this.academic.getSubjects(),
-      this.academic.getFaculties(),
+    [this.courses, this.programs] = await Promise.all([
+      this.academic.getCourses(),
+      this.academic.getPrograms(),
     ]);
-    this.teachers = this.teacherService.getAll();
     this.loading = false;
     this.cdr.detectChanges();
   }
 
-  get filteredSubjects(): Subject[] {
-    if (!this.filterFacultyId) return this.subjects;
-    return this.subjects.filter(s => s.facultyId === this.filterFacultyId);
+  get filteredCourses(): Course[] {
+    if (!this.filterProgramId) return this.courses;
+    return this.courses.filter(c => c.programId === this.filterProgramId);
   }
 
-  facultyName(id: string): string {
-    return this.faculties.find(f => f.id === id)?.name ?? '—';
-  }
-
-  teacherName(uid: string): string {
-    const t = this.teachers.find(t => t.UID === uid);
-    if (!t) return '—';
-    return `${t.firstname} ${t.lastname}`.trim();
-  }
-
-  get availableTeachers(): TeacherAccount[] {
-    return this.teachers;
+  programName(id: string): string {
+    return this.programs.find(p => p.id === id)?.name ?? '—';
   }
 
   openAddForm(): void {
@@ -103,15 +80,14 @@ export class AdminSubjects implements OnInit {
     this.showForm = true;
   }
 
-  openEditForm(s: Subject): void {
-    this.editingId = s.id;
+  openEditForm(c: Course): void {
+    this.editingId = c.id;
     this.form = {
-      name: s.name,
-      units: s.units,
-      schedule: s.schedule,
-      semester: s.semester,
-      facultyId: s.facultyId,
-      teacherUID: s.teacherUID,
+      name: c.name,
+      units: c.units,
+      schedule: c.schedule,
+      semester: c.semester,
+      programId: c.programId,
     };
     this.showForm = true;
   }
@@ -122,59 +98,52 @@ export class AdminSubjects implements OnInit {
     this.form = this.emptyForm();
   }
 
-  async saveSubject(): Promise<void> {
-    const { name, units, schedule, semester, facultyId, teacherUID } = this.form;
-    if (!name.trim() || !units || !schedule.trim() || !semester.trim() || !facultyId || !teacherUID) {
-      this.toast('error', 'Please fill in all fields');
+  async saveCourse(): Promise<void> {
+    const { name, units, schedule, semester, programId } = this.form;
+    if (!name.trim() || !units || !semester.trim() || !programId) {
+      this.toast('error', 'Please fill in all required fields');
       return;
     }
 
-    const teacher = this.teachers.find(t => t.UID === teacherUID);
-    const teacherName = teacher
-      ? `${teacher.firstname} ${teacher.lastname}`.trim()
-      : '';
-
-    const payload = {
+    const payload: Omit<Course, 'id'> = {
       name: name.trim(),
       units: Number(units),
       schedule: schedule.trim(),
       semester: semester.trim(),
-      facultyId,
-      teacherUID,
-      teacherName,
+      programId,
     };
 
     try {
       if (this.editingId) {
-        await this.academic.updateSubject(this.editingId, payload);
-        this.toast('success', 'Subject updated');
+        await this.academic.updateCourse(this.editingId, payload);
+        this.toast('success', 'Course updated');
       } else {
-        await this.academic.addSubject(payload);
-        this.toast('success', 'Subject created');
+        await this.academic.addCourse(payload);
+        this.toast('success', 'Course created');
       }
       this.cancelForm();
       await this.loadAll();
     } catch {
-      this.toast('error', 'Failed to save subject');
+      this.toast('error', 'Failed to save course');
     }
   }
 
-  async deleteSubject(id: string): Promise<void> {
+  async deleteCourse(id: string): Promise<void> {
     const res = await Swal.fire({
       icon: 'warning',
-      title: 'Delete subject?',
-      text: 'All enrollments for this subject will also be removed.',
+      title: 'Delete course?',
+      text: 'All section assignments and enrollments will also be removed.',
       showCancelButton: true,
       confirmButtonText: 'Delete',
       confirmButtonColor: '#ef4444',
     });
     if (!res.isConfirmed) return;
     try {
-      await this.academic.deleteSubject(id);
+      await this.academic.deleteCourse(id);
       await this.loadAll();
-      this.toast('success', 'Subject deleted');
+      this.toast('success', 'Course deleted');
     } catch {
-      this.toast('error', 'Failed to delete subject');
+      this.toast('error', 'Failed to delete course');
     }
   }
 }

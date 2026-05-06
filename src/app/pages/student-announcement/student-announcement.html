@@ -2,41 +2,51 @@
   <header>
     <h2 class="page-title">Announcements</h2>
     <p class="page-subtitle">
-      Stay updated with the latest posts from your enrolled teachers.
+      Stay updated with announcements from your enrolled courses.
     </p>
   </header>
 
+  <p class="muted" *ngIf="loading">Loading…</p>
+
   <!-- Filter -->
-  <div class="filter-bar" *ngIf="enrolledSubjects.length > 0">
+  <div class="filter-bar"
+    *ngIf="!loading && allAnnouncements.length > 0">
     <label class="filter-field">
       <span class="filter-label">Filter by teacher</span>
       <select [(ngModel)]="filterTeacherUID" (ngModelChange)="onFilterChange()">
         <option value="">All teachers</option>
-        <option *ngFor="let s of enrolledSubjects" [value]="s.teacherUID">
-          {{ s.teacherName || s.teacherUID }} — {{ s.name }}
+        <option *ngFor="let t of uniqueTeachers" [value]="t.uid">
+          {{ t.name }}
         </option>
       </select>
     </label>
     <span class="filter-count">{{ filteredAnnouncements.length }} announcement(s)</span>
   </div>
 
-  <section class="announcement-list" *ngIf="filteredAnnouncements.length > 0; else emptyState">
-    <article class="announcement-card" *ngFor="let a of filteredAnnouncements">
+  <!-- Empty state -->
+  <section class="empty-card"
+    *ngIf="!loading && allAnnouncements.length === 0">
+    <p class="empty-text">
+      No announcements yet from your enrolled courses.
+    </p>
+  </section>
+
+  <!-- Announcements list -->
+  <section class="announcement-list"
+    *ngIf="!loading && filteredAnnouncements.length > 0">
+    <article class="announcement-card"
+      *ngFor="let a of filteredAnnouncements">
       <header>
         <h3>{{ a.title }}</h3>
-        <span class="meta">{{ a.createdAt | date: 'short' }}</span>
+        <span class="meta">{{ a.createdAt | date: 'medium' }}</span>
       </header>
       <p>{{ a.message }}</p>
     </article>
   </section>
 
-  <ng-template #emptyState>
-    <section class="empty-card">
-      <p class="empty-text">
-        {{ enrolledSubjects.length === 0
-          ? 'You are not enrolled in any subjects yet.'
-          : 'No announcements found for the selected filter.' }}
-      </p>
-    </section>
-  </ng-template>
+  <section class="empty-card"
+    *ngIf="!loading && filteredAnnouncements.length === 0
+      && allAnnouncements.length > 0">
+    <p class="empty-text">No announcements match the selected filter.</p>
+  </section>
 </div>

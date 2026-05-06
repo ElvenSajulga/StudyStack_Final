@@ -1,0 +1,164 @@
+<div class="admin-page">
+  <header class="page-header">
+    <div>
+      <h2 class="page-title">Courses</h2>
+      <p class="page-subtitle">
+        Create courses under a program and assign sections to teachers.
+      </p>
+    </div>
+    <button type="button" class="btn primary" (click)="openAddCourse()">
+      + Add course
+    </button>
+  </header>
+
+  <!-- Course form -->
+  <section class="card" *ngIf="showCourseForm">
+    <h3>{{ editingCourseId ? 'Edit course' : 'New course' }}</h3>
+    <div class="form-grid">
+      <label class="field">
+        <span class="field-label">Course name <span class="req">*</span></span>
+        <input type="text" [(ngModel)]="courseForm.name"
+          placeholder="e.g. Fundamentals of Databases" />
+      </label>
+
+      <label class="field">
+        <span class="field-label">Program <span class="req">*</span></span>
+        <select [(ngModel)]="courseForm.programId">
+          <option value="">— Select program —</option>
+          <option *ngFor="let p of programs" [value]="p.id">{{ p.name }}</option>
+        </select>
+      </label>
+
+      <label class="field">
+        <span class="field-label">Units <span class="req">*</span></span>
+        <input type="number" [(ngModel)]="courseForm.units" min="1" max="6" />
+      </label>
+
+      <label class="field">
+        <span class="field-label">Semester <span class="req">*</span></span>
+        <select [(ngModel)]="courseForm.semester">
+          <option value="">— Select semester —</option>
+          <option value="1st Semester">1st Semester</option>
+          <option value="2nd Semester">2nd Semester</option>
+          <option value="Summer">Summer</option>
+        </select>
+      </label>
+
+      <label class="field full-width">
+        <span class="field-label">Schedule</span>
+        <input type="text" [(ngModel)]="courseForm.schedule"
+          placeholder="e.g. MWF 8:00–9:00 AM" />
+      </label>
+    </div>
+    <div class="form-actions">
+      <button class="btn subtle" (click)="cancelCourseForm()">Cancel</button>
+      <button class="btn primary" (click)="saveCourse()">
+        {{ editingCourseId ? 'Save changes' : 'Create course' }}
+      </button>
+    </div>
+  </section>
+
+  <!-- Filter -->
+  <div class="filter-bar" *ngIf="!showCourseForm && courses.length > 0">
+    <label class="field">
+      <span class="field-label">Filter by program</span>
+      <select [(ngModel)]="filterProgramId">
+        <option value="">All programs</option>
+        <option *ngFor="let p of programs" [value]="p.id">{{ p.name }}</option>
+      </select>
+    </label>
+    <span class="muted">{{ filteredCourses.length }} course(s)</span>
+  </div>
+
+  <p class="muted center" *ngIf="loading">Loading…</p>
+
+  <section class="card empty-state"
+    *ngIf="!loading && !showCourseForm && courses.length === 0">
+    <p>No courses yet. Click <strong>+ Add course</strong> to get started.</p>
+  </section>
+
+  <!-- Course list -->
+  <section class="course-list" *ngIf="!loading && !showCourseForm">
+    <div class="course-block" *ngFor="let c of filteredCourses">
+
+      <!-- Course header row -->
+      <div class="course-row" (click)="toggleCourse(c.id)">
+        <div class="course-info">
+          <span class="course-name">{{ c.name }}</span>
+          <span class="course-meta">
+            {{ programName(c.programId) }} &nbsp;·&nbsp;
+            {{ c.units }} units &nbsp;·&nbsp;
+            {{ c.semester }}
+            <span *ngIf="c.schedule"> &nbsp;·&nbsp; {{ c.schedule }}</span>
+          </span>
+        </div>
+        <div class="course-actions" (click)="$event.stopPropagation()">
+          <span class="assign-count">
+            {{ assignmentsForCourse(c.id).length }} section(s)
+          </span>
+          <button class="btn small subtle" (click)="openEditCourse(c)">Edit</button>
+          <button class="btn small danger" (click)="deleteCourse(c)">Delete</button>
+          <span class="expand-arrow">
+            {{ expandedCourseId === c.id ? '▾' : '▸' }}
+          </span>
+        </div>
+      </div>
+
+      <!-- Section-teacher assignments -->
+      <div class="assignments-panel" *ngIf="expandedCourseId === c.id">
+
+        <p class="assign-label">Section — Teacher assignments</p>
+
+        <p class="muted"
+          *ngIf="assignmentsForCourse(c.id).length === 0">
+          No sections assigned yet.
+        </p>
+
+        <!-- Existing assignments -->
+        <div class="assign-row"
+          *ngFor="let cs of assignmentsForCourse(c.id)">
+          <div class="assign-info">
+            <span class="section-chip">{{ sectionName(cs.sectionId) }}</span>
+            <span class="assign-arrow">→</span>
+            <span class="teacher-chip">{{ teacherName(cs.teacherUID) }}</span>
+          </div>
+          <button class="btn small danger"
+            (click)="removeAssignment(cs)">Remove</button>
+        </div>
+
+        <!-- Add assignment form -->
+        <div class="add-assign-form"
+          *ngIf="unassignedSections(c.id, c.programId).length > 0">
+          <select [(ngModel)]="assignForm[c.id].sectionId">
+            <option value="">— Select section —</option>
+            <option
+              *ngFor="let s of unassignedSections(c.id, c.programId)"
+              [value]="s.id"
+            >
+              {{ yearLevelName(s.yearLevelId) }} — {{ s.name }}
+            </option>
+          </select>
+          <select [(ngModel)]="assignForm[c.id].teacherUID">
+            <option value="">— Select teacher —</option>
+            <option
+              *ngFor="let t of teachersForProgram(c.programId)"
+              [value]="t.UID"
+            >
+              {{ t.lastname }}, {{ t.firstname }}
+            </option>
+          </select>
+          <button class="btn small primary"
+            (click)="assignSection(c.id, c.programId)">
+            Assign
+          </button>
+        </div>
+
+        <p class="muted"
+          *ngIf="unassignedSections(c.id, c.programId).length === 0
+            && assignmentsForCourse(c.id).length > 0">
+          All sections have been assigned.
+        </p>
+      </div>
+    </div>
+  </section>
+</div>

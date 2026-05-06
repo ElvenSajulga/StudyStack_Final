@@ -1,0 +1,157 @@
+<div class="admin-page">
+  <header class="page-header">
+    <div>
+      <h2 class="page-title">Sections</h2>
+      <p class="page-subtitle">
+        Manage year levels and sections under each program.
+      </p>
+    </div>
+  </header>
+
+  <p class="muted center" *ngIf="loading">Loading…</p>
+
+  <section class="card empty-state" *ngIf="!loading && programs.length === 0">
+    <p>No programs found. Add programs first on the Programs &amp; Faculties page.</p>
+  </section>
+
+  <!-- Program list -->
+  <section class="tree" *ngIf="!loading && programs.length > 0">
+    <div class="program-block" *ngFor="let p of programs">
+
+      <!-- Program row -->
+      <div class="tree-row program-row">
+        <button class="expand-btn" (click)="toggleProgram(p.id)">
+          {{ expandedProgramId === p.id ? '▾' : '▸' }}
+        </button>
+        <span class="tree-label program-label">{{ p.name }}</span>
+        <span class="count-badge">
+          {{ yearLevelsForProgram(p.id).length }} year level(s)
+        </span>
+      </div>
+
+      <!-- Program content -->
+      <div class="program-content" *ngIf="expandedProgramId === p.id">
+
+        <!-- Seed defaults button -->
+        <div
+          class="seed-row"
+          *ngIf="yearLevelsForProgram(p.id).length === 0"
+        >
+          <p class="muted">No year levels yet.</p>
+          <button
+            type="button"
+            class="btn small primary"
+            (click)="seedDefaults(p.id)"
+          >
+            + Add default year levels (1st–4th Year)
+          </button>
+        </div>
+
+        <!-- Add custom year level -->
+        <div class="inline-form indent">
+          <input
+            type="text"
+            placeholder="e.g. 5th Year"
+            [(ngModel)]="newYearLevelName[p.id]"
+            (keyup.enter)="addYearLevel(p.id)"
+          />
+          <button
+            type="button"
+            class="btn small subtle"
+            (click)="addYearLevel(p.id)"
+          >
+            + Add year level
+          </button>
+        </div>
+
+        <!-- Year levels -->
+        <div
+          class="year-level-block"
+          *ngFor="let yl of yearLevelsForProgram(p.id)"
+        >
+          <!-- Year level row -->
+          <div class="tree-row year-row">
+            <ng-container *ngIf="editingYearLevelId === yl.id; else ylView">
+              <input
+                class="inline-input"
+                type="text"
+                [(ngModel)]="editingYearLevelName"
+                (keyup.enter)="saveEditYearLevel(yl.id)"
+              />
+              <button class="btn small primary" (click)="saveEditYearLevel(yl.id)">Save</button>
+              <button class="btn small subtle" (click)="cancelEditYearLevel()">Cancel</button>
+            </ng-container>
+            <ng-template #ylView>
+              <button class="expand-btn" (click)="toggleYearLevel(yl.id)">
+                {{ expandedYearLevelId === yl.id ? '▾' : '▸' }}
+              </button>
+              <span class="tree-label year-label">{{ yl.name }}</span>
+              <span class="count-badge">
+                {{ sectionsForYearLevel(yl.id).length }} section(s)
+              </span>
+              <div class="row-actions">
+                <button class="btn small subtle" (click)="startEditYearLevel(yl)">Edit</button>
+                <button class="btn small danger" (click)="deleteYearLevel(yl)">Delete</button>
+              </div>
+            </ng-template>
+          </div>
+
+          <!-- Sections under year level -->
+          <div
+            class="sections-content"
+            *ngIf="expandedYearLevelId === yl.id"
+          >
+            <!-- Add section -->
+            <div class="inline-form indent">
+              <input
+                type="text"
+                placeholder="e.g. BSIT 2A"
+                [(ngModel)]="newSectionName[yl.id]"
+                (keyup.enter)="addSection(yl.id, p.id)"
+              />
+              <button
+                type="button"
+                class="btn small primary"
+                (click)="addSection(yl.id, p.id)"
+              >
+                Add section
+              </button>
+            </div>
+
+            <p
+              class="muted indent"
+              *ngIf="sectionsForYearLevel(yl.id).length === 0"
+            >
+              No sections yet.
+            </p>
+
+            <!-- Section rows -->
+            <div
+              class="tree-row section-row indent"
+              *ngFor="let s of sectionsForYearLevel(yl.id)"
+            >
+              <ng-container *ngIf="editingSectionId === s.id; else sectionView">
+                <input
+                  class="inline-input"
+                  type="text"
+                  [(ngModel)]="editingSectionName"
+                  (keyup.enter)="saveEditSection(s.id)"
+                />
+                <button class="btn small primary" (click)="saveEditSection(s.id)">Save</button>
+                <button class="btn small subtle" (click)="cancelEditSection()">Cancel</button>
+              </ng-container>
+              <ng-template #sectionView>
+                <span class="section-dot">•</span>
+                <span class="tree-label">{{ s.name }}</span>
+                <div class="row-actions">
+                  <button class="btn small subtle" (click)="startEditSection(s)">Edit</button>
+                  <button class="btn small danger" (click)="deleteSection(s)">Delete</button>
+                </div>
+              </ng-template>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>

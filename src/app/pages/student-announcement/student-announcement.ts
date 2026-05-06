@@ -1,10 +1,17 @@
-import { Component, OnDestroy, OnInit, inject, PLATFORM_ID, ChangeDetectorRef, NgZone } from '@angular/core';
+import { Component, OnDestroy, OnInit, NgZone,
+  inject, PLATFORM_ID, ChangeDetectorRef } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Announcement, AnnouncementService } from '../../services/announcement.service';
-import { AcademicService, Subject } from '../../services/academic.service';
+import { AcademicService, Course, Enrollment } from '../../services/academic.service';
 import { AuthService } from '../../services/auth.service';
-import { TeacherAccountService } from '../../services/teacher-account.service';
+import { TeacherAccount, TeacherAccountService } from '../../services/teacher-account.service';
+
+interface AnnouncementGroup {
+  course: Course;
+  teacherName: string;
+  announcements: Announcement[];
+}
 
 @Component({
   selector: 'app-student-announcement',
@@ -14,36 +21,32 @@ import { TeacherAccountService } from '../../services/teacher-account.service';
   styleUrl: './student-announcement.scss',
 })
 export class StudentAnnouncement implements OnInit, OnDestroy {
+  groups: AnnouncementGroup[] = [];
   allAnnouncements: Announcement[] = [];
   filteredAnnouncements: Announcement[] = [];
 
-  enrolledSubjects: Subject[] = [];
   filterTeacherUID = '';
+  enrollments: Enrollment[] = [];
+  courses: Course[] = [];
+  teachers: TeacherAccount[] = [];
 
-  private enrolledTeacherUIDs: string[] = [];
+  loading = false;
+
   private readonly platformId = inject(PLATFORM_ID);
+  private readonly zone = inject(NgZone);
   private refreshTimer?: ReturnType<typeof setInterval>;
-
-  private readonly onVisibility = () => {
-    if (document.visibilityState === 'visible') {
-      this.zone.run(() => void this.loadAnnouncements());
-    }
-  };
 
   constructor(
     private readonly announcementService: AnnouncementService,
     private readonly academic: AcademicService,
     private readonly auth: AuthService,
-    private readonly cdr: ChangeDetectorRef,
-    private readonly zone: NgZone,
     private readonly teacherService: TeacherAccountService,
+    private readonly cdr: ChangeDetectorRef,
   ) {}
 
   ngOnInit(): void {
     void this.init();
-
     if (isPlatformBrowser(this.platformId)) {
-      document.addEventListener('visibilitychange', this.onVisibility);
       this.zone.runOutsideAngular(() => {
         this.refreshTimer = setInterval(() => {
           this.zone.run(() => void this.loadAnnouncements());
@@ -57,60 +60,49 @@ export class StudentAnnouncement implements OnInit, OnDestroy {
   }
 
   private async init(): Promise<void> {
-    const user = this.auth.getCurrentUser();
+    this.loading = true;
+    await this.teacherService.reloadFromServer();
+    this.teachers = this.teacherService.getAll();
+
     const sid = this.studentID;
-    const studentUID = user?.UID;
-
     if (sid) {
-      const enrollments = await this.academic.getEnrollments();
-      const myEnrollments = enrollments.filter(e =>
-        e.studentID === sid || (studentUID && e.studentUID === studentUID)
-      );
-      this.enrolledTeacherUIDs = [...new Set(myEnrollments.map(e => e.teacherUID))];
-
-      const allSubjects = await this.academic.getSubjects();
-      this.enrolledSubjects = allSubjects.filter(s =>
-        this.enrolledTeacherUIDs.includes(s.teacherUID)
-      );
+      this.enrollments = await this.academic.getEnrollmentsByStudentID(sid);
+      this.courses = await this.academic.getCourses();
     }
 
     await this.loadAnnouncements();
+    this.loading = false;
+    this.cdr.detectChanges();
   }
 
   private async loadAnnouncements(): Promise<void> {
-    try {
-      if (this.enrolledTeacherUIDs.length > 0) {
-        // Map login UIDs → teacherIDs for announcement lookup
-        await this.teacherService.reloadFromServer();
-        const allTeachers = this.teacherService.getAll();
+    if (!this.studentID) return;
 
-        const perTeacher = await Promise.all(
-          this.enrolledTeacherUIDs.map(uid => {
-            const teacher = allTeachers.find(t => t.UID === uid);
-            const teacherIDValue = teacher?.teacherID ?? uid;
-            return this.announcementService.getForTeacher(teacherIDValue);
-          })
-        );
+    const teacherUIDs = [...new Set(this.enrollments.map(e => e.teacherUID))];
 
-        const flat = perTeacher.flat();
-        const seen = new Set<string | number>();
-        this.allAnnouncements = flat
-          .filter(a => {
-            if (seen.has(a.id)) return false;
-            seen.add(a.id);
-            return true;
-          })
-          .sort((a, b) =>
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          );
-      } else {
-        this.allAnnouncements = await this.announcementService.getAllForStudents();
-      }
-    } catch {
+    if (teacherUIDs.length === 0) {
       this.allAnnouncements = [];
+      this.filteredAnnouncements = [];
+      this.groups = [];
+      this.cdr.detectChanges();
+      return;
     }
 
+    // fetch announcements only from enrolled teachers
+    const perTeacher = await Promise.all(
+      teacherUIDs.map(uid => this.announcementService.getForTeacher(uid))
+    );
+
+    const seen = new Set<string | number>();
+    this.allAnnouncements = perTeacher
+      .flat()
+      .filter(a => { if (seen.has(a.id)) return false; seen.add(a.id); return true; })
+      .sort((a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+
     this.applyFilter();
+    this.buildGroups();
     this.cdr.detectChanges();
   }
 
@@ -118,24 +110,53 @@ export class StudentAnnouncement implements OnInit, OnDestroy {
     if (!this.filterTeacherUID) {
       this.filteredAnnouncements = [...this.allAnnouncements];
     } else {
-      // filterTeacherUID is a login UID — map to teacherID for comparison
-      const allTeachers = this.teacherService.getAll();
-      const teacher = allTeachers.find(t => t.UID === this.filterTeacherUID);
-      const teacherIDValue = teacher?.teacherID ?? this.filterTeacherUID;
       this.filteredAnnouncements = this.allAnnouncements.filter(
-        a => a.teacherID === teacherIDValue
+        a => a.teacherID === this.filterTeacherUID
       );
     }
   }
 
-  onFilterChange(): void {
-    this.applyFilter();
+  onFilterChange(): void { this.applyFilter(); }
+
+  private buildGroups(): void {
+    const grouped: AnnouncementGroup[] = [];
+    const teacherUIDs = [...new Set(this.enrollments.map(e => e.teacherUID))];
+
+    for (const uid of teacherUIDs) {
+      const enrollment = this.enrollments.find(e => e.teacherUID === uid);
+      if (!enrollment) continue;
+
+      const course = this.courses.find(c => c.id === enrollment.courseId);
+      if (!course) continue;
+
+      const teacher = this.teachers.find(t => t.UID === uid);
+      const teacherName = teacher
+        ? `${teacher.firstname} ${teacher.lastname}`.trim()
+        : uid;
+
+      const announcements = this.allAnnouncements.filter(
+        a => a.teacherID === uid
+      );
+
+      if (announcements.length > 0) {
+        grouped.push({ course, teacherName, announcements });
+      }
+    }
+
+    this.groups = grouped;
+  }
+
+  teacherNameForUID(uid: string): string {
+    const t = this.teachers.find(t => t.UID === uid);
+    return t ? `${t.firstname} ${t.lastname}`.trim() : uid;
+  }
+
+  get uniqueTeachers(): { uid: string; name: string }[] {
+    const uids = [...new Set(this.enrollments.map(e => e.teacherUID))];
+    return uids.map(uid => ({ uid, name: this.teacherNameForUID(uid) }));
   }
 
   ngOnDestroy(): void {
-    if (isPlatformBrowser(this.platformId)) {
-      if (this.refreshTimer != null) clearInterval(this.refreshTimer);
-      document.removeEventListener('visibilitychange', this.onVisibility);
-    }
+    if (this.refreshTimer != null) clearInterval(this.refreshTimer);
   }
 }

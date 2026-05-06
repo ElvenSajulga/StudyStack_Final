@@ -116,3 +116,14 @@
   }
 }
 
+.pill-high, .pill-mid, .pill-low {
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 3px 10px;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+.pill-high { background: #E1F5EE; color: #085041; }
+.pill-mid  { background: #FAEEDA; color: #633806; }
+.pill-low  { background: #FCEBEB; color: #791F1F; }
