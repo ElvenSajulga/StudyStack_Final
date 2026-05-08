@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Activity, ActivityService, ActivitySubmission, AttendanceStatus, } from '../../services/activity.service';
 import { AuthService } from '../../services/auth.service';
 import { AcademicService, Course, Enrollment } from '../../services/academic.service';
+import { QuizService, QuizQuestion } from '../../services/quiz.service';
 
 interface CourseCard {
   course: Course;
@@ -30,8 +31,13 @@ export class StudentActivity implements OnInit, OnDestroy {
 
   submissions: Record<string, ActivitySubmission | undefined> = {};
   draftContent: Record<string, string> = {};
+  quizQuestions: Record<string, QuizQuestion[]> = {};
+  quizAnswers: Record<string, Record<string, string>> = {};
+  submissionLinks: Record<string, { label: string; url: string }[]> = {};
 
   loading = false;
+  newLinkLabel: Record<string, string> = {};
+  newLinkUrl: Record<string, string> = {};
 
   private readonly platformId = inject(PLATFORM_ID);
   private readonly zone = inject(NgZone);
@@ -41,6 +47,7 @@ export class StudentActivity implements OnInit, OnDestroy {
     private readonly activityService: ActivityService,
     private readonly auth: AuthService,
     private readonly academic: AcademicService,
+    private readonly quizService: QuizService,
     private readonly cdr: ChangeDetectorRef,
   ) {}
 
@@ -78,7 +85,7 @@ export class StudentActivity implements OnInit, OnDestroy {
       if (!course) continue;
 
       const activities = await this.activityService
-        .getActivitiesForTeacher(e.teacherUID);
+        .getActivitiesForTeacherUID(e.teacherUID);
 
       const now = new Date();
       const pending = activities.filter(
@@ -118,7 +125,7 @@ export class StudentActivity implements OnInit, OnDestroy {
   private async loadStream(card: CourseCard): Promise<void> {
     this.loading = true;
     const all = await this.activityService
-      .getActivitiesForTeacher(card.teacherUID);
+      .getActivitiesForTeacherUID(card.teacherUID);
     this.streamActivities = all.sort(
       (a, b) => new Date(b.deadline).getTime() - new Date(a.deadline).getTime(),
     );
@@ -126,13 +133,28 @@ export class StudentActivity implements OnInit, OnDestroy {
     this.cdr.detectChanges();
   }
 
-  openActivity(activity: Activity): void {
+  async openActivity(activity: Activity): Promise<void> {
     this.selectedActivity = activity;
     this.view = 'detail';
     if (!this.draftContent[activity.id]) {
       this.draftContent[activity.id] =
         this.submissions[activity.id]?.content ?? '';
     }
+    if (!this.submissionLinks[activity.id]) {
+      this.submissionLinks[activity.id] =
+        this.submissions[activity.id]?.links ?? [];
+    }
+    if (activity.type === 'quiz' && !this.quizQuestions[activity.id]) {
+      const questions = await this.quizService.getQuestionsForActivity(activity.id);
+      const displayQuestions = activity.shuffleQuestions
+        ? this.quizService.shuffleQuestions(questions)
+        : questions;
+      this.quizQuestions[activity.id] = displayQuestions;
+      if (!this.quizAnswers[activity.id]) {
+        this.quizAnswers[activity.id] = this.submissions[activity.id]?.quizAnswers ?? {};
+      }
+    }
+    this.cdr.detectChanges();
   }
 
   goBack(): void {
@@ -166,6 +188,42 @@ export class StudentActivity implements OnInit, OnDestroy {
     return !!this.submissions[activity.id];
   }
 
+  canSeeScorerAnswers(activity: Activity): boolean {
+    return activity.scoresReleased === true;
+  }
+
+  getScorePercentage(activity: Activity): string {
+    const sub = this.submissions[activity.id];
+    if (!sub || sub.score == null || !activity.maxPoints || activity.maxPoints === 0) {
+      return '';
+    }
+    const percentage = Math.round((sub.score / activity.maxPoints) * 100);
+    return `${percentage}%`;
+  }
+
+  addLink(activity: Activity): void {
+    const label = (this.newLinkLabel[activity.id] ?? '').trim();
+    const url = (this.newLinkUrl[activity.id] ?? '').trim();
+    if (!label || !url) {
+      alert('Please enter both label and URL.');
+      return;
+    }
+    if (!this.submissionLinks[activity.id]) {
+      this.submissionLinks[activity.id] = [];
+    }
+    this.submissionLinks[activity.id].push({ label, url });
+    this.newLinkLabel[activity.id] = '';
+    this.newLinkUrl[activity.id] = '';
+    this.cdr.detectChanges();
+  }
+
+  removeLink(activity: Activity, index: number): void {
+    if (this.submissionLinks[activity.id]) {
+      this.submissionLinks[activity.id].splice(index, 1);
+      this.cdr.detectChanges();
+    }
+  }
+
   // ── submit ────────────────────────────────────────────────────────────────────
 
   async submit(activity: Activity): Promise<void> {
@@ -175,18 +233,41 @@ export class StudentActivity implements OnInit, OnDestroy {
 
     if (!sid) return;
     const content = this.draftContent[activity.id] ?? '';
-    if (!content.trim()) {
-      alert('Please enter your answer before submitting.');
-      return;
-    }
+
     if (!this.isOpen(activity)) {
       alert('This activity is already closed.');
       return;
     }
-    const sub = await this.activityService.submitOrUpdateSubmission(
-      activity.id, sid, sUID, content,
-    );
-    this.submissions[activity.id] = sub;
+
+    if (activity.type === 'quiz') {
+      const questions = this.quizQuestions[activity.id] ?? [];
+      if (questions.length === 0) {
+        alert('No questions loaded.');
+        return;
+      }
+      const answers = this.quizAnswers[activity.id] ?? {};
+      const unanswered = questions.filter(q => !answers[q.id]);
+      if (unanswered.length > 0) {
+        alert('Please answer all questions before submitting.');
+        return;
+      }
+      const sub = await this.activityService.submitOrUpdateSubmission(
+        activity.id, sid, sUID, content,
+        { quizAnswers: answers }
+      );
+      this.submissions[activity.id] = sub;
+    } else {
+      if (!content.trim() && (!this.submissionLinks[activity.id] || this.submissionLinks[activity.id].length === 0)) {
+        alert('Please enter your answer or add at least one link before submitting.');
+        return;
+      }
+      const links = this.submissionLinks[activity.id] ?? [];
+      const sub = await this.activityService.submitOrUpdateSubmission(
+        activity.id, sid, sUID, content,
+        { links }
+      );
+      this.submissions[activity.id] = sub;
+    }
     this.cdr.detectChanges();
     alert('Submitted successfully!');
   }

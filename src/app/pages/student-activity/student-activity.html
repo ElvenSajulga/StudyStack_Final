@@ -108,6 +108,47 @@
         </div>
       </article>
 
+      <!-- Quiz section -->
+      <ng-container *ngIf="selectedActivity.type === 'quiz'">
+        <article class="detail-card">
+          <h4>Questions</h4>
+          <div class="quiz-section" *ngFor="let q of quizQuestions[selectedActivity.id]; let i = index">
+            <div class="question-header">
+              <span class="q-num">Q{{ i + 1 }}</span>
+              <span class="q-points">{{ q.points }} pt{{ q.points !== 1 ? 's' : '' }}</span>
+            </div>
+            <p class="question-text">{{ q.question }}</p>
+
+            <!-- Multiple choice -->
+            <div *ngIf="q.type === 'multiple-choice'" class="choices">
+              <label class="choice-label" *ngFor="let c of q.choices">
+                <input type="radio" [name]="'q-' + q.id" [value]="c.id"
+                  [(ngModel)]="quizAnswers[selectedActivity.id][q.id]"
+                  [disabled]="!isOpen(selectedActivity)" />
+                <span>{{ c.text }}</span>
+              </label>
+            </div>
+
+            <!-- True/False -->
+            <div *ngIf="q.type === 'true-false'" class="choices">
+              <label class="choice-label" *ngFor="let c of q.choices">
+                <input type="radio" [name]="'q-' + q.id" [value]="c.id"
+                  [(ngModel)]="quizAnswers[selectedActivity.id][q.id]"
+                  [disabled]="!isOpen(selectedActivity)" />
+                <span>{{ c.text }}</span>
+              </label>
+            </div>
+
+            <!-- Short answer -->
+            <div *ngIf="q.type === 'short-answer'" class="short-answer">
+              <input type="text" placeholder="Type your answer here..."
+                [(ngModel)]="quizAnswers[selectedActivity.id][q.id]"
+                [disabled]="!isOpen(selectedActivity)" />
+            </div>
+          </div>
+        </article>
+      </ng-container>
+
       <!-- Submission panel -->
       <article class="submission-panel">
         <h4>Your submission</h4>
@@ -123,22 +164,67 @@
           </span>
         </div>
 
-        <div class="score-row" *ngIf="submissions[selectedActivity.id]?.score != null">
+        <div class="score-row" *ngIf="canSeeScorerAnswers(selectedActivity) && submissions[selectedActivity.id]?.score != null">
           <span class="score-label">Score:</span>
           <span class="score-value">
             {{ submissions[selectedActivity.id]?.score }}
             <span *ngIf="selectedActivity.maxPoints != null">
               / {{ selectedActivity.maxPoints }}
             </span>
+            <span class="score-percentage" *ngIf="getScorePercentage(selectedActivity)">
+              ({{ getScorePercentage(selectedActivity) }})
+            </span>
           </span>
         </div>
 
-        <ng-container *ngIf="isOpen(selectedActivity)">
+        <p class="score-hidden-notice" *ngIf="!canSeeScorerAnswers(selectedActivity) && submissions[selectedActivity.id]?.submitted">
+          Scores have not been released yet. Check back later to see your score and answers.
+        </p>
+
+        <ng-container *ngIf="isOpen(selectedActivity) && selectedActivity.type === 'output'">
           <textarea
             rows="6"
             [(ngModel)]="draftContent[selectedActivity.id]"
-            placeholder="Write your answer or paste your output link here."
+            placeholder="Write your answer or describe your output here."
           ></textarea>
+
+          <div style="margin-top: 16px;">
+            <h5 style="margin-bottom: 8px;">Submit files or links</h5>
+            <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+              <input
+                type="text"
+                [(ngModel)]="newLinkLabel[selectedActivity.id]"
+                placeholder="Label (e.g., Google Drive, GitHub)"
+                style="flex: 0.5;"
+              />
+              <input
+                type="url"
+                [(ngModel)]="newLinkUrl[selectedActivity.id]"
+                placeholder="URL"
+                style="flex: 1;"
+              />
+              <button
+                type="button"
+                class="btn outline"
+                (click)="addLink(selectedActivity)"
+              >
+                Add link
+              </button>
+            </div>
+            <div *ngIf="submissionLinks[selectedActivity.id] && submissionLinks[selectedActivity.id].length > 0" style="margin-bottom: 12px;">
+              <div *ngFor="let link of submissionLinks[selectedActivity.id]; let i = index" style="display: flex; align-items: center; gap: 8px; padding: 8px; background: #f3f4f6; border-radius: 6px; margin-bottom: 6px;">
+                <span style="flex: 1;">{{ link.label }}: <a [href]="link.url" target="_blank" style="color: #0a7a45; text-decoration: underline;">{{ link.url }}</a></span>
+                <button
+                  type="button"
+                  class="btn danger sm"
+                  (click)="removeLink(selectedActivity, i)"
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+          </div>
+
           <button
             type="button"
             class="submit-btn"
@@ -146,6 +232,20 @@
           >
             {{ hasSubmission(selectedActivity) ? 'Update submission' : 'Submit' }}
           </button>
+        </ng-container>
+
+        <ng-container *ngIf="isOpen(selectedActivity) && selectedActivity.type === 'quiz'">
+          <button
+            type="button"
+            class="submit-btn"
+            (click)="submit(selectedActivity)"
+            [disabled]="submissions[selectedActivity.id]?.submitted"
+          >
+            {{ submissions[selectedActivity.id]?.submitted ? 'Quiz submitted ✓' : 'Submit quiz' }}
+          </button>
+          <p class="submitted-notice" *ngIf="submissions[selectedActivity.id]?.submitted">
+            Your quiz has been submitted and cannot be unsubmitted.
+          </p>
         </ng-container>
 
         <p class="closed-notice" *ngIf="!isOpen(selectedActivity)">

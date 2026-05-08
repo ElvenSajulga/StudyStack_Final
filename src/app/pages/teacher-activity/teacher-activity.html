@@ -1,14 +1,49 @@
 <div class="ta-page">
 
-  <!-- ══ LIST VIEW ══════════════════════════════════════════════════════ -->
-  <ng-container *ngIf="view === 'list'">
+  <!-- ══ COURSES VIEW ════════════════════════════════════════════════════ -->
+  <ng-container *ngIf="view === 'courses'">
     <header class="page-header">
       <div>
         <h2 class="page-title">Activities</h2>
-        <p class="page-subtitle">Create and manage activities for your students.</p>
+        <p class="page-subtitle">Select a course to view and manage its activities.</p>
+      </div>
+    </header>
+
+    <p class="muted" *ngIf="loading">Loading…</p>
+
+    <section class="course-grid" *ngIf="!loading">
+      <div
+        class="course-card"
+        *ngFor="let card of courseCards"
+        (click)="openCourse(card)"
+      >
+        <div class="course-card-header">
+          <span class="course-card-name">{{ card.course.name }}</span>
+          <span class="course-card-sem">{{ card.course.semester }}</span>
+        </div>
+        <div class="course-card-body">
+          <span class="units-badge">{{ card.course.units }} units</span>
+        </div>
+      </div>
+
+      <div class="empty-card" *ngIf="courseCards.length === 0">
+        <p class="empty-text">You are not assigned to any courses yet.</p>
+      </div>
+    </section>
+  </ng-container>
+
+  <!-- ══ LIST VIEW ══════════════════════════════════════════════════════ -->
+  <ng-container *ngIf="view === 'list' && selectedCourseCard">
+    <header class="page-header">
+      <div>
+        <button class="back-btn" (click)="goBackToCourses()">← Back</button>
+        <h2 class="page-title">{{ selectedCourseCard.course.name }}</h2>
+        <p class="page-subtitle">Create and manage activities for this course.</p>
       </div>
       <button class="btn primary" (click)="showCreate()">+ New activity</button>
     </header>
+
+    <p class="muted" *ngIf="loading">Loading activities…</p>
 
     <section *ngIf="activities.length > 0; else emptyActivities" class="activity-list">
       <article class="activity-card" *ngFor="let a of activities">
@@ -99,6 +134,11 @@
         <label class="field" *ngIf="form.type === 'output'">
           <span class="field-label">Max points</span>
           <input type="number" [(ngModel)]="form.maxPoints" min="1" placeholder="e.g. 100" />
+        </label>
+
+        <label class="field checkbox" *ngIf="form.type === 'quiz'">
+          <input type="checkbox" [(ngModel)]="form.shuffleQuestions" />
+          <span class="field-label">Shuffle questions for each student</span>
         </label>
 
         <label class="field">

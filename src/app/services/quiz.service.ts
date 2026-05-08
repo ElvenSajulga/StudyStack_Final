@@ -66,6 +66,15 @@ export class QuizService {
     return crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
   }
 
+  shuffleQuestions(questions: QuizQuestion[]): QuizQuestion[] {
+    const shuffled = [...questions];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  }
+
   /** Auto-grade a student's answers against correct answers.
    *  Returns { totalScore, maxScore, results } */
   gradeQuiz(

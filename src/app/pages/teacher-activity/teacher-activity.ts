@@ -6,9 +6,15 @@ import { QuizQuestion, QuizService, QuestionChoice } from '../../services/quiz.s
 import { NotificationService } from '../../services/notification.service';
 import { AuthService } from '../../services/auth.service';
 import { StudentAccountService } from '../../services/student-account.service';
+import { AcademicService, Course, CourseSection } from '../../services/academic.service';
 import Swal from 'sweetalert2';
 
-type TeacherView = 'list' | 'create' | 'quiz-builder' | 'grade';
+interface CourseCard {
+  courseSection: CourseSection;
+  course: Course;
+}
+
+type TeacherView = 'courses' | 'list' | 'create' | 'quiz-builder' | 'grade';
 
 @Component({
   selector: 'app-teacher-activity',
@@ -18,13 +24,16 @@ type TeacherView = 'list' | 'create' | 'quiz-builder' | 'grade';
   styleUrl: './teacher-activity.scss',
 })
 export class TeacherActivity implements OnInit {
-  view: TeacherView = 'list';
+  view: TeacherView = 'courses';
+  courseCards: CourseCard[] = [];
+  selectedCourseCard: CourseCard | null = null;
   activities: Activity[] = [];
+  loading = false;
 
   form: {
     title: string; description: string; type: ActivityType;
-    deadline: string; closeAt: string; maxPoints?: number;
-  } = { title: '', description: '', type: 'quiz', deadline: '', closeAt: '' };
+    deadline: string; closeAt: string; maxPoints?: number; shuffleQuestions?: boolean;
+  } = { title: '', description: '', type: 'quiz', deadline: '', closeAt: '', shuffleQuestions: false };
 
   selectedActivity: Activity | null = null;
   questions: QuizQuestion[] = [];
@@ -44,24 +53,66 @@ export class TeacherActivity implements OnInit {
     private readonly notificationService: NotificationService,
     private readonly auth: AuthService,
     private readonly studentService: StudentAccountService,
+    private readonly academic: AcademicService,
     private readonly cdr: ChangeDetectorRef,
   ) {}
 
-  ngOnInit(): void { void this.loadActivities(); }
+  ngOnInit(): void { void this.loadCourseCards(); }
+
+  private get teacherUID(): string | undefined {
+    return (this.auth.getCurrentUser() as unknown as { UID?: string })?.UID;
+  }
 
   private get teacherID(): string | undefined {
     return this.auth.getCurrentUser()?.teacherID;
   }
 
-  async loadActivities(): Promise<void> {
-    const id = this.teacherID;
-    if (!id) { this.activities = []; this.cdr.detectChanges(); return; }
-    this.activities = await this.activityService.getActivitiesForTeacher(id);
+  async loadCourseCards(): Promise<void> {
+    const uid = this.teacherUID;
+    if (!uid) { this.courseCards = []; this.cdr.detectChanges(); return; }
+
+    this.loading = true;
+    const [courseSections, courses] = await Promise.all([
+      this.academic.getCourseSectionsByTeacher(uid),
+      this.academic.getCourses(),
+    ]);
+
+    const cards: CourseCard[] = [];
+    for (const cs of courseSections) {
+      const course = courses.find(c => c.id === cs.courseId);
+      if (!course) continue;
+      cards.push({ courseSection: cs, course });
+    }
+
+    this.courseCards = cards;
+    this.loading = false;
     this.cdr.detectChanges();
   }
 
+  async openCourse(card: CourseCard): Promise<void> {
+    this.selectedCourseCard = card;
+    this.view = 'list';
+    await this.loadActivities();
+  }
+
+  async loadActivities(): Promise<void> {
+    const id = this.teacherID;
+    if (!id || !this.selectedCourseCard) { this.activities = []; this.cdr.detectChanges(); return; }
+    this.loading = true;
+    const all = await this.activityService.getActivitiesForTeacher(id);
+    this.activities = all.filter(a => a.courseId === this.selectedCourseCard!.course.id);
+    this.loading = false;
+    this.cdr.detectChanges();
+  }
+
+  goBackToCourses(): void {
+    this.view = 'courses';
+    this.selectedCourseCard = null;
+    this.activities = [];
+  }
+
   showCreate(): void {
-    this.form = { title: '', description: '', type: 'quiz', deadline: '', closeAt: '' };
+    this.form = { title: '', description: '', type: 'quiz', deadline: '', closeAt: '', shuffleQuestions: false };
     this.view = 'create';
   }
 
@@ -95,7 +146,7 @@ export class TeacherActivity implements OnInit {
 
   async createActivity(): Promise<void> {
     const teacherID = this.teacherID;
-    if (!teacherID) { alert('You must be logged in as a teacher.'); return; }
+    if (!teacherID || !this.selectedCourseCard) { alert('You must select a course first.'); return; }
     const title = this.form.title.trim();
     const deadline = this.form.deadline.trim();
     const closeAt = this.form.closeAt.trim();
@@ -107,7 +158,8 @@ export class TeacherActivity implements OnInit {
       type: this.form.type,
       deadline: new Date(deadline).toISOString(),
       closeAt: new Date(closeAt).toISOString(),
-      teacherID, maxPoints: this.form.maxPoints,
+      teacherID, courseId: this.selectedCourseCard.course.id, maxPoints: this.form.maxPoints,
+      shuffleQuestions: this.form.type === 'quiz' ? this.form.shuffleQuestions : undefined,
     });
 
     if (this.form.type === 'quiz') {

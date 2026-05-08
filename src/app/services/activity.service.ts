@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { FirestoreService } from './firestore.service';
+import { TeacherAccountService } from './teacher-account.service';
 import { where } from '@angular/fire/firestore';
 
 export type ActivityType = 'quiz' | 'output';
@@ -10,11 +11,13 @@ export interface Activity {
   title: string;
   description: string;
   type: ActivityType;
-  teacherID: string;
+  teacherID: string;      // This is TeacherAccount.teacherID, e.g. "T-0001"
+  courseId?: string;      // Course this activity belongs to
   deadline: string;
   closeAt: string;
   maxPoints?: number;
   scoresReleased?: boolean;
+  shuffleQuestions?: boolean;  // For quiz activities
 }
 
 export type AttendanceStatus = 'present' | 'late' | 'absent';
@@ -42,14 +45,15 @@ export interface ActivitySubmission {
 
 @Injectable({ providedIn: 'root' })
 export class ActivityService {
-  private readonly ACTIVITIES_URL = 'http://localhost:3000/activities';
-  private readonly SUBMISSIONS_URL = 'http://localhost:3000/activitySubmissions';
-  private readonly ACT_COLLECTION = 'activities';
-  private readonly SUB_COLLECTION = 'activitySubmissions';
+  private readonly ACTIVITIES_URL   = 'http://localhost:3000/activities';
+  private readonly SUBMISSIONS_URL  = 'http://localhost:3000/activitySubmissions';
+  private readonly ACT_COLLECTION   = 'activities';
+  private readonly SUB_COLLECTION   = 'activitySubmissions';
 
   constructor(
     private readonly http: HttpClient,
     private readonly firestoreService: FirestoreService,
+    private readonly teacherAccountService: TeacherAccountService,
   ) {}
 
   // ─── Activities ───────────────────────────────────────────────────────────
@@ -75,6 +79,10 @@ export class ActivityService {
     }
   }
 
+  /**
+   * Fetch activities by the teacher's credential ID (TeacherAccount.teacherID,
+   * e.g. "T-0001").  This is the value stored in the Activity.teacherID field.
+   */
   async getActivitiesForTeacher(teacherID: string): Promise<Activity[]> {
     try {
       const list = await this.firestoreService.getAll<Activity>(
@@ -97,6 +105,62 @@ export class ActivityService {
     } catch {
       return [];
     }
+  }
+
+  /**
+   * Fetch activities by the teacher's account UID (TeacherAccount.UID,
+   * e.g. "teacher1") — the value stored in Enrollment.teacherUID.
+   *
+   * The enrollment record stores the teacher's UID, but activities store the
+   * teacher's teacherID (credential).  This helper resolves the mismatch by
+   * looking up the TeacherAccount record and then delegating to
+   * getActivitiesForTeacher().
+   */
+  async getActivitiesForTeacherUID(teacherUID: string): Promise<Activity[]> {
+    // Resolve UID → teacherID via the cached teacher accounts
+    let teacherAccount = this.teacherAccountService.getByUID(teacherUID);
+
+    // If not in cache, reload to ensure data is available
+    if (!teacherAccount) {
+      await this.teacherAccountService.reloadFromServer();
+      teacherAccount = this.teacherAccountService.getByUID(teacherUID);
+    }
+
+    if (!teacherAccount) {
+      console.warn(
+        `ActivityService.getActivitiesForTeacherUID: no teacher account found for UID "${teacherUID}"`
+      );
+      return [];
+    }
+    return this.getActivitiesForTeacher(teacherAccount.teacherID);
+  }
+
+  /**
+   * Convenience helper used by the student dashboard and attendance pages.
+   * Accepts an array of teacher UIDs (from enrollment records) and returns
+   * all activities belonging to those teachers, deduplicated.
+   */
+  async getActivitiesForEnrolledTeacherUIDs(teacherUIDs: string[]): Promise<Activity[]> {
+    if (teacherUIDs.length === 0) return [];
+
+    const perTeacher = await Promise.all(
+      teacherUIDs.map(uid => this.getActivitiesForTeacherUID(uid))
+    );
+
+    // Deduplicate by activity id (edge case: same teacher enrolled twice)
+    const seen = new Set<string>();
+    const result: Activity[] = [];
+    for (const activities of perTeacher) {
+      for (const a of activities) {
+        if (!seen.has(a.id)) {
+          seen.add(a.id);
+          result.push(a);
+        }
+      }
+    }
+    return result.sort(
+      (a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
+    );
   }
 
   async getActivityById(id: string): Promise<Activity | undefined> {
@@ -283,8 +347,8 @@ export class ActivityService {
       graded?: boolean;
     }
   ): Promise<ActivitySubmission> {
-    const nowIso = new Date().toISOString();
-    const existing = await this.getSubmission(activityId, studentID);
+    const nowIso    = new Date().toISOString();
+    const existing  = await this.getSubmission(activityId, studentID);
 
     if (!existing) {
       const id = crypto.randomUUID
@@ -296,13 +360,13 @@ export class ActivityService {
         studentID,
         studentUID,
         content,
-        submittedAt: nowIso,
+        submittedAt:  nowIso,
         lastEditedAt: nowIso,
-        submitted: true,
-        links: extra?.links ?? [],
-        quizAnswers: extra?.quizAnswers ?? {},
-        score: extra?.score ?? 0,
-        graded: extra?.graded ?? false,
+        submitted:    true,
+        links:        extra?.links        ?? [],
+        quizAnswers:  extra?.quizAnswers  ?? {},
+        score:        extra?.score        ?? 0,
+        graded:       extra?.graded       ?? false,
       };
       try {
         await this.firestoreService.set(this.SUB_COLLECTION, id, { ...submission });
@@ -324,22 +388,22 @@ export class ActivityService {
       ...existing,
       content,
       lastEditedAt: nowIso,
-      submitted: true,
-      links: extra?.links ?? existing.links ?? [],
-      quizAnswers: extra?.quizAnswers ?? existing.quizAnswers ?? {},
-      score: extra?.score ?? existing.score ?? 0,
-      graded: extra?.graded ?? existing.graded ?? false,
+      submitted:    true,
+      links:        extra?.links       ?? existing.links       ?? [],
+      quizAnswers:  extra?.quizAnswers ?? existing.quizAnswers ?? {},
+      score:        extra?.score       ?? existing.score       ?? 0,
+      graded:       extra?.graded      ?? existing.graded      ?? false,
     };
 
     try {
       await this.firestoreService.update(this.SUB_COLLECTION, existing.id, {
         content,
         lastEditedAt: nowIso,
-        submitted: true,
-        links: updated.links,
-        quizAnswers: updated.quizAnswers,
-        score: updated.score,
-        graded: updated.graded,
+        submitted:    true,
+        links:        updated.links,
+        quizAnswers:  updated.quizAnswers,
+        score:        updated.score,
+        graded:       updated.graded,
       });
       return updated;
     } catch (e) {
@@ -358,7 +422,7 @@ export class ActivityService {
   async unsubmitSubmission(submissionId: string): Promise<void> {
     try {
       await this.firestoreService.update(this.SUB_COLLECTION, submissionId, {
-        submitted: false,
+        submitted:    false,
         lastEditedAt: new Date().toISOString(),
       });
       return;
@@ -405,10 +469,10 @@ export class ActivityService {
     submission?: ActivitySubmission
   ): AttendanceStatus {
     if (!submission || !submission.submitted) return 'absent';
-    const deadline = new Date(activity.deadline);
-    const closeAt = new Date(activity.closeAt);
-    const submittedAt = new Date(submission.submittedAt);
-    const lastEditedAt = new Date(submission.lastEditedAt);
+    const deadline        = new Date(activity.deadline);
+    const closeAt         = new Date(activity.closeAt);
+    const submittedAt     = new Date(submission.submittedAt);
+    const lastEditedAt    = new Date(submission.lastEditedAt);
     const submittedOnTime = submittedAt.getTime() <= deadline.getTime();
     const editedAfterDeadline =
       lastEditedAt.getTime() > deadline.getTime() &&
@@ -417,7 +481,7 @@ export class ActivityService {
       submittedAt.getTime() > deadline.getTime() &&
       submittedAt.getTime() <= closeAt.getTime();
     if (submittedOnTime && !editedAfterDeadline) return 'present';
-    if (submittedLate || editedAfterDeadline) return 'late';
+    if (submittedLate || editedAfterDeadline)    return 'late';
     return 'absent';
   }
 
