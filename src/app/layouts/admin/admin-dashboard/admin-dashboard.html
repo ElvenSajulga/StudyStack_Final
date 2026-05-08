@@ -1,45 +1,161 @@
-<div class="dashboard">
-  <h2 class="page-title">Dashboard</h2>
+<div class="admin-dashboard">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Dashboard</h1>
+      <p class="page-subtitle">{{ today | date: 'EEEE, MMMM d, y' }}</p>
+    </div>
+  </div>
 
   <section class="stats-grid">
-    <article class="stat-card primary">
-      <h3>Total Students</h3>
-      <p class="stat-number">{{ totalStudents }}</p>
-      <p class="stat-caption">Enrolled</p>
+    <article class="card stat-card primary">
+      <div class="stat-content">
+        <h3>Total Students</h3>
+        <p class="stat-number">{{ totalStudents }}</p>
+        <p class="stat-caption">Enrolled in the system</p>
+        <span class="badge badge-primary">
+          <i class="ti ti-users"></i>
+        </span>
+      </div>
     </article>
 
-    <article class="stat-card">
-      <h3>Total Teachers</h3>
-      <p class="stat-number">{{ totalTeachers }}</p>
-      <p class="stat-caption">Active</p>
+    <article class="card stat-card secondary">
+      <div class="stat-content">
+        <h3>Total Teachers</h3>
+        <p class="stat-number">{{ totalTeachers }}</p>
+        <p class="stat-caption">Active and available</p>
+        <span class="badge badge-secondary">
+          <i class="ti ti-user-check"></i>
+        </span>
+      </div>
     </article>
 
-    <article class="stat-card">
-      <h3>Activities</h3>
-      <p class="stat-number">{{ totalActivities }}</p>
-      <p class="stat-caption">Created</p>
-    </article>
-
-    <article class="stat-card">
-      <h3>Announcements</h3>
-      <p class="stat-number">{{ totalAnnouncements }}</p>
-      <p class="stat-caption">Posted</p>
+    <article class="card stat-card info">
+      <div class="stat-content">
+        <h3>Total Programs</h3>
+        <p class="stat-number">{{ totalPrograms }}</p>
+        <p class="stat-caption">Available in system</p>
+        <span class="badge badge-info">
+          <i class="ti ti-briefcase"></i>
+        </span>
+      </div>
     </article>
   </section>
 
-  <section class="panels">
-    <article class="panel">
-      <h3>System overview</h3>
-      <p class="panel-empty">
-        Manage student and teacher accounts from the <strong>Students</strong> and <strong>Teachers</strong> pages.
-      </p>
+  <section class="content-sections">
+    <article class="card">
+      <div class="card-header">
+        <h2 class="card-title">Recent Students</h2>
+      </div>
+      <ng-container *ngIf="recentStudents.length > 0; else noStudents">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Student ID</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let student of recentStudents; let even = even" [class.even]="even">
+              <td>{{ student.firstname }} {{ student.lastname }}</td>
+              <td>{{ student.studentID }}</td>
+              <td>
+                <span class="badge" [ngClass]="student.status === 'active' ? 'badge-success' : 'badge-neutral'">
+                  {{ student.status }}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </ng-container>
+      <ng-template #noStudents>
+        <p class="empty-state">No students yet. Add students to get started.</p>
+      </ng-template>
     </article>
 
-    <article class="panel">
-      <h3>Getting started</h3>
-      <p class="panel-empty">
-        Create teacher accounts first, then let them post activities and announcements for their students.
-      </p>
+    <article class="card">
+      <div class="card-header">
+        <h2 class="card-title">Recent Teachers</h2>
+      </div>
+      <ng-container *ngIf="recentTeachers.length > 0; else noTeachers">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Teacher ID</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let teacher of recentTeachers; let even = even" [class.even]="even">
+              <td>{{ teacher.firstname }} {{ teacher.lastname }}</td>
+              <td>{{ teacher.teacherID }}</td>
+              <td>
+                <span class="badge" [ngClass]="teacher.status === 'active' ? 'badge-success' : 'badge-neutral'">
+                  {{ teacher.status }}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </ng-container>
+      <ng-template #noTeachers>
+        <p class="empty-state">No teachers yet. Add teachers to enable activities.</p>
+      </ng-template>
+    </article>
+
+    <article class="card">
+      <div class="card-header">
+        <h2 class="card-title">Recent Activities</h2>
+      </div>
+      <ng-container *ngIf="recentActivities.length > 0; else noActivities">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Activity</th>
+              <th>Due Date</th>
+              <th>Type</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let activity of recentActivities; let even = even" [class.even]="even">
+              <td>{{ activity.title }}</td>
+              <td>{{ activity.deadline | date: 'short' }}</td>
+              <td>
+                <span class="badge badge-info">{{ activity.type }}</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </ng-container>
+      <ng-template #noActivities>
+        <p class="empty-state">No activities yet.</p>
+      </ng-template>
+    </article>
+
+    <article class="card">
+      <div class="card-header">
+        <h2 class="card-title">Recent Announcements</h2>
+      </div>
+      <ng-container *ngIf="recentAnnouncements.length > 0; else noAnnouncementsPanel">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>Posted</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let announcement of recentAnnouncements; let even = even" [class.even]="even">
+              <td>{{ announcement.title }}</td>
+              <td>{{ announcement.createdAt | date: 'short' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </ng-container>
+      <ng-template #noAnnouncementsPanel>
+        <p class="empty-state">No announcements yet.</p>
+      </ng-template>
     </article>
   </section>
 </div>

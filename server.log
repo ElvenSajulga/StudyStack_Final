@@ -1,0 +1,6 @@
+
+> study-stack-wp@0.0.0 start
+> ng serve --port 4201
+
+[1m[31mAn unhandled exception occurred: Port 4201 is already in use. Use '--port' to specify a different port.
+See "C:\Users\JOHNEL~1\AppData\Local\Temp\ng-57RErg\angular-errors.log" for further details.[39m[22m

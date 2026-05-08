@@ -1,6 +1,6 @@
 <div class="notif-wrapper">
   <button class="notif-bell" (click)="togglePanel()" [class.has-unread]="unreadCount > 0">
-    🔔
+    <i class="ti ti-bell"></i>
     <span class="badge" *ngIf="unreadCount > 0">{{ unreadCount > 9 ? '9+' : unreadCount }}</span>
   </button>
 

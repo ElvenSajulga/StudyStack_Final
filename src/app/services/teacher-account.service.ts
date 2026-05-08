@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, EnvironmentInjector, runInInjectionContext, afterNextRender } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, from, map } from 'rxjs';
 import { FirestoreService } from './firestore.service';
@@ -30,9 +30,14 @@ export class TeacherAccountService {
   constructor(
     private readonly http: HttpClient,
     private readonly firestoreService: FirestoreService,
+    private readonly injector: EnvironmentInjector,
   ) {
     this.teachers = this.loadFromStorage();
-    void this.syncFromFirestore();
+    afterNextRender(() => {
+      runInInjectionContext(this.injector, () => {
+        void this.syncFromFirestore();
+      });
+    }, { injector: this.injector });
   }
 
   // ─── Storage helpers ──────────────────────────────────────────────────────

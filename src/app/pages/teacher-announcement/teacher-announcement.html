@@ -1,10 +1,43 @@
 <div class="teacher-announcement">
-  <header>
-    <h2 class="page-title">Announcements</h2>
-    <p class="page-subtitle">
-      Post important updates that will appear on your students' announcement page.
-    </p>
-  </header>
+  <!-- ── COURSES VIEW ── -->
+  <ng-container *ngIf="view === 'courses'">
+    <header>
+      <h2 class="page-title">Announcements</h2>
+      <p class="page-subtitle">Select a course to post announcements.</p>
+    </header>
+
+    <p class="muted" *ngIf="loading">Loading…</p>
+
+    <section class="course-grid" *ngIf="!loading">
+      <div
+        class="course-card"
+        *ngFor="let card of courseCards"
+        (click)="openCourse(card)"
+      >
+        <div class="course-card-header">
+          <span class="course-card-name">{{ card.course.name }}</span>
+          <span class="course-card-sem">{{ card.course.semester }}</span>
+        </div>
+        <div class="course-card-body">
+          <span class="units-badge">{{ card.course.units }} units</span>
+        </div>
+      </div>
+
+      <div class="empty-card" *ngIf="courseCards.length === 0">
+        <p class="empty-text">You are not assigned to any courses yet.</p>
+      </div>
+    </section>
+  </ng-container>
+
+  <!-- ── LIST VIEW ── -->
+  <ng-container *ngIf="view === 'list' && selectedCourseCard">
+    <header>
+      <button class="back-btn" (click)="goBackToCourses()">← Back</button>
+      <h2 class="page-title">{{ selectedCourseCard.course.name }}</h2>
+      <p class="page-subtitle">
+        Post important updates that will appear on your students' announcement page.
+      </p>
+    </header>
 
   <section class="form-section">
     <h3>Post new announcement</h3>
@@ -39,9 +72,10 @@
     </article>
   </section>
 
-  <ng-template #emptyState>
-    <section class="empty-card">
-      <p class="empty-text">No announcements yet.</p>
-    </section>
-  </ng-template>
+    <ng-template #emptyState>
+      <section class="empty-card">
+        <p class="empty-text">No announcements yet.</p>
+      </section>
+    </ng-template>
+  </ng-container>
 </div>

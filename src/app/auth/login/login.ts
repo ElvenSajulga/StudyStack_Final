@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
@@ -22,9 +22,10 @@ interface AdminAccount {
   templateUrl: './login.html',
   styleUrl: './login.scss',
 })
-export class Login implements OnInit {
+export class Login {
   UID = '';
   password = '';
+  showPassword = false;
   private readonly ADMIN_API_URL = 'http://localhost:3000/admins';
 
   constructor(
@@ -36,12 +37,12 @@ export class Login implements OnInit {
     private readonly firestoreService: FirestoreService,
   ) {}
 
-  ngOnInit(): void {
-    const user = this.auth.getCurrentUser();
-    if (!user) return;
-    if (user.role === 'admin') void this.router.navigate(['/admin-dashboard']);
-    else if (user.role === 'student') void this.router.navigate(['/student-dashboard']);
-    else if (user.role === 'teacher') void this.router.navigate(['/teacher-dashboard']);
+  // NOTE: The previous ngOnInit redirect guard has been removed.
+  // Redirection of authenticated users away from /login is now handled
+  // declaratively by loginGuard in app.routes.ts.
+
+  togglePasswordVisibility(): void {
+    this.showPassword = !this.showPassword;
   }
 
   async login(): Promise<void> {
@@ -87,7 +88,7 @@ export class Login implements OnInit {
         role: 'student',
         name: `${student.firstname} ${student.lastname}`.trim(),
         studentID: student.studentID,
-        UID: student.UID,   
+        UID: student.UID,
       });
       this.showSuccess('Welcome, student!');
       void this.router.navigate(['/student-dashboard']);
@@ -101,7 +102,7 @@ export class Login implements OnInit {
         role: 'teacher',
         name: `${teacher.firstname} ${teacher.lastname}`.trim(),
         teacherID: teacher.teacherID,
-        UID: teacher.UID,   
+        UID: teacher.UID,
       });
       this.showSuccess('Welcome, teacher!');
       void this.router.navigate(['/teacher-dashboard']);

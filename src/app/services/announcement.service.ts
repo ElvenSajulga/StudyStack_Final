@@ -9,6 +9,7 @@ export interface Announcement {
   message: string;
   createdAt: string; // ISO
   teacherID: string;
+  courseId?: string; // Course this announcement belongs to
 }
 
 @Injectable({
@@ -83,19 +84,24 @@ export class AnnouncementService {
   async create(
     teacherID: string,
     title: string,
-    message: string
+    message: string,
+    courseId?: string
   ): Promise<Announcement> {
-    const payload = {
+    const payload: Record<string, unknown> = {
       title,
       message,
       teacherID,
       createdAt: new Date().toISOString(),
     };
 
+    if (courseId) {
+      payload['courseId'] = courseId;
+    }
+
     if (this.useFirestore) {
       try {
         const id = await this.firestoreService.add(this.COLLECTION, payload);
-        return { id, ...payload };
+        return { id, ...payload } as Announcement;
       } catch {
         this.useFirestore = false;
       }

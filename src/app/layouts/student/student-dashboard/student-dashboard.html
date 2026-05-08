@@ -1,58 +1,116 @@
 <div class="student-dashboard">
-  <h2 class="page-title">My dashboard</h2>
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Dashboard</h1>
+      <p class="page-subtitle">{{ today | date: 'EEEE, MMMM d, y' }}</p>
+    </div>
+  </div>
 
   <section class="stats-grid">
-    <article class="stat-card">
-      <div class="stat-icon" style="background:#E1F5EE">
-        <i class="ti ti-check" style="color:#0F6E56" aria-hidden="true"></i>
+    <article class="card stat-card">
+      <div class="stat-content">
+        <h3>On-Time Submissions</h3>
+        <p class="stat-number">{{ presentCount }}</p>
+        <p class="stat-caption">Completed on schedule</p>
+        <span class="badge badge-success">
+          <i class="ti ti-check"></i>
+        </span>
       </div>
-      <h3>Present</h3>
-      <p class="stat-number">{{ presentCount }}</p>
-      <p class="stat-caption">On-time submissions</p>
     </article>
 
-    <article class="stat-card">
-      <div class="stat-icon" style="background:#FAEEDA">
-        <i class="ti ti-clock" style="color:#854F0B" aria-hidden="true"></i>
+    <article class="card stat-card">
+      <div class="stat-content">
+        <h3>Late Submissions</h3>
+        <p class="stat-number">{{ lateCount }}</p>
+        <p class="stat-caption">Submitted after deadline</p>
+        <span class="badge badge-warning">
+          <i class="ti ti-clock"></i>
+        </span>
       </div>
-      <h3>Late</h3>
-      <p class="stat-number">{{ lateCount }}</p>
-      <p class="stat-caption">Submitted after deadline</p>
     </article>
 
-    <article class="stat-card">
-      <div class="stat-icon" style="background:#FCEBEB">
-        <i class="ti ti-x" style="color:#A32D2D" aria-hidden="true"></i>
+    <article class="card stat-card">
+      <div class="stat-content">
+        <h3>Missing Submissions</h3>
+        <p class="stat-number">{{ absentCount }}</p>
+        <p class="stat-caption">No valid submission</p>
+        <span class="badge badge-danger">
+          <i class="ti ti-x"></i>
+        </span>
       </div>
-      <h3>Absent</h3>
-      <p class="stat-number">{{ absentCount }}</p>
-      <p class="stat-caption">No valid submission</p>
     </article>
 
-    <article class="stat-card">
-      <div class="stat-icon" style="background:#E6F1FB">
-        <i class="ti ti-file-text" style="color:#185FA5" aria-hidden="true"></i>
+    <article class="card stat-card">
+      <div class="stat-content">
+        <h3>Open Activities</h3>
+        <p class="stat-number">{{ openActivities }}</p>
+        <p class="stat-caption">Still accepting submissions</p>
+        <span class="badge badge-info">
+          <i class="ti ti-file-text"></i>
+        </span>
       </div>
-      <h3>Open activities</h3>
-      <p class="stat-number">{{ openActivities }}</p>
-      <p class="stat-caption">Still accepting submissions</p>
     </article>
   </section>
 
-  <section class="panels">
-    <article class="panel">
-      <h3>Recent announcements</h3>
+  <section class="content-sections">
+    <article class="card">
+      <div class="card-header">
+        <h2 class="card-title">Upcoming Activities</h2>
+      </div>
+      <ng-container *ngIf="upcomingActivities.length > 0; else noUpcoming">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Activity</th>
+              <th>Due Date</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let activity of upcomingActivities; let even = even" [class.even]="even">
+              <td>{{ activity.title }}</td>
+              <td>{{ activity.closeAt | date: 'short' }}</td>
+              <td>
+                <span class="badge" [ngClass]="isUrgent(activity.closeAt) ? 'badge-danger' : 'badge-info'">
+                  {{ getDaysLeft(activity.closeAt) }}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </ng-container>
+      <ng-template #noUpcoming>
+        <p class="empty-state">No upcoming activities at this time.</p>
+      </ng-template>
+    </article>
+
+    <article class="card">
+      <div class="card-header">
+        <h2 class="card-title">Recent Announcements</h2>
+      </div>
       <ng-container *ngIf="latestAnnouncements.length; else noAnnouncements">
-        <ul class="announcement-list">
-          <li *ngFor="let a of latestAnnouncements">
-            <strong>{{ a.title }}</strong>
-            <span class="meta">{{ a.createdAt | date: 'short' }}</span>
-            <p>{{ a.message }}</p>
-          </li>
-        </ul>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>Posted</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let a of latestAnnouncements; let even = even" [class.even]="even">
+              <td>
+                <div class="announcement-cell">
+                  <strong>{{ a.title }}</strong>
+                  <small>{{ a.message }}</small>
+                </div>
+              </td>
+              <td>{{ a.createdAt | date: 'short' }}</td>
+            </tr>
+          </tbody>
+        </table>
       </ng-container>
       <ng-template #noAnnouncements>
-        <p class="panel-empty">No announcements yet.</p>
+        <p class="empty-state">No announcements yet.</p>
       </ng-template>
     </article>
   </section>

@@ -28,17 +28,18 @@
   display: inline-flex;
   align-items: baseline;
   gap: 8px;
-  padding: 10px 16px;
-  border-radius: 999px;
-  background: #111827;
-  color: #f9fafb;
+  padding: 8px 16px;
+  border-radius: 8px;
+  background: var(--color-background-secondary);   
+  color: var(--color-text-primary);               
+  border: 0.5px solid var(--color-border-tertiary);
 }
 
 .metric-label {
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  opacity: 0.8;
+  color: var(--color-text-tertiary);  
 }
 
 .metric-value {
@@ -53,14 +54,14 @@
 }
 
 .card {
-  background: #ffffff;
-  border-radius: 18px;
-  padding: 18px 18px 20px;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
-  border: 1px solid #e5e7eb;
+  background: var(--color-background-primary);
+  border-radius: 12px;
+  padding: 18px;
+  box-shadow: none;
+  border: 0.5px solid var(--color-border-tertiary);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
 }
 
 .card-header h3 {
@@ -103,18 +104,19 @@
 .field input,
 .field select {
   border-radius: 8px;
-  border: 1px solid #d1d5db;
+  border: 0.5px solid var(--color-border-tertiary);
   padding: 8px 10px;
   font-size: 0.85rem;
-  background: #f9fafb;
+  background: var(--color-background-secondary);
+  color: var(--color-text-primary);
 }
 
 .field input:focus,
 .field select:focus {
   outline: none;
-  border-color: #2563eb;
-  box-shadow: 0 0 0 1px #2563eb33;
-  background: #ffffff;
+  border-color: #1D9E75;
+  box-shadow: 0 0 0 2px #1D9E7520;
+  background: var(--color-background-primary);
 }
 
 .form-actions {
@@ -134,15 +136,14 @@
 }
 
 .btn.primary {
-  background: linear-gradient(135deg, #2563eb, #1d4ed8);
-  color: #f9fafb;
-  box-shadow: 0 10px 18px -10px rgba(37, 99, 235, 0.7);
+  background: #1D9E75;      
+  color: #fff;
+  box-shadow: none;        
 }
 
-.btn.primary:disabled {
-  opacity: 0.5;
-  cursor: default;
-  box-shadow: none;
+.btn.primary:hover:not(:disabled) {
+  background: #178a63;
+  filter: none;
 }
 
 .btn.subtle {
@@ -179,13 +180,16 @@ td {
 }
 
 th {
-  font-weight: 600;
-  color: #4b5563;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: var(--color-background-secondary);
 }
 
 tbody tr:hover {
-  background: #f9fafb;
+  background: var(--color-background-secondary);
 }
 
 .actions {
@@ -199,14 +203,13 @@ tbody tr:hover {
   border-radius: 999px;
   font-size: 0.75rem;
   font-weight: 500;
-  text-transform: capitalize;
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: #E1F5EE;   
+  color: #085041;      
 }
 
 .status-chip.inactive {
-  background: #fee2e2;
-  color: #b91c1c;
+  background: #FCEBEB;
+  color: #791F1F;
 }
 
 .muted {
@@ -259,17 +262,11 @@ tbody tr:hover {
 }
 
 .modal-card {
-  background: #ffffff;
-  border-radius: 18px;
-  padding: 24px;
-  width: 100%;
-  max-width: 640px;
-  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.18);
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  max-height: 90vh;
-  overflow-y: auto;
+  background: var(--color-background-primary);
+  border-radius: 14px;
+  padding: 22px;
+  border: 0.5px solid var(--color-border-tertiary);
+  box-shadow: 0 12px 32px rgba(0,0,0,0.12);
 }
 
 .modal-header {

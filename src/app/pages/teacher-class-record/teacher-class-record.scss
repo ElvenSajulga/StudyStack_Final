@@ -1,32 +1,35 @@
 .teacher-class-record {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 20px;
 }
 
 .teacher-class-record h2 {
   margin: 0;
   font-size: 1.4rem;
-  font-weight: 600;
-  color: #111827;
+  font-weight: 500;
+  color: var(--color-text-primary);
 }
 
 .card {
-  background: #ffffff;
-  border-radius: 18px;
-  padding: 18px 18px 20px;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
-  border: 1px solid #e5e7eb;
+  background: var(--color-background-primary);
+  border-radius: 12px;
+  border: 0.5px solid var(--color-border-tertiary);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
+  overflow: hidden;
+}
+
+.card-header {
+  padding: 16px 18px 0;
 }
 
 .card-header h3 {
   margin: 0;
-  font-size: 1rem;
-  font-weight: 600;
-  color: #111827;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--color-text-primary);
 }
 
 .table-wrapper {
@@ -40,40 +43,51 @@ table {
   font-size: 0.85rem;
 }
 
-th,
-td {
-  padding: 8px 10px;
+th, td {
+  padding: 9px 14px;
   text-align: left;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+  white-space: nowrap;
 }
 
 th {
-  font-weight: 600;
-  color: #4b5563;
-  background: #f9fafb;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: var(--color-background-secondary);
+  position: sticky;
+  top: 0;
 }
 
 tbody tr:hover {
-  background: #f3f4f6;
+  background: var(--color-background-secondary);
+}
+
+td {
+  color: var(--color-text-secondary);
 }
 
 .total-col {
   font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+/* score cell coloring */
+td.score-cell {
+  font-weight: 500;
 }
 
 .empty-state {
-  font-size: 0.9rem;
-  color: #6b7280;
+  padding: 48px 24px;
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
 }
 
-@media (max-width: 640px) {
-  .card {
-    padding: 14px 14px 16px;
-  }
-
-  th,
-  td {
-    padding: 6px 8px;
-  }
+.meta {
+  font-size: 0.82rem;
+  color: var(--color-text-tertiary);
+  margin-top: 4px;
 }
-

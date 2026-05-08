@@ -137,6 +137,50 @@ form {
   border-color: #0a7a45;
 }
 
+.password-input-wrapper {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.password-input-wrapper .form-control {
+  padding-right: 44px;
+  margin-bottom: 14px;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #5a7a68;
+  font-size: 18px;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+
+  &:hover {
+    color: #0a7a45;
+  }
+
+  &:active {
+    transform: translateY(-50%) scale(0.95);
+  }
+
+  i {
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
 .login-button {
   width: 100%;
   padding: 13px;

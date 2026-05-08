@@ -18,11 +18,11 @@
 }
 
 .card {
-  background: #ffffff;
-  border-radius: 18px;
-  padding: 18px 18px 20px;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
-  border: 1px solid #e5e7eb;
+  background: var(--color-background-primary);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: none;
+  border: 0.5px solid var(--color-border-tertiary);
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -49,16 +49,16 @@
 }
 
 .avatar {
-  width: 120px;
-  height: 120px;
-  border-radius: 999px;
-  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  width: 80px;             // reduce from 120px
+  height: 80px;
+  border-radius: 12px;     // square-ish instead of circle
+  background: #1D9E75;     // consistent teal
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #f9fafb;
-  font-size: 2.25rem;
-  font-weight: 700;
+  color: #fff;
+  font-size: 1.75rem;
+  font-weight: 500;
 }
 
 .profile-meta {
@@ -89,17 +89,23 @@
 
 .field input {
   border-radius: 8px;
-  border: 1px solid #d1d5db;
+  border: 0.5px solid var(--color-border-tertiary);
   padding: 8px 10px;
   font-size: 0.85rem;
-  background: #f9fafb;
+  background: var(--color-background-secondary);
+  color: var(--color-text-primary);
 }
 
 .field input:focus {
   outline: none;
-  border-color: #2563eb;
-  box-shadow: 0 0 0 1px #2563eb33;
-  background: #ffffff;
+  border-color: #1D9E75;
+  box-shadow: 0 0 0 2px #1D9E7520;
+  background: var(--color-background-primary);
+}
+
+.field input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .form-grid {
@@ -107,6 +113,8 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px 16px;
 }
+
+
 
 .info-note {
   margin-top: 10px;

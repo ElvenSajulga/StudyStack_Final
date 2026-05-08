@@ -28,12 +28,18 @@ export class StudentAccountService {
   private students: StudentAccount[] = [];
   private useFirestore = true;
 
+  
   constructor(
     private readonly http: HttpClient,
     private readonly firestoreService: FirestoreService,
+    private readonly injector: EnvironmentInjector,
   ) {
     this.students = this.loadFromStorage();
-    void this.syncFromFirestore();
+    afterNextRender(() => {
+      runInInjectionContext(this.injector, () => {
+        void this.syncFromFirestore();
+      });
+    }, { injector: this.injector });
   }
 
   // ─── Storage helpers ──────────────────────────────────────────────────────

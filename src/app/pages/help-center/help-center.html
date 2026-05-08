@@ -1,0 +1,44 @@
+<div class="help-center">
+  <div class="help-header">
+    <h1 class="page-title">Help Center</h1>
+    <p class="help-subtitle">Find answers to common questions about StudyStack</p>
+  </div>
+
+  <div class="help-content">
+    <section class="faq-section">
+      <h2 class="section-title">Frequently Asked Questions</h2>
+      <div class="faq-list">
+        <div class="faq-item" *ngFor="let faq of faqs; let i = index">
+          <button
+            type="button"
+            class="faq-question"
+            (click)="toggleFAQ(i)"
+            [class.expanded]="faq.expanded"
+          >
+            <span class="question-text">{{ faq.question }}</span>
+            <span class="toggle-icon">
+              <i class="ti" [class.ti-chevron-down]="!faq.expanded" [class.ti-chevron-up]="faq.expanded"></i>
+            </span>
+          </button>
+          <div class="faq-answer" *ngIf="faq.expanded">
+            <p>{{ faq.answer }}</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="contact-section">
+      <h2 class="section-title">Still need help?</h2>
+      <div class="contact-card">
+        <div class="contact-icon">
+          <i class="ti ti-mail"></i>
+        </div>
+        <div class="contact-info">
+          <h3>Contact Support</h3>
+          <p>Email us at <a href="mailto:support@studystack.edu">support@studystack.edu</a> for further assistance.</p>
+          <p class="response-time">We typically respond within 24 hours.</p>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>

@@ -30,6 +30,9 @@
                     absent: attendanceStatus(a, s) === 'absent'
                   }"
                 >
+                  <i class="ti ti-check"  *ngIf="attendanceStatus(a,s)==='present'" aria-hidden="true"></i>
+                  <i class="ti ti-clock"  *ngIf="attendanceStatus(a,s)==='late'"    aria-hidden="true"></i>
+                  <i class="ti ti-x"      *ngIf="attendanceStatus(a,s)==='absent'"  aria-hidden="true"></i>
                   {{ attendanceStatus(a, s) | titlecase }}
                 </span>
               </td>
