@@ -122,19 +122,69 @@
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let r of filteredRows">
-            <td>{{ r.studentID }}</td>
-            <td>{{ r.studentName }}</td>
-            <td>{{ r.programName }}</td>
-            <td>{{ r.courseName }}</td>
-            <td>{{ r.sectionName }}</td>
-            <td>{{ r.teacherName }}</td>
-            <td>{{ r.enrollment.enrolledAt | date: 'mediumDate' }}</td>
-            <td class="actions">
-              <button class="btn small danger"
-                (click)="removeEnrollment(r)">Remove</button>
-            </td>
-          </tr>
+          <ng-container *ngFor="let r of filteredRows">
+            <tr>
+              <td>{{ r.studentID }}</td>
+              <td>{{ r.studentName }}</td>
+              <td>{{ r.programName }}</td>
+              <td>{{ r.courseName }}</td>
+              <td>{{ r.sectionName }}</td>
+              <td>{{ r.teacherName }}</td>
+              <td>
+                <div class="enrollment-date">
+                  {{ r.enrollment.enrolledAt | date: 'mediumDate' }}
+                  <span *ngIf="r.enrollment.transferredAt"
+                    class="badge badge-warning"
+                    [title]="'Transferred: ' + (r.enrollment.transferredAt | date: 'mediumDate')">
+                    Transferred
+                  </span>
+                </div>
+              </td>
+              <td class="actions">
+                <button class="btn small subtle"
+                  (click)="openTransfer(r)"
+                  title="Transfer student to another section">
+                  <i class="ti ti-edit"></i>
+                </button>
+                <button class="btn small danger"
+                  (click)="removeEnrollment(r)">Remove</button>
+              </td>
+            </tr>
+
+            <!-- Transfer edit row -->
+            <tr *ngIf="editingEnrollmentId === r.enrollment.id"
+              class="transfer-edit-row active">
+              <td colspan="8" class="transfer-cell">
+                <div class="transfer-form">
+                  <label class="field">
+                    <span class="field-label">New section</span>
+                    <select [(ngModel)]="editTransferForm.sectionId"
+                      (ngModelChange)="onTransferSectionChange()">
+                      <option value="">— Select section —</option>
+                      <option *ngFor="let s of sectionsForCourse(r.enrollment.courseId)"
+                        [value]="s.id">
+                        {{ yearLevelName(s.yearLevelId) }} — {{ s.name }}
+                      </option>
+                    </select>
+                  </label>
+
+                  <div class="field info-field">
+                    <span class="field-label">Teacher</span>
+                    <span class="info-value" [class.no-teacher]="!editTransferForm.teacherUID">
+                      {{ editTransferForm.teacherUID
+                        ? teacherNameForUID(editTransferForm.teacherUID)
+                        : 'No teacher assigned' }}
+                    </span>
+                  </div>
+
+                  <div class="form-actions">
+                    <button class="btn subtle" (click)="cancelTransfer()">Cancel</button>
+                    <button class="btn primary" (click)="saveTransfer(r)">Save transfer</button>
+                  </div>
+                </div>
+              </td>
+            </tr>
+          </ng-container>
         </tbody>
       </table>
     </div>

@@ -76,12 +76,61 @@
   background: #ffffff;
 }
 
+// Toggle Switch Styles
+.toggle-switch {
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+  cursor: pointer;
+  user-select: none;
+
+  input[type="checkbox"] {
+    display: none;
+  }
+
+  .toggle-track {
+    display: flex;
+    align-items: center;
+    width: 44px;
+    height: 24px;
+    background: #d1d5db;
+    border-radius: 12px;
+    transition: background 0.25s ease;
+    flex-shrink: 0;
+
+    &::before {
+      content: "";
+      display: block;
+      width: 18px;
+      height: 18px;
+      background: white;
+      border-radius: 50%;
+      margin-left: 3px;
+      transition: margin-left 0.25s ease;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+  }
+
+  input[type="checkbox"]:checked + .toggle-track {
+    background: #1D9E75;
+
+    &::before {
+      margin-left: 23px;
+    }
+  }
+
+  input[type="checkbox"]:focus + .toggle-track {
+    outline: 2px solid #1D9E75;
+    outline-offset: 2px;
+  }
+}
+
 .toggle-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 10px 0;
+  padding: 12px 0;
   border-bottom: 1px solid #e5e7eb;
 }
 
@@ -98,31 +147,147 @@
 .toggle-caption {
   font-size: 0.8rem;
   color: #6b7280;
+  margin: 2px 0 0;
 }
 
 .btn-row {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
+  gap: 12px;
   margin-top: 8px;
+}
+
+.unsaved-badge {
+  display: flex;
+  align-items: center;
+}
+
+.badge-warning {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: rgba(217, 119, 6, 0.12);
+  color: #D97706;
 }
 
 .btn {
   border: none;
-  border-radius: 999px;
+  border-radius: 6px;
   font-size: 0.85rem;
   font-weight: 500;
   padding: 8px 16px;
   cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
 }
 
 .btn.primary {
   background: linear-gradient(135deg, #2563eb, #1d4ed8);
-  color: #f9fafb;
+  color: #ffffff;
+
+  &:hover:not(:disabled) {
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    transform: translateY(-1px);
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(0);
+  }
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: #ffffff;
+
+  &:hover:not(:disabled) {
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+    transform: translateY(-1px);
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(0);
+  }
+}
+
+// Danger Zone Card
+.danger-zone-card {
+  border-color: #fecaca;
+  background: linear-gradient(135deg, rgba(254, 242, 242, 0.5), rgba(255, 248, 245, 0.5));
+
+  h3 {
+    color: #991b1b;
+  }
+
+  .card-description {
+    color: #b91c1c;
+  }
+}
+
+.danger-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+}
+
+.danger-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #991b1b;
+  margin: 0;
+}
+
+.danger-caption {
+  font-size: 0.8rem;
+  color: #b91c1c;
+  margin: 4px 0 0;
 }
 
 @media (max-width: 768px) {
   .settings-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .btn-row {
+    flex-direction: column-reverse;
+    width: 100%;
+  }
+
+  .unsaved-badge {
+    width: 100%;
+  }
+
+  .badge-warning {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .danger-action {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .btn-danger {
+    width: 100%;
+    justify-content: center;
   }
 }
 

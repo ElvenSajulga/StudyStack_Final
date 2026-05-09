@@ -98,36 +98,129 @@
           <h3>Student list</h3>
           <p class="card-description">Overview of all registered students.</p>
         </div>
-        <p class="muted" *ngIf="students.length">Showing {{ students.length }} student(s)</p>
+        <div class="card-header-actions">
+          <button type="button" class="btn secondary" (click)="showImportModal = true">
+            <i class="ti ti-upload"></i>
+            Import CSV
+          </button>
+          <p class="muted" *ngIf="students.length">Total: {{ totalStudents }} student(s)</p>
+        </div>
       </header>
 
-      <section class="card-body" *ngIf="students.length > 0; else emptyState">
+      <!-- Search bar -->
+      <div class="search-bar" *ngIf="students.length > 0">
+        <i class="ti ti-search search-icon"></i>
+        <input
+          type="text"
+          class="search-input"
+          placeholder="Search by name or ID…"
+          [(ngModel)]="searchQuery"
+          (ngModelChange)="onSearchChange()"
+        />
+      </div>
+
+      <!-- Bulk actions bar -->
+      <div class="bulk-actions-bar" *ngIf="selectedStudentUIDs.size > 0">
+        <span class="bulk-info">{{ selectedStudentUIDs.size }} selected</span>
+        <div class="bulk-buttons">
+          <button type="button" class="btn subtle" (click)="bulkSetStatus('active')">
+            <i class="ti ti-check"></i>
+            Set active
+          </button>
+          <button type="button" class="btn subtle danger" (click)="bulkSetStatus('inactive')">
+            <i class="ti ti-x"></i>
+            Set inactive
+          </button>
+        </div>
+      </div>
+
+      <section class="card-body" *ngIf="paginatedRecords.length > 0; else emptyState">
         <div class="table-wrapper">
           <table>
             <thead>
               <tr>
-                <th>UID</th>
-                <th>Student ID</th>
-                <th>Name</th>
-                <th>Program</th>
-                <th>Email</th>
-                <th>Status</th>
+                <th class="checkbox-col">
+                  <input
+                    type="checkbox"
+                    [checked]="isAllSelectedOnPage"
+                    (change)="toggleSelectAll()"
+                    title="Select all on this page"
+                  />
+                </th>
+                <th class="sortable" (click)="sortBy('UID')">
+                  UID
+                  <span class="sort-icon">
+                    <i *ngIf="sortField !== 'UID'" class="ti ti-arrows-sort"></i>
+                    <i *ngIf="sortField === 'UID' && sortDir === 'asc'" class="ti ti-arrow-up"></i>
+                    <i *ngIf="sortField === 'UID' && sortDir === 'desc'" class="ti ti-arrow-down"></i>
+                  </span>
+                </th>
+                <th class="sortable" (click)="sortBy('studentID')">
+                  Student ID
+                  <span class="sort-icon">
+                    <i *ngIf="sortField !== 'studentID'" class="ti ti-arrows-sort"></i>
+                    <i *ngIf="sortField === 'studentID' && sortDir === 'asc'" class="ti ti-arrow-up"></i>
+                    <i *ngIf="sortField === 'studentID' && sortDir === 'desc'" class="ti ti-arrow-down"></i>
+                  </span>
+                </th>
+                <th class="sortable" (click)="sortBy('lastname')">
+                  Name
+                  <span class="sort-icon">
+                    <i *ngIf="sortField !== 'lastname'" class="ti ti-arrows-sort"></i>
+                    <i *ngIf="sortField === 'lastname' && sortDir === 'asc'" class="ti ti-arrow-up"></i>
+                    <i *ngIf="sortField === 'lastname' && sortDir === 'desc'" class="ti ti-arrow-down"></i>
+                  </span>
+                </th>
+                <th class="sortable" (click)="sortBy('program')">
+                  Program
+                  <span class="sort-icon">
+                    <i *ngIf="sortField !== 'program'" class="ti ti-arrows-sort"></i>
+                    <i *ngIf="sortField === 'program' && sortDir === 'asc'" class="ti ti-arrow-up"></i>
+                    <i *ngIf="sortField === 'program' && sortDir === 'desc'" class="ti ti-arrow-down"></i>
+                  </span>
+                </th>
+                <th class="sortable" (click)="sortBy('email')">
+                  Email
+                  <span class="sort-icon">
+                    <i *ngIf="sortField !== 'email'" class="ti ti-arrows-sort"></i>
+                    <i *ngIf="sortField === 'email' && sortDir === 'asc'" class="ti ti-arrow-up"></i>
+                    <i *ngIf="sortField === 'email' && sortDir === 'desc'" class="ti ti-arrow-down"></i>
+                  </span>
+                </th>
+                <th class="sortable" (click)="sortBy('status')">
+                  Status
+                  <span class="sort-icon">
+                    <i *ngIf="sortField !== 'status'" class="ti ti-arrows-sort"></i>
+                    <i *ngIf="sortField === 'status' && sortDir === 'asc'" class="ti ti-arrow-up"></i>
+                    <i *ngIf="sortField === 'status' && sortDir === 'desc'" class="ti ti-arrow-down"></i>
+                  </span>
+                </th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let s of students">
+              <tr *ngFor="let s of paginatedRecords" [class.row-selected]="selectedStudentUIDs.has(s.UID)">
+                <td class="checkbox-col">
+                  <input
+                    type="checkbox"
+                    [checked]="selectedStudentUIDs.has(s.UID)"
+                    (change)="toggleSelectStudent(s.UID)"
+                  />
+                </td>
                 <td>{{ s.UID }}</td>
                 <td>{{ s.studentID }}</td>
                 <td>{{ s.lastname }}, {{ s.firstname }} {{ s.middlename }}</td>
                 <td>{{ s.program || '—' }}</td>
                 <td>{{ s.email || '—' }}</td>
                 <td>
-                  <span class="status-chip" [class.inactive]="s.status === 'inactive'">
+                  <span class="status-chip clickable" [class.inactive]="s.status === 'inactive'" (click)="toggleStudentStatus(s)">
                     {{ s.status }}
                   </span>
                 </td>
                 <td class="actions">
+                  <button type="button" class="btn subtle" title="Reset password" (click)="resetStudentPassword(s)">
+                    <i class="ti ti-key"></i>
+                  </button>
                   <button type="button" class="btn subtle" (click)="openEdit(s)">Edit</button>
                   <button type="button" class="btn subtle danger" (click)="removeStudent(s.UID)">Remove</button>
                 </td>
@@ -135,12 +228,53 @@
             </tbody>
           </table>
         </div>
+
+        <!-- Pagination -->
+        <div class="pagination-row">
+          <span class="pagination-info">
+            Showing {{ displayCount.start }}–{{ displayCount.end }} of {{ displayCount.total }}
+          </span>
+          <div class="pagination-controls">
+            <button
+              type="button"
+              class="btn pagination-btn"
+              (click)="prevPage()"
+              [disabled]="currentPage <= 1"
+            >
+              <i class="ti ti-chevron-left"></i>
+              Prev
+            </button>
+
+            <div class="pagination-numbers">
+              <button
+                *ngFor="let page of [].constructor(totalPages); let i = index"
+                type="button"
+                class="btn pagination-number"
+                [class.active]="currentPage === i + 1"
+                (click)="goToPage(i + 1)"
+              >
+                {{ i + 1 }}
+              </button>
+            </div>
+
+            <button
+              type="button"
+              class="btn pagination-btn"
+              (click)="nextPage()"
+              [disabled]="currentPage >= totalPages"
+            >
+              Next
+              <i class="ti ti-chevron-right"></i>
+            </button>
+          </div>
+        </div>
       </section>
 
       <ng-template #emptyState>
         <div class="empty-state">
-          <p>No students registered yet.</p>
-          <p class="muted">Use the form on the left to create the first account.</p>
+          <p *ngIf="!searchQuery">No students registered yet.</p>
+          <p *ngIf="searchQuery">No results for "{{ searchQuery }}"</p>
+          <p class="muted" *ngIf="!searchQuery">Use the form on the left to create the first account.</p>
         </div>
       </ng-template>
     </article>
@@ -218,4 +352,12 @@
       </div>
     </div>
   </div>
+
+  <!-- CSV Import Modal -->
+  <app-csv-import-modal
+    [isOpen]="showImportModal"
+    [config]="csvImportConfig"
+    (close)="showImportModal = false"
+    (import)="onCSVImport($event)"
+  ></app-csv-import-modal>
 </div>

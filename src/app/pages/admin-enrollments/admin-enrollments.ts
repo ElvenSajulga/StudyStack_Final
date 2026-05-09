@@ -12,6 +12,10 @@ import {
 } from '../../services/academic.service';
 import { StudentAccount, StudentAccountService } from '../../services/student-account.service';
 import { TeacherAccount, TeacherAccountService } from '../../services/teacher-account.service';
+import { AuditLogService } from '../../services/audit-log.service';
+import { AuthService } from '../../services/auth.service';
+import { AcademicCalendarService } from '../../services/academic-calendar.service';
+import { FirestoreService } from '../../services/firestore.service';
 import Swal from 'sweetalert2';
 
 interface EnrollmentRow {
@@ -54,12 +58,22 @@ export class AdminEnrollments implements OnInit {
     teacherUID: '',
   };
 
+  editingEnrollmentId: string | null = null;
+  editTransferForm = {
+    sectionId: '',
+    teacherUID: '',
+  };
+
   loading = false;
 
   constructor(
     private readonly academic: AcademicService,
     private readonly studentService: StudentAccountService,
     private readonly teacherService: TeacherAccountService,
+    private readonly auditLog: AuditLogService,
+    private readonly auth: AuthService,
+    private readonly academicCalendar: AcademicCalendarService,
+    private readonly firestore: FirestoreService,
     private readonly cdr: ChangeDetectorRef,
   ) {}
 
@@ -217,6 +231,8 @@ export class AdminEnrollments implements OnInit {
     if (!student) return;
 
     try {
+      const course = this.courses.find(c => c.id === courseId);
+      const section = this.sections.find(s => s.id === sectionId);
       await this.academic.enrollStudent({
         studentUID,
         studentID: student.studentID,
@@ -224,9 +240,32 @@ export class AdminEnrollments implements OnInit {
         sectionId,
         teacherUID,
       });
+      const actor = this.auth.getCurrentUser();
+      void this.auditLog.log({
+        actorUID: actor?.UID ?? 'unknown',
+        actorName: actor?.name ?? 'Unknown Admin',
+        action: 'create',
+        entityType: 'enrollment',
+        entityId: `${studentUID}-${courseId}-${sectionId}`,
+        description: `Enrolled student ${student.firstname} ${student.lastname} in ${course?.name} (${section?.name})`,
+        timestamp: new Date().toISOString(),
+      });
       this.showForm = false;
       await this.loadAll();
       this.toast('success', 'Student enrolled successfully');
+
+      // Check enrollment window
+      const calendar = await this.academicCalendar.get();
+      if (calendar && !this.academicCalendar.isEnrollmentOpen(calendar)) {
+        const enrollOpen = new Date(calendar.enrollmentOpen).toLocaleDateString();
+        const enrollClose = new Date(calendar.enrollmentClose).toLocaleDateString();
+        void Swal.fire({
+          icon: 'info',
+          title: 'Enrollment window closed',
+          html: `<p>Enrollment is currently outside the scheduled window.</p><p style="margin-top: 8px;"><strong>Enrollment period:</strong> ${enrollOpen} to ${enrollClose}</p>`,
+          showConfirmButton: true,
+        });
+      }
     } catch { this.toast('error', 'Failed to enroll student'); }
   }
 
@@ -242,8 +281,76 @@ export class AdminEnrollments implements OnInit {
     if (!res.isConfirmed) return;
     try {
       await this.academic.removeEnrollment(r.enrollment.id);
+      const actor = this.auth.getCurrentUser();
+      void this.auditLog.log({
+        actorUID: actor?.UID ?? 'unknown',
+        actorName: actor?.name ?? 'Unknown Admin',
+        action: 'delete',
+        entityType: 'enrollment',
+        entityId: r.enrollment.id,
+        description: `Removed ${r.studentName} from ${r.courseName} (${r.sectionName})`,
+        timestamp: new Date().toISOString(),
+      });
       await this.loadAll();
       this.toast('success', 'Enrollment removed');
     } catch { this.toast('error', 'Failed to remove enrollment'); }
+  }
+
+  openTransfer(r: EnrollmentRow): void {
+    this.editingEnrollmentId = r.enrollment.id;
+    this.editTransferForm = {
+      sectionId: r.enrollment.sectionId,
+      teacherUID: r.enrollment.teacherUID,
+    };
+  }
+
+  cancelTransfer(): void {
+    this.editingEnrollmentId = null;
+    this.editTransferForm = { sectionId: '', teacherUID: '' };
+  }
+
+  onTransferSectionChange(): void {
+    const row = this.rows.find(r => r.enrollment.id === this.editingEnrollmentId);
+    if (!row) return;
+    const cs = this.courseSections.find(
+      cs => cs.courseId === row.enrollment.courseId
+        && cs.sectionId === this.editTransferForm.sectionId,
+    );
+    this.editTransferForm.teacherUID = cs?.teacherUID ?? '';
+  }
+
+  async saveTransfer(r: EnrollmentRow): Promise<void> {
+    const newSection = this.sections.find(s => s.id === this.editTransferForm.sectionId);
+    if (!newSection) {
+      this.toast('error', 'Invalid section selected');
+      return;
+    }
+    if (!this.editTransferForm.teacherUID) {
+      this.toast('error', 'No teacher assigned to this section');
+      return;
+    }
+
+    try {
+      await this.firestore.update('enrollments', r.enrollment.id, {
+        sectionId: this.editTransferForm.sectionId,
+        teacherUID: this.editTransferForm.teacherUID,
+        transferredAt: new Date().toISOString(),
+      });
+
+      const actor = this.auth.getCurrentUser();
+      void this.auditLog.log({
+        actorUID: actor?.UID ?? 'unknown',
+        actorName: actor?.name ?? 'Unknown Admin',
+        action: 'update',
+        entityType: 'enrollment',
+        entityId: r.enrollment.id,
+        description: `Transferred ${r.studentName} to ${newSection.name}`,
+        timestamp: new Date().toISOString(),
+      });
+
+      this.editingEnrollmentId = null;
+      await this.loadAll();
+      this.toast('success', `Student transferred to ${newSection.name}`);
+    } catch { this.toast('error', 'Failed to transfer enrollment'); }
   }
 }

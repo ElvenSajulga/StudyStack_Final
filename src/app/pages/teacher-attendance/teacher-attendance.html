@@ -1,47 +1,173 @@
 <div class="teacher-attendance">
-  <h2>Class attendance</h2>
-
-  <section *ngIf="activities.length > 0 && students.length > 0; else emptyState">
-    <article class="card" *ngFor="let a of activities">
-      <header class="card-header">
-        <h3>{{ a.title }}</h3>
-        <span class="meta">Deadline: {{ a.deadline | date: 'short' }}</span>
-      </header>
-
-      <div class="table-wrapper">
-        <table>
-          <thead>
-            <tr>
-              <th>Student ID</th>
-              <th>Name</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let s of students">
-              <td>{{ s.studentID }}</td>
-              <td>{{ s.lastname }}, {{ s.firstname }} {{ s.middlename }}</td>
-              <td>
-                <span
-                  class="status-pill"
-                  [ngClass]="{
-                    present: attendanceStatus(a, s) === 'present',
-                    late: attendanceStatus(a, s) === 'late',
-                    absent: attendanceStatus(a, s) === 'absent'
-                  }"
-                >
-                  <i class="ti ti-check"  *ngIf="attendanceStatus(a,s)==='present'" aria-hidden="true"></i>
-                  <i class="ti ti-clock"  *ngIf="attendanceStatus(a,s)==='late'"    aria-hidden="true"></i>
-                  <i class="ti ti-x"      *ngIf="attendanceStatus(a,s)==='absent'"  aria-hidden="true"></i>
-                  {{ attendanceStatus(a, s) | titlecase }}
-                </span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+  <header class="page-header">
+    <h2>Class Attendance</h2>
+    <div class="page-header-actions">
+      <div class="view-tabs" role="tablist" aria-label="Attendance view">
+        <button
+          type="button"
+          role="tab"
+          class="tab-btn"
+          [class.active]="attendanceView === 'by-activity'"
+          [attr.aria-selected]="attendanceView === 'by-activity'"
+          (click)="setAttendanceView('by-activity')"
+        >
+          By activity
+        </button>
+        <button
+          type="button"
+          role="tab"
+          class="tab-btn"
+          [class.active]="attendanceView === 'by-student'"
+          [attr.aria-selected]="attendanceView === 'by-student'"
+          (click)="setAttendanceView('by-student')"
+        >
+          By student
+        </button>
       </div>
-    </article>
-  </section>
+      <button
+        type="button"
+        class="btn btn-subtle"
+        (click)="exportAttendanceCsv()"
+        [disabled]="activities.length === 0 || students.length === 0"
+        aria-label="Export CSV"
+      >
+        <i class="ti ti-download" aria-hidden="true"></i>
+        <span>Export CSV</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="filter-bar" *ngIf="courseFilters.length > 0">
+    <label for="course-filter">Filter by course</label>
+    <select
+      id="course-filter"
+      [(ngModel)]="selectedCourseId"
+      (ngModelChange)="onCourseFilterChange()"
+    >
+      <option value="">All courses</option>
+      <option *ngFor="let filter of courseFilters" [value]="filter.courseId">
+        {{ filter.courseName }} – {{ filter.sectionName }}
+      </option>
+    </select>
+    <span class="muted" *ngIf="activities.length > 0">
+      Showing {{ activities.length }} {{ activities.length === 1 ? 'activity' : 'activities' }},
+      {{ students.length }} {{ students.length === 1 ? 'student' : 'students' }}
+    </span>
+  </div>
+
+  <ng-container *ngIf="activities.length > 0 && students.length > 0; else emptyState">
+    <!-- BY ACTIVITY VIEW -->
+    <section *ngIf="attendanceView === 'by-activity'">
+      <article class="card" *ngFor="let a of activities">
+        <header class="card-header">
+          <h3>{{ a.title }}</h3>
+          <span class="meta">Deadline: {{ a.deadline | date: 'short' }}</span>
+        </header>
+
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Student ID</th>
+                <th>Name</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let s of students">
+                <td>{{ s.studentID }}</td>
+                <td>{{ s.lastname }}, {{ s.firstname }} {{ s.middlename }}</td>
+                <td>
+                  <span
+                    class="status-pill"
+                    [ngClass]="{
+                      present: attendanceStatus(a, s) === 'present',
+                      late: attendanceStatus(a, s) === 'late',
+                      absent: attendanceStatus(a, s) === 'absent'
+                    }"
+                  >
+                    <i class="ti ti-check"  *ngIf="attendanceStatus(a,s)==='present'" aria-hidden="true"></i>
+                    <i class="ti ti-clock"  *ngIf="attendanceStatus(a,s)==='late'"    aria-hidden="true"></i>
+                    <i class="ti ti-x"      *ngIf="attendanceStatus(a,s)==='absent'"  aria-hidden="true"></i>
+                    {{ attendanceStatus(a, s) | titlecase }}
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+    </section>
+
+    <!-- BY STUDENT VIEW -->
+    <section *ngIf="attendanceView === 'by-student'">
+      <article class="card">
+        <header class="card-header">
+          <h3>Attendance summary per student</h3>
+          <span class="meta">{{ activities.length }} {{ activities.length === 1 ? 'activity' : 'activities' }} tracked</span>
+        </header>
+
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Student ID</th>
+                <th>Name</th>
+                <th class="num-col">Present</th>
+                <th class="num-col">Late</th>
+                <th class="num-col">Absent</th>
+                <th class="num-col">Total</th>
+                <th
+                  class="num-col sortable"
+                  [class.sorted]="rateSortDir !== null"
+                  (click)="toggleRateSort()"
+                >
+                  Rate
+                  <i
+                    class="ti sort-icon"
+                    [ngClass]="{
+                      'ti-arrows-sort': rateSortDir === null,
+                      'ti-sort-ascending': rateSortDir === 'asc',
+                      'ti-sort-descending': rateSortDir === 'desc'
+                    }"
+                    aria-hidden="true"
+                  ></i>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let summary of studentSummaries">
+                <td>{{ summary.student.studentID }}</td>
+                <td>
+                  {{ summary.student.lastname }}, {{ summary.student.firstname }}
+                  {{ summary.student.middlename }}
+                </td>
+                <td class="num-col">{{ summary.present }}</td>
+                <td class="num-col">{{ summary.late }}</td>
+                <td class="num-col">{{ summary.absent }}</td>
+                <td class="num-col">{{ summary.total }}</td>
+                <td class="num-col rate-cell" [ngClass]="rateClass(summary.rate)">
+                  {{ summary.rate.toFixed(1) }}%
+                </td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr class="summary-row">
+                <td colspan="2">Class totals</td>
+                <td class="num-col">{{ totalsRow.present }}</td>
+                <td class="num-col">{{ totalsRow.late }}</td>
+                <td class="num-col">{{ totalsRow.absent }}</td>
+                <td class="num-col">{{ totalsRow.total }}</td>
+                <td class="num-col rate-cell" [ngClass]="rateClass(totalsRow.rate)">
+                  {{ totalsRow.rate.toFixed(1) }}%
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </article>
+    </section>
+  </ng-container>
 
   <ng-template #emptyState>
     <article class="card empty-state">

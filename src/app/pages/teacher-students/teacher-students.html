@@ -1,0 +1,116 @@
+<div class="teacher-page">
+  <header class="page-header">
+    <div class="page-header-titles">
+      <h2>My Students</h2>
+      <p class="page-subtitle">Students enrolled across all your courses.</p>
+    </div>
+    <div class="page-header-actions">
+      <div class="search-input-wrapper">
+        <i class="ti ti-search search-icon" aria-hidden="true"></i>
+        <input
+          type="text"
+          class="search-input"
+          [(ngModel)]="searchQuery"
+          placeholder="Search by name or ID…"
+          aria-label="Search students"
+        />
+      </div>
+    </div>
+  </header>
+
+  <section class="stats-row">
+    <article class="stat-card">
+      <span class="stat-label">Total students</span>
+      <span class="stat-value">{{ totalStudents }}</span>
+    </article>
+    <article class="stat-card">
+      <span class="stat-label">Total courses</span>
+      <span class="stat-value">{{ totalCourses }}</span>
+    </article>
+  </section>
+
+  <p class="muted" *ngIf="loading">Loading students…</p>
+
+  <ng-container *ngIf="!loading">
+    <article class="card" *ngIf="rows.length > 0; else emptyState">
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Student ID</th>
+              <th
+                class="sortable"
+                [class.sorted]="isSorted('name')"
+                (click)="sortBy('name')"
+              >
+                Name
+                <i
+                  class="ti sort-icon"
+                  [ngClass]="{
+                    'ti-arrows-sort': !isSorted('name'),
+                    'ti-sort-ascending': isSorted('name') && sortDir === 'asc',
+                    'ti-sort-descending': isSorted('name') && sortDir === 'desc'
+                  }"
+                  aria-hidden="true"
+                ></i>
+              </th>
+              <th>Program</th>
+              <th>Courses</th>
+              <th
+                class="sortable num-col"
+                [class.sorted]="isSorted('submissions')"
+                (click)="sortBy('submissions')"
+              >
+                Submissions
+                <i
+                  class="ti sort-icon"
+                  [ngClass]="{
+                    'ti-arrows-sort': !isSorted('submissions'),
+                    'ti-sort-ascending': isSorted('submissions') && sortDir === 'asc',
+                    'ti-sort-descending': isSorted('submissions') && sortDir === 'desc'
+                  }"
+                  aria-hidden="true"
+                ></i>
+              </th>
+              <th>Enrolled</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngIf="filteredRows.length === 0">
+              <td colspan="6" class="no-results">
+                No students match your search.
+              </td>
+            </tr>
+            <tr *ngFor="let row of filteredRows; trackBy: trackByUID">
+              <td class="mono">{{ row.student.studentID }}</td>
+              <td>
+                {{ row.student.lastname }}, {{ row.student.firstname }}
+                <span *ngIf="row.student.middlename"> {{ row.student.middlename }}</span>
+              </td>
+              <td>{{ row.programName || '—' }}</td>
+              <td>
+                <div class="course-badges">
+                  <span class="badge badge-info" *ngFor="let c of row.courses">
+                    {{ c.courseName }} · {{ c.sectionName }}
+                  </span>
+                </div>
+              </td>
+              <td class="num-col">{{ row.submissionCount }}</td>
+              <td>{{ row.enrolledAt ? (row.enrolledAt | date:'mediumDate') : '—' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </article>
+
+    <ng-template #emptyState>
+      <article class="card empty-state">
+        <i class="ti ti-users empty-icon" aria-hidden="true"></i>
+        <p class="empty-title">No students yet</p>
+        <p class="empty-meta">
+          Once students are enrolled in your courses, they will appear here.
+        </p>
+      </article>
+    </ng-template>
+  </ng-container>
+</div>

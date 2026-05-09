@@ -1,0 +1,99 @@
+<div class="search-wrapper" #dropdownContainer>
+  <div class="search-input-container">
+    <i class="ti ti-search search-icon"></i>
+    <input
+      #searchInput
+      type="text"
+      class="search-input"
+      placeholder="Search students, teachers, courses…"
+      [(ngModel)]="searchQuery"
+      (ngModelChange)="onInputChange(searchQuery)"
+      (keydown.escape)="closeDropdown()"
+    />
+  </div>
+
+  <!-- Results Dropdown -->
+  <div class="search-dropdown" *ngIf="isOpen">
+    <ng-container *ngIf="hasResults; else noResults">
+      <!-- Students Section -->
+      <ng-container *ngIf="results.students.length > 0">
+        <div class="results-group">
+          <div class="group-header">
+            <span class="group-label">STUDENTS</span>
+            <span class="group-count">{{ results.students.length }}</span>
+          </div>
+          <div class="group-items">
+            <button
+              *ngFor="let result of results.students"
+              type="button"
+              class="result-item"
+              (click)="selectResult(result)"
+            >
+              <i [class]="'ti ' + result.icon"></i>
+              <div class="result-text">
+                <div class="result-primary">{{ result.primaryText }}</div>
+                <div class="result-secondary">{{ result.secondaryText }}</div>
+              </div>
+            </button>
+          </div>
+        </div>
+      </ng-container>
+
+      <!-- Teachers Section -->
+      <ng-container *ngIf="results.teachers.length > 0">
+        <div class="results-group">
+          <div class="group-header">
+            <span class="group-label">TEACHERS</span>
+            <span class="group-count">{{ results.teachers.length }}</span>
+          </div>
+          <div class="group-items">
+            <button
+              *ngFor="let result of results.teachers"
+              type="button"
+              class="result-item"
+              (click)="selectResult(result)"
+            >
+              <i [class]="'ti ' + result.icon"></i>
+              <div class="result-text">
+                <div class="result-primary">{{ result.primaryText }}</div>
+                <div class="result-secondary">{{ result.secondaryText }}</div>
+              </div>
+            </button>
+          </div>
+        </div>
+      </ng-container>
+
+      <!-- Courses Section -->
+      <ng-container *ngIf="results.courses.length > 0">
+        <div class="results-group">
+          <div class="group-header">
+            <span class="group-label">COURSES</span>
+            <span class="group-count">{{ results.courses.length }}</span>
+          </div>
+          <div class="group-items">
+            <button
+              *ngFor="let result of results.courses"
+              type="button"
+              class="result-item"
+              (click)="selectResult(result)"
+            >
+              <i [class]="'ti ' + result.icon"></i>
+              <div class="result-text">
+                <div class="result-primary">{{ result.primaryText }}</div>
+                <div class="result-secondary">{{ result.secondaryText }}</div>
+              </div>
+            </button>
+          </div>
+        </div>
+      </ng-container>
+    </ng-container>
+
+    <!-- No Results State -->
+    <ng-template #noResults>
+      <div class="empty-state">
+        <p class="empty-message">No results found</p>
+        <p class="empty-hint">Try searching for students, teachers, or courses</p>
+      </div>
+    </ng-template>
+  </div>
+</div>

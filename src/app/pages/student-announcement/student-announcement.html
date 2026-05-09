@@ -8,19 +8,27 @@
 
   <p class="muted" *ngIf="loading">Loading…</p>
 
-  <!-- Filter -->
-  <div class="filter-bar"
+  <!-- Filter and Actions -->
+  <div class="filter-and-actions"
     *ngIf="!loading && allAnnouncements.length > 0">
-    <label class="filter-field">
-      <span class="filter-label">Filter by teacher</span>
-      <select [(ngModel)]="filterTeacherUID" (ngModelChange)="onFilterChange()">
-        <option value="">All teachers</option>
-        <option *ngFor="let t of uniqueTeachers" [value]="t.uid">
-          {{ t.name }}
-        </option>
-      </select>
-    </label>
-    <span class="filter-count">{{ filteredAnnouncements.length }} announcement(s)</span>
+    <div class="filter-bar">
+      <label class="filter-field">
+        <span class="filter-label">Filter by teacher</span>
+        <select [(ngModel)]="filterTeacherUID" (ngModelChange)="onFilterChange()">
+          <option value="">All teachers</option>
+          <option *ngFor="let t of uniqueTeachers" [value]="t.uid">
+            {{ t.name }}
+          </option>
+        </select>
+      </label>
+      <span class="filter-count">{{ filteredAnnouncements.length }} announcement(s)</span>
+    </div>
+    <div class="page-actions">
+      <button class="mark-all-btn" (click)="markAllAsRead()" *ngIf="unreadCount > 0">
+        Mark all as read
+        <span class="unread-badge">{{ unreadCount }}</span>
+      </button>
+    </div>
   </div>
 
   <!-- Empty state -->
@@ -35,10 +43,16 @@
   <section class="announcement-list"
     *ngIf="!loading && filteredAnnouncements.length > 0">
     <article class="announcement-card"
-      *ngFor="let a of filteredAnnouncements">
-      <header>
-        <h3>{{ a.title }}</h3>
-        <span class="meta">{{ a.createdAt | date: 'medium' }}</span>
+      *ngFor="let a of filteredAnnouncements"
+      [class.unread]="isUnread(a.id)"
+      (click)="markAsRead(a.id)">
+      <span class="unread-dot" *ngIf="isUnread(a.id)" aria-label="Unread announcement"></span>
+      <span class="new-badge" *ngIf="isUnread(a.id)">NEW</span>
+      <header class="ann-header-content">
+        <div>
+          <h3>{{ a.title }}</h3>
+          <span class="meta">{{ a.createdAt | date: 'medium' }}</span>
+        </div>
       </header>
       <p>{{ a.message }}</p>
     </article>

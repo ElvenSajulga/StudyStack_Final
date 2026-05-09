@@ -21,8 +21,8 @@ export class AdminSections implements OnInit {
   yearLevels: YearLevel[] = [];
   sections: Section[] = [];
 
-  expandedProgramId: string | null = null;
-  expandedYearLevelId: string | null = null;
+  expandedProgramIds = new Set<string>();
+  expandedYearLevelIds = new Set<string>();
 
   // year level form
   newYearLevelName: Record<string, string> = {};
@@ -74,12 +74,41 @@ export class AdminSections implements OnInit {
   // ── helpers ───────────────────────────────────────────────────────────────────
 
   toggleProgram(id: string): void {
-    this.expandedProgramId = this.expandedProgramId === id ? null : id;
-    this.expandedYearLevelId = null;
+    if (this.expandedProgramIds.has(id)) {
+      this.expandedProgramIds.delete(id);
+    } else {
+      this.expandedProgramIds.add(id);
+    }
   }
 
   toggleYearLevel(id: string): void {
-    this.expandedYearLevelId = this.expandedYearLevelId === id ? null : id;
+    if (this.expandedYearLevelIds.has(id)) {
+      this.expandedYearLevelIds.delete(id);
+    } else {
+      this.expandedYearLevelIds.add(id);
+    }
+  }
+
+  isProgramExpanded(id: string): boolean {
+    return this.expandedProgramIds.has(id);
+  }
+
+  isYearLevelExpanded(id: string): boolean {
+    return this.expandedYearLevelIds.has(id);
+  }
+
+  expandAll(): void {
+    this.programs.forEach(p => this.expandedProgramIds.add(p.id));
+    this.yearLevels.forEach(yl => this.expandedYearLevelIds.add(yl.id));
+  }
+
+  collapseAll(): void {
+    this.expandedProgramIds.clear();
+    this.expandedYearLevelIds.clear();
+  }
+
+  get allExpanded(): boolean {
+    return this.programs.length > 0 && this.programs.every(p => this.expandedProgramIds.has(p.id));
   }
 
   yearLevelsForProgram(programId: string): YearLevel[] {
@@ -158,7 +187,7 @@ export class AdminSections implements OnInit {
     if (!res.isConfirmed) return;
     try {
       await this.academic.deleteYearLevel(yl.id);
-      if (this.expandedYearLevelId === yl.id) this.expandedYearLevelId = null;
+      this.expandedYearLevelIds.delete(yl.id);
       await this.loadAll();
       this.toast('success', 'Year level deleted');
     } catch { this.toast('error', 'Failed to delete year level'); }

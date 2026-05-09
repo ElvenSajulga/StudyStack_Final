@@ -11,6 +11,138 @@
   color: var(--color-text-primary);
 }
 
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.page-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.view-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  background: var(--color-background-secondary);
+  border: 1px solid var(--color-border-tertiary);
+  border-radius: 6px;
+}
+
+.tab-btn {
+  display: inline-flex;
+  align-items: center;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--color-text-secondary);
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+
+  &:hover:not(.active) {
+    background: var(--color-background-primary);
+    color: var(--color-text-primary);
+  }
+
+  &.active {
+    background: var(--color-background-info, rgba(26, 86, 219, 0.10));
+    color: var(--color-text-info, var(--color-primary, #1A56DB));
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(26, 86, 219, 0.18);
+  }
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  border-radius: 3px;
+  padding: 7px 14px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  letter-spacing: 0.01em;
+  background: transparent;
+  color: var(--color-text-primary);
+
+  i {
+    font-size: 16px;
+    line-height: 1;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(26, 86, 219, 0.18);
+  }
+}
+
+.btn-subtle {
+  background: var(--color-background-primary);
+  border-color: var(--color-border-tertiary);
+  color: var(--color-text-secondary);
+
+  &:hover:not(:disabled) {
+    background: var(--color-background-secondary);
+    color: var(--color-text-primary);
+  }
+}
+
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 4px;
+
+  label {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+  }
+
+  select {
+    padding: 6px 12px;
+    background: var(--color-bg-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 3px;
+    font-size: 0.9rem;
+    color: var(--color-text-primary);
+    cursor: pointer;
+
+    &:focus {
+      outline: none;
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px rgba(26, 86, 219, 0.12);
+    }
+  }
+}
+
+.muted {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
 .card {
   background: var(--color-background-primary);
   border-radius: 12px;
@@ -88,6 +220,64 @@ td {
 .status-pill.present { background: #E1F5EE; color: #085041; }
 .status-pill.late    { background: #FAEEDA; color: #633806; }
 .status-pill.absent  { background: #FCEBEB; color: #791F1F; }
+
+.num-col {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+th.sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.15s ease;
+
+  &:hover {
+    color: var(--color-text-secondary);
+
+    .sort-icon {
+      color: var(--color-text-secondary);
+    }
+  }
+}
+
+.sort-icon {
+  font-size: 13px;
+  margin-left: 4px;
+  color: var(--color-text-tertiary);
+  vertical-align: middle;
+}
+
+th.sorted {
+  color: var(--color-text-info, var(--color-primary, #1A56DB));
+
+  .sort-icon {
+    color: var(--color-text-info, var(--color-primary, #1A56DB));
+  }
+}
+
+.rate-cell {
+  font-weight: 600;
+}
+
+.rate-high {
+  color: var(--color-text-success, #0E9F8A);
+}
+
+.rate-mid {
+  color: var(--color-text-warning, #D97706);
+}
+
+.rate-low {
+  color: var(--color-text-danger, #BE185D);
+}
+
+.summary-row td {
+  font-weight: 600;
+  background: var(--color-background-secondary);
+  border-top: 2px solid var(--color-border-tertiary);
+  color: var(--color-text-primary);
+}
 
 .empty-state {
   font-size: 0.875rem;

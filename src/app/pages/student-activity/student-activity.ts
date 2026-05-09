@@ -5,6 +5,9 @@ import { Activity, ActivityService, ActivitySubmission, AttendanceStatus, } from
 import { AuthService } from '../../services/auth.service';
 import { AcademicService, Course, Enrollment } from '../../services/academic.service';
 import { QuizService, QuizQuestion } from '../../services/quiz.service';
+import { StudentQuestionService } from '../../services/student-question.service';
+import { TeacherAccountService } from '../../services/teacher-account.service';
+import Swal from 'sweetalert2';
 
 interface CourseCard {
   course: Course;
@@ -39,6 +42,13 @@ export class StudentActivity implements OnInit, OnDestroy {
   newLinkLabel: Record<string, string> = {};
   newLinkUrl: Record<string, string> = {};
 
+  bookmarkedIds: Set<string> = new Set();
+  showBookmarkedOnly = false;
+
+  showQuestionModal = false;
+  questionDraft = '';
+  sendingQuestion = false;
+
   private readonly platformId = inject(PLATFORM_ID);
   private readonly zone = inject(NgZone);
   private refreshTimer?: ReturnType<typeof setInterval>;
@@ -48,10 +58,13 @@ export class StudentActivity implements OnInit, OnDestroy {
     private readonly auth: AuthService,
     private readonly academic: AcademicService,
     private readonly quizService: QuizService,
+    private readonly studentQuestionService: StudentQuestionService,
+    private readonly teacherAccountService: TeacherAccountService,
     private readonly cdr: ChangeDetectorRef,
   ) {}
 
   ngOnInit(): void {
+    this.loadBookmarks();
     void this.loadCourseCards();
     if (isPlatformBrowser(this.platformId)) {
       this.zone.runOutsideAngular(() => {
@@ -64,6 +77,50 @@ export class StudentActivity implements OnInit, OnDestroy {
 
   private get studentID(): string | undefined {
     return this.auth.getCurrentUser()?.studentID;
+  }
+
+  private get studentUID(): string | undefined {
+    return (this.auth.getCurrentUser() as any)?.UID;
+  }
+
+  private get bookmarkStorageKey(): string {
+    return `ss_bookmarks_${this.studentUID || 'anon'}`;
+  }
+
+  private loadBookmarks(): void {
+    const raw = localStorage.getItem(this.bookmarkStorageKey);
+    if (raw) {
+      try {
+        this.bookmarkedIds = new Set(JSON.parse(raw));
+      } catch {
+        // fallback to empty set
+      }
+    }
+  }
+
+  private saveBookmarks(): void {
+    localStorage.setItem(this.bookmarkStorageKey, JSON.stringify([...this.bookmarkedIds]));
+  }
+
+  toggleBookmark(activityId: string, event: Event): void {
+    event.stopPropagation();
+    if (this.bookmarkedIds.has(activityId)) {
+      this.bookmarkedIds.delete(activityId);
+    } else {
+      this.bookmarkedIds.add(activityId);
+    }
+    this.saveBookmarks();
+  }
+
+  isBookmarked(activityId: string): boolean {
+    return this.bookmarkedIds.has(activityId);
+  }
+
+  get filteredActivities(): Activity[] {
+    if (!this.showBookmarkedOnly) {
+      return this.streamActivities;
+    }
+    return this.streamActivities.filter(a => this.isBookmarked(a.id));
   }
 
   private async loadCourseCards(): Promise<void> {
@@ -157,6 +214,24 @@ export class StudentActivity implements OnInit, OnDestroy {
     this.cdr.detectChanges();
   }
 
+  get currentView(): 'courses' | 'stream' | 'detail' {
+    if (this.selectedActivity) return 'detail';
+    if (this.selectedCard) return 'stream';
+    return 'courses';
+  }
+
+  backToCourses(): void {
+    this.selectedCard = null;
+    this.selectedActivity = null;
+    this.streamActivities = [];
+    this.view = 'cards';
+  }
+
+  backToStream(): void {
+    this.selectedActivity = null;
+    this.view = 'stream';
+  }
+
   goBack(): void {
     if (this.view === 'detail') {
       this.view = 'stream';
@@ -220,6 +295,90 @@ export class StudentActivity implements OnInit, OnDestroy {
   removeLink(activity: Activity, index: number): void {
     if (this.submissionLinks[activity.id]) {
       this.submissionLinks[activity.id].splice(index, 1);
+      this.cdr.detectChanges();
+    }
+  }
+
+  // ── question modal ────────────────────────────────────────────────────────────
+
+  openQuestionModal(): void {
+    this.showQuestionModal = true;
+    this.questionDraft = '';
+  }
+
+  closeQuestionModal(): void {
+    this.showQuestionModal = false;
+  }
+
+  async sendQuestion(): Promise<void> {
+    if (!this.questionDraft.trim()) {
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Empty question',
+        text: 'Please type your question before sending.',
+        confirmButtonText: 'OK',
+      });
+      return;
+    }
+
+    const user = this.auth.getCurrentUser();
+    const studentUID = (user as any)?.UID;
+    const studentID = user?.studentID;
+    const studentName = (user as any)?.displayName || 'Student';
+
+    if (!studentUID || !studentID || !this.selectedActivity || !this.selectedCard) {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Unable to send question. Missing required information.',
+        confirmButtonText: 'OK',
+      });
+      return;
+    }
+
+    this.sendingQuestion = true;
+
+    try {
+      // Get the teacher info from the activity's teacherID via teacher account service
+      const teachers = this.teacherAccountService.getAll();
+      const teacher = teachers.find(t => t.teacherID === this.selectedActivity!.teacherID);
+
+      if (!teacher) {
+        throw new Error('Teacher not found');
+      }
+
+      const payload: Omit<any, 'id' | 'createdAt' | 'answered'> = {
+        activityId: this.selectedActivity.id,
+        activityTitle: this.selectedActivity.title,
+        studentUID,
+        studentID,
+        studentName,
+        teacherUID: teacher.UID,
+        teacherID: teacher.teacherID,
+        message: this.questionDraft.trim(),
+      };
+
+      await this.studentQuestionService.createQuestion(payload);
+
+      await Swal.fire({
+        icon: 'success',
+        title: 'Question sent!',
+        text: 'Your teacher will be notified and respond when they are available.',
+        timer: 1500,
+        showConfirmButton: false,
+      });
+
+      this.closeQuestionModal();
+    } catch (error) {
+      console.error('Error sending question:', error);
+      await Swal.fire({
+        icon: 'error',
+        title: 'Failed to send question',
+        text: 'Please try again later.',
+        confirmButtonText: 'OK',
+      });
+    } finally {
+      this.sendingQuestion = false;
       this.cdr.detectChanges();
     }
   }

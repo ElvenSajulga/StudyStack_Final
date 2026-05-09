@@ -4,11 +4,13 @@ import { where } from '@angular/fire/firestore';
 
 export interface AppNotification {
   id: string;
-  recipientUID: string;   // student UID
-  type: 'score-released' | 'activity-created' | 'announcement';
+  recipientUID: string;   // student UID for student types, teacher UID for teacher types
+  type: 'score-released' | 'activity-created' | 'announcement'
+      | 'submission-received' | 'grading-pending' | 'student-question';
   title: string;
   message: string;
   activityId?: string;
+  relatedId?: string;
   read: boolean;
   createdAt: string; // ISO
 }

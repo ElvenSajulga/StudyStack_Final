@@ -1,83 +1,158 @@
-<div class="teacher-dashboard">
+<div class="teacher-page teacher-dashboard">
   <div class="page-header">
     <div>
       <h1 class="page-title">Dashboard</h1>
       <p class="page-subtitle">{{ today | date: 'EEEE, MMMM d, y' }}</p>
     </div>
+    <div class="header-actions">
+      <a routerLink="/teacher-activity" class="btn btn-primary">
+        <i class="ti ti-plus"></i> New activity
+      </a>
+      <a routerLink="/teacher-announcement" class="btn btn-subtle">
+        <i class="ti ti-megaphone"></i> Announcement
+      </a>
+    </div>
   </div>
 
-  <section class="stats-grid">
-    <article class="card stat-card primary">
-      <div class="stat-content">
-        <h3>Total Students</h3>
-        <p class="stat-number">{{ totalStudents }}</p>
-        <p class="stat-caption">Enrolled in your classes</p>
-        <span class="badge badge-primary">
-          <i class="ti ti-users"></i>
-        </span>
-      </div>
+  <!-- Stats bento -->
+  <section class="bento-grid">
+    <article class="stat-tile">
+      <span class="stat-tile-icon"><i class="ti ti-users"></i></span>
+      <span class="stat-tile-label">Total Students</span>
+      <span class="stat-tile-value">{{ totalStudents }}</span>
+      <span class="stat-tile-caption">Across all your courses</span>
     </article>
 
-    <article class="card stat-card">
-      <div class="stat-content">
-        <h3>My Activities</h3>
-        <p class="stat-number">{{ totalActivities }}</p>
-        <p class="stat-caption">Created by you</p>
-        <span class="badge badge-info">
-          <i class="ti ti-file-text"></i>
-        </span>
-      </div>
+    <article class="stat-tile">
+      <span class="stat-tile-icon" style="background: var(--amber-50); color: var(--amber-500);">
+        <i class="ti ti-calendar"></i>
+      </span>
+      <span class="stat-tile-label">Closing this week</span>
+      <span class="stat-tile-value">{{ activitiesClosingThisWeek }}</span>
+      <span class="stat-tile-caption">Activities deadline within 7 days</span>
     </article>
 
-    <article class="card stat-card">
-      <div class="stat-content">
-        <h3>Upcoming Activities</h3>
-        <p class="stat-number">{{ upcomingActivities }}</p>
-        <p class="stat-caption">Deadline not yet passed</p>
-        <span class="badge badge-secondary">
-          <i class="ti ti-calendar"></i>
-        </span>
-      </div>
+    <article class="stat-tile">
+      <span class="stat-tile-icon" style="background: var(--blue-50); color: var(--blue-600);">
+        <i class="ti ti-clipboard-list"></i>
+      </span>
+      <span class="stat-tile-label">Total activities</span>
+      <span class="stat-tile-value">{{ totalActivities }}</span>
+      <span class="stat-tile-caption">{{ upcomingActivities }} upcoming</span>
     </article>
 
-    <article class="card stat-card">
-      <div class="stat-content">
-        <h3>Announcements</h3>
-        <p class="stat-number">{{ totalAnnouncements }}</p>
-        <p class="stat-caption">Posted to students</p>
-        <span class="badge badge-warning">
-          <i class="ti ti-megaphone"></i>
-        </span>
-      </div>
+    <article class="stat-tile">
+      <span class="stat-tile-icon"><i class="ti ti-megaphone"></i></span>
+      <span class="stat-tile-label">Announcements</span>
+      <span class="stat-tile-value">{{ totalAnnouncements }}</span>
+      <span class="stat-tile-caption">Posted by you</span>
     </article>
   </section>
 
-  <section class="content-sections">
-    <article class="card">
+  <!-- My Courses -->
+  <section *ngIf="courseStats.length > 0; else noCourses" class="my-courses-block">
+    <h2 class="section-heading">My Courses</h2>
+    <div class="bento-grid">
+      <a *ngFor="let course of courseStats" [routerLink]="['/teacher-activity']" class="card course-stat-card">
+        <div class="course-card-head">
+          <h4>{{ course.courseName }}</h4>
+          <span class="badge badge-info">{{ course.semester }}</span>
+        </div>
+        <div class="course-metric-row">
+          <div class="course-metric">
+            <i class="ti ti-users"></i>
+            <span>{{ course.studentCount }} {{ course.studentCount === 1 ? 'student' : 'students' }}</span>
+          </div>
+          <div class="course-metric">
+            <i class="ti ti-clipboard-list"></i>
+            <span>{{ course.openActivities }} open</span>
+          </div>
+          <div class="course-metric" *ngIf="course.pendingGrading > 0">
+            <span class="badge badge-danger">{{ course.pendingGrading }} pending</span>
+          </div>
+        </div>
+        <p class="go-to-activities">Go to activities →</p>
+      </a>
+    </div>
+  </section>
+
+  <ng-template #noCourses>
+    <article class="card empty-card">
+      <div class="empty-icon"><i class="ti ti-layout-grid"></i></div>
+      <p class="empty-title">No courses assigned yet</p>
+      <p class="empty-meta">Contact your administrator to get started.</p>
+    </article>
+  </ng-template>
+
+  <!-- Needs grading + Recent activities/announcements -->
+  <section class="bento-grid">
+    <article class="card item-full needs-grading-card">
+      <div class="card-header">
+        <h2 class="card-title">
+          <i class="ti ti-clipboard-check"></i>
+          Needs grading
+          <span class="badge badge-danger" *ngIf="needsGrading.length > 0">{{ needsGrading.length }}</span>
+        </h2>
+      </div>
+
+      <ng-container *ngIf="needsGrading.length === 0; else hasNeedsGrading">
+        <div class="empty-state-success">
+          <i class="ti ti-circle-check"></i>
+          <p>All submissions are graded</p>
+        </div>
+      </ng-container>
+
+      <ng-template #hasNeedsGrading>
+        <div class="needs-grading-list">
+          <div class="ng-item" *ngFor="let item of needsGrading">
+            <div>
+              <p class="ng-title">{{ item.activity.title }}</p>
+              <p class="ng-meta">
+                <span class="badge badge-warning">{{ item.ungraded }} ungraded</span>
+                <span class="ng-due">Due {{ item.activity.deadline | date:'MMM d, y' }}</span>
+              </p>
+            </div>
+            <a routerLink="/teacher-activity" class="btn btn-subtle btn-small">
+              <i class="ti ti-arrow-right"></i> Grade now
+            </a>
+          </div>
+        </div>
+      </ng-template>
+    </article>
+
+    <article class="card item-large">
       <div class="card-header">
         <h2 class="card-title">Recent Activities</h2>
       </div>
       <ng-container *ngIf="recentActivities.length > 0; else noActivitiesPanel">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Activity</th>
-              <th>Due Date</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let activity of recentActivities; let even = even" [class.even]="even">
-              <td>{{ activity.title }}</td>
-              <td>{{ activity.deadline | date: 'short' }}</td>
-              <td>
-                <span class="badge" [ngClass]="isActivityUpcoming(activity.deadline) ? 'badge-warning' : 'badge-info'">
-                  {{ activity.type }}
-                </span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th class="col-text">Activity</th>
+                <th class="col-text">Due Date</th>
+                <th class="col-status">Status</th>
+                <th class="col-actions">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let activity of recentActivities">
+                <td class="col-text">{{ activity.title }}</td>
+                <td class="col-text">{{ activity.deadline | date: 'short' }}</td>
+                <td class="col-status">
+                  <span class="badge" [ngClass]="isActivityUpcoming(activity.deadline) ? 'badge-warning' : 'badge-info'">
+                    {{ activity.type }}
+                  </span>
+                </td>
+                <td class="col-actions">
+                  <a routerLink="/teacher-activity" class="btn btn-subtle btn-small">
+                    <i class="ti ti-pencil"></i> Grade
+                  </a>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </ng-container>
       <ng-template #noActivitiesPanel>
         <p class="empty-state">No activities yet. Create activities to get started.</p>
@@ -89,25 +164,13 @@
         <h2 class="card-title">Recent Announcements</h2>
       </div>
       <ng-container *ngIf="recentAnnouncements.length > 0; else noAnnouncementsPanel">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Title</th>
-              <th>Posted</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let announcement of recentAnnouncements; let even = even" [class.even]="even">
-              <td>
-                <div class="announcement-cell">
-                  <strong>{{ announcement.title }}</strong>
-                  <small>{{ announcement.message }}</small>
-                </div>
-              </td>
-              <td>{{ announcement.createdAt | date: 'short' }}</td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="announcement-list">
+          <div class="announcement-row" *ngFor="let announcement of recentAnnouncements">
+            <strong>{{ announcement.title }}</strong>
+            <p>{{ announcement.message }}</p>
+            <small>{{ announcement.createdAt | date: 'short' }}</small>
+          </div>
+        </div>
       </ng-container>
       <ng-template #noAnnouncementsPanel>
         <p class="empty-state">No announcements yet.</p>

@@ -1,0 +1,54 @@
+<div class="notif-wrapper">
+  <button
+    class="notif-bell"
+    type="button"
+    (click)="togglePanel()"
+    [class.has-unread]="unreadCount > 0"
+    [attr.aria-expanded]="isOpen"
+    aria-label="Notifications"
+  >
+    <i class="ti ti-bell" aria-hidden="true"></i>
+    <span class="badge" *ngIf="unreadCount > 0">
+      {{ unreadCount > 9 ? '9+' : unreadCount }}
+    </span>
+  </button>
+
+  <div class="notif-panel" *ngIf="isOpen" role="dialog" aria-label="Notifications">
+    <div class="np-header">
+      <span class="np-title">Notifications</span>
+      <button
+        class="np-mark-all"
+        type="button"
+        (click)="markAllRead()"
+        *ngIf="unreadCount > 0"
+      >
+        Mark all read
+      </button>
+    </div>
+
+    <div class="np-list">
+      <div *ngIf="notifications.length === 0" class="np-empty">
+        <i class="ti ti-bell-off np-empty-icon" aria-hidden="true"></i>
+        <p class="np-empty-text">No notifications yet</p>
+      </div>
+
+      <button
+        type="button"
+        class="np-item"
+        *ngFor="let n of notifications; trackBy: trackById"
+        [class.unread]="!n.read"
+        (click)="onItemClick(n)"
+      >
+        <span class="np-icon" [class.icon-pending]="n.type === 'grading-pending'"
+                              [class.icon-submission]="n.type === 'submission-received'">
+          <i class="ti" [ngClass]="iconForType(n.type)" aria-hidden="true"></i>
+        </span>
+        <div class="np-content">
+          <p class="np-msg-title">{{ n.title }}</p>
+          <p class="np-msg">{{ n.message }}</p>
+          <span class="np-time">{{ formatTime(n.createdAt) }}</span>
+        </div>
+      </button>
+    </div>
+  </div>
+</div>

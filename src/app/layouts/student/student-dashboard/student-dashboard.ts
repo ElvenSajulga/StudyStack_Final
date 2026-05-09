@@ -1,5 +1,6 @@
 import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { RouterModule } from '@angular/router';
 import {
   Activity,
   ActivityService,
@@ -9,11 +10,32 @@ import {
 import { Announcement, AnnouncementService } from '../../../services/announcement.service';
 import { AcademicService } from '../../../services/academic.service';
 import { AuthService } from '../../../services/auth.service';
+import { TeacherAccountService } from '../../../services/teacher-account.service';
+
+interface CalendarDay {
+  date: Date;
+  dateNum: number;
+  isCurrentMonth: boolean;
+  isToday: boolean;
+  activities: Activity[];
+}
+
+interface CourseProgress {
+  courseId: string;
+  courseName: string;
+  teacherName: string;
+  totalActivities: number;
+  completedActivities: number;
+  completionPercent: number;
+  averageScore: number;
+  attendanceRate: number;
+  status: 'on-track' | 'attention' | 'at-risk';
+}
 
 @Component({
   selector: 'app-student-dashboard',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, RouterModule],
   templateUrl: './student-dashboard.html',
   styleUrl: './student-dashboard.scss',
 })
@@ -22,8 +44,17 @@ export class StudentDashboard implements OnInit {
   lateCount        = 0;
   absentCount      = 0;
   openActivities   = 0;
+  overallAveragePercent = 0;
+  submissionsThisWeek = 0;
+  nextDeadline: Activity | null = null;
+  onTimeRate = 0;
   latestAnnouncements: Announcement[] = [];
   upcomingActivities: Activity[] = [];
+  allUpcomingActivities: Activity[] = [];
+  calendarDays: CalendarDay[] = [];
+  currentMonth: Date = new Date();
+  selectedDay: CalendarDay | null = null;
+  courseProgress: CourseProgress[] = [];
 
   userName = '';
   today = new Date();
@@ -33,6 +64,7 @@ export class StudentDashboard implements OnInit {
     private readonly announcementService: AnnouncementService,
     private readonly academic: AcademicService,
     private readonly auth: AuthService,
+    private readonly teacherAccountService: TeacherAccountService,
     private readonly cdr: ChangeDetectorRef,
   ) {}
 
@@ -58,6 +90,7 @@ export class StudentDashboard implements OnInit {
 
   private async init(): Promise<void> {
     await this.computeStats();
+    await this.buildCourseProgress();
 
     // ── Announcements: only from teachers the student is enrolled under ──────
     const sid = this.studentID;
@@ -81,18 +114,28 @@ export class StudentDashboard implements OnInit {
         const enrolledActivities = await this.activityService
           .getActivitiesForEnrolledTeacherUIDs(teacherUIDs);
         const now = new Date();
-        this.upcomingActivities = enrolledActivities
-          .filter(a => now <= new Date(a.closeAt))
+        const openActivities = enrolledActivities.filter(a => now <= new Date(a.closeAt));
+
+        this.upcomingActivities = openActivities
           .sort((a, b) => new Date(a.closeAt).getTime() - new Date(b.closeAt).getTime())
           .slice(0, 5);
+
+        // ── Store ALL upcoming activities for calendar ──────────────────
+        this.allUpcomingActivities = openActivities
+          .sort((a, b) => new Date(a.closeAt).getTime() - new Date(b.closeAt).getTime());
       } else {
         this.latestAnnouncements = [];
         this.upcomingActivities = [];
+        this.allUpcomingActivities = [];
       }
     } else {
       this.latestAnnouncements = [];
       this.upcomingActivities = [];
+      this.allUpcomingActivities = [];
     }
+
+    // ── Build calendar ────────────────────────────────────────────────────────
+    this.buildCalendar();
 
     this.cdr.detectChanges();
   }
@@ -114,6 +157,203 @@ export class StudentDashboard implements OnInit {
     const diff = close.getTime() - now.getTime();
     const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
     return days <= 3;
+  }
+
+  getDeadlineUrgency(): 'urgent' | 'soon' | 'later' {
+    if (!this.nextDeadline) return 'later';
+    const now = new Date();
+    const close = new Date(this.nextDeadline.closeAt);
+    const diffMs = close.getTime() - now.getTime();
+    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+
+    if (hours <= 24) return 'urgent';
+    if (hours <= 72) return 'soon';
+    return 'later';
+  }
+
+  hoursUntilDeadline(): number {
+    if (!this.nextDeadline) return 0;
+    const now = new Date();
+    const close = new Date(this.nextDeadline.closeAt);
+    const diffMs = close.getTime() - now.getTime();
+    return Math.floor(diffMs / (1000 * 60 * 60));
+  }
+
+  get monthLabel(): string {
+    return this.currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  }
+
+  buildCalendar(): void {
+    this.calendarDays = [];
+    const year = this.currentMonth.getFullYear();
+    const month = this.currentMonth.getMonth();
+
+    // Get the first day of the month
+    const firstDay = new Date(year, month, 1);
+    const firstDayOfWeek = firstDay.getDay(); // 0 = Sunday, 6 = Saturday
+
+    // Start from the Sunday before the first day (if needed)
+    const startDate = new Date(firstDay);
+    startDate.setDate(firstDay.getDate() - firstDayOfWeek);
+
+    // Generate 6 weeks × 7 days = 42 days
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    for (let i = 0; i < 42; i++) {
+      const date = new Date(startDate);
+      date.setDate(startDate.getDate() + i);
+      const dateStr = date.toDateString();
+
+      const isCurrentMonth = date.getMonth() === month;
+      const isToday = dateStr === today.toDateString();
+
+      // Filter activities for this day
+      const activitiesForDay = this.allUpcomingActivities.filter(a => {
+        const activityDate = new Date(a.closeAt);
+        return activityDate.toDateString() === dateStr;
+      });
+
+      this.calendarDays.push({
+        date,
+        dateNum: date.getDate(),
+        isCurrentMonth,
+        isToday,
+        activities: activitiesForDay,
+      });
+    }
+  }
+
+  prevMonth(): void {
+    const date = new Date(this.currentMonth);
+    date.setMonth(date.getMonth() - 1);
+    this.currentMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+    this.selectedDay = null;
+    this.buildCalendar();
+  }
+
+  nextMonth(): void {
+    const date = new Date(this.currentMonth);
+    date.setMonth(date.getMonth() + 1);
+    this.currentMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+    this.selectedDay = null;
+    this.buildCalendar();
+  }
+
+  selectDay(day: CalendarDay): void {
+    if (day.activities.length > 0) {
+      this.selectedDay = day;
+    }
+  }
+
+  closeSelectedDay(): void {
+    this.selectedDay = null;
+  }
+
+  private async buildCourseProgress(): Promise<void> {
+    const sid = this.studentID;
+    if (!sid) {
+      this.courseProgress = [];
+      return;
+    }
+
+    try {
+      const enrollments = await this.academic.getEnrollmentsByStudentID(sid);
+      const courses = await this.academic.getCourses();
+      const teachers = this.teacherAccountService.getAll();
+      const submissions = await this.activityService.getSubmissionsForStudent(sid);
+
+      // Build courseId → courseName map
+      const courseIdToName: Record<string, string> = {};
+      for (const course of courses) {
+        courseIdToName[course.id] = course.name;
+      }
+
+      // Build UID → teacher name map
+      const uidToTeacherName: Record<string, string> = {};
+      for (const teacher of teachers) {
+        const fullName = `${teacher.firstname} ${teacher.lastname}`.trim();
+        uidToTeacherName[teacher.UID] = fullName || teacher.name || 'Unknown';
+      }
+
+      // Process each enrollment
+      const progress: CourseProgress[] = [];
+      for (const enrollment of enrollments) {
+        const courseName = courseIdToName[enrollment.courseId] || 'Unknown';
+        const teacherName = uidToTeacherName[enrollment.teacherUID] || 'Unknown';
+
+        // Get activities for this teacher
+        const enrolledActivities = await this.activityService
+          .getActivitiesForEnrolledTeacherUIDs([enrollment.teacherUID]);
+
+        // Count only closed activities (closeAt < now)
+        const now = new Date();
+        const closedActivities = enrolledActivities.filter(a => new Date(a.closeAt) < now);
+        const totalActivities = closedActivities.length;
+
+        if (totalActivities === 0) continue; // Skip if no closed activities
+
+        // Count completed submissions
+        const courseSubmissions = submissions.filter(s =>
+          closedActivities.some(a => a.id === s.activityId) && s.submitted
+        );
+        const completedActivities = courseSubmissions.length;
+        const completionPercent = totalActivities > 0 ? (completedActivities / totalActivities) * 100 : 0;
+
+        // Calculate average score
+        const gradedSubmissions = courseSubmissions.filter(s => s.graded && s.score != null);
+        let averageScore = 0;
+        if (gradedSubmissions.length > 0) {
+          const scores = gradedSubmissions.map(s => {
+            const activity = closedActivities.find(a => a.id === s.activityId);
+            if (!activity || !activity.maxPoints) return 0;
+            return (s.score! / activity.maxPoints) * 100;
+          });
+          averageScore = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+        }
+
+        // Calculate attendance rate
+        let attendanceRate = 0;
+        let presentCount = 0;
+        let lateCount = 0;
+        let totalCount = 0;
+        for (const activity of closedActivities) {
+          const sub = submissions.find(s => s.activityId === activity.id);
+          const status = this.activityService.getAttendanceStatus(activity, sub);
+          if (status === 'present') presentCount++;
+          if (status === 'late') lateCount++;
+          totalCount++;
+        }
+        attendanceRate = totalCount > 0 ? ((presentCount + lateCount) / totalCount) * 100 : 0;
+
+        // Determine status
+        let status: 'on-track' | 'attention' | 'at-risk';
+        if (averageScore >= 80) {
+          status = 'on-track';
+        } else if (averageScore >= 60) {
+          status = 'attention';
+        } else {
+          status = 'at-risk';
+        }
+
+        progress.push({
+          courseId: enrollment.courseId,
+          courseName,
+          teacherName,
+          totalActivities,
+          completedActivities,
+          completionPercent,
+          averageScore,
+          attendanceRate,
+          status,
+        });
+      }
+
+      this.courseProgress = progress;
+    } catch (e) {
+      console.warn('buildCourseProgress failed:', e);
+      this.courseProgress = [];
+    }
   }
 
   private async computeStats(): Promise<void> {
@@ -189,5 +429,31 @@ export class StudentDashboard implements OnInit {
       if (status === 'late')    this.lateCount++;
       if (status === 'absent')  this.absentCount++;
     }
+
+    // ── Calculate overall average percentage ──────────────────────────────────
+    const graded = subs.filter(s => s.graded && s.score != null);
+    if (graded.length > 0 && enrolledActivities.length > 0) {
+      const percentages = graded.map(s => {
+        const a = enrolledActivities.find(x => x.id === s.activityId);
+        if (!a || !a.maxPoints) return 0;
+        return (s.score! / a.maxPoints) * 100;
+      });
+      this.overallAveragePercent = percentages.reduce((sum, p) => sum + p, 0) / percentages.length;
+    }
+
+    // ── Count submissions from this week ──────────────────────────────────────
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    this.submissionsThisWeek = subs.filter(s => s.submitted && new Date(s.submittedAt) >= sevenDaysAgo).length;
+
+    // ── Find next deadline (closest upcoming) ─────────────────────────────────
+    const upcoming = enrolledActivities
+      .filter(a => new Date(a.closeAt) > new Date())
+      .sort((a, b) => new Date(a.closeAt).getTime() - new Date(b.closeAt).getTime());
+    this.nextDeadline = upcoming[0] ?? null;
+
+    // ── Calculate on-time rate ───────────────────────────────────────────────
+    const totalActivities = this.presentCount + this.lateCount + this.absentCount;
+    this.onTimeRate = totalActivities > 0 ? (this.presentCount / totalActivities) * 100 : 0;
   }
 }

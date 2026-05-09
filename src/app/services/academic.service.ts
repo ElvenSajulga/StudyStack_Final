@@ -59,6 +59,7 @@ export interface Enrollment {
   sectionId: string;
   teacherUID: string;
   enrolledAt: string;
+  transferredAt?: string;
 }
 
 // ─── Service ──────────────────────────────────────────────────────────────────

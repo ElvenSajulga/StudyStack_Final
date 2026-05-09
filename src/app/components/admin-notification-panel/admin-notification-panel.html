@@ -1,0 +1,67 @@
+<div class="admin-notification-wrapper">
+  <!-- Notification bell button -->
+  <button
+    type="button"
+    class="notification-bell"
+    (click)="togglePanel()"
+    [attr.aria-label]="unreadCount > 0 ? unreadCount + ' unread notifications' : 'Notifications'"
+  >
+    <i class="ti ti-bell"></i>
+    <span class="notification-badge" *ngIf="unreadCount > 0">
+      {{ unreadCount > 99 ? '99+' : unreadCount }}
+    </span>
+  </button>
+
+  <!-- Notification panel dropdown -->
+  <div class="notification-panel" *ngIf="isOpen" (click)="$event.stopPropagation()">
+    <div class="panel-header">
+      <h3>Notifications</h3>
+      <button
+        type="button"
+        class="mark-all-read"
+        *ngIf="unreadCount > 0"
+        (click)="markAllAsRead()"
+      >
+        Mark all read
+      </button>
+    </div>
+
+    <div class="panel-content">
+      <!-- Notifications list -->
+      <div class="notifications-list" *ngIf="notifications.length > 0; else noNotifications">
+        <button
+          type="button"
+          class="notification-item"
+          *ngFor="let notif of notifications"
+          [class.unread]="!notif.isRead"
+          (click)="markAsRead(notif)"
+        >
+          <div class="notification-icon">
+            <i class="ti" [ngClass]="getNotificationIcon(notif.type)"></i>
+          </div>
+
+          <div class="notification-content">
+            <p class="notification-title">{{ getNotificationTitle(notif) }}</p>
+            <p class="notification-message">{{ notif.message }}</p>
+            <p class="notification-time">{{ getRelativeTime(notif.createdAt) }}</p>
+          </div>
+
+          <div class="notification-status" *ngIf="!notif.isRead">
+            <span class="unread-dot"></span>
+          </div>
+        </button>
+      </div>
+
+      <!-- Empty state -->
+      <ng-template #noNotifications>
+        <div class="empty-state">
+          <i class="ti ti-bell-off"></i>
+          <p>No notifications yet</p>
+        </div>
+      </ng-template>
+    </div>
+  </div>
+</div>
+
+<!-- Click outside to close -->
+<div class="panel-overlay" *ngIf="isOpen" (click)="closePanel()"></div>

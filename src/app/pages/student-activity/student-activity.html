@@ -1,5 +1,28 @@
 <div class="student-activity">
 
+  <!-- ── Breadcrumb trail ── -->
+  <nav class="breadcrumb" *ngIf="currentView !== 'courses'">
+    <button class="bc-link" (click)="backToCourses()">
+      <i class="ti ti-clipboard-list" aria-hidden="true"></i>
+      Activities
+    </button>
+    <i class="ti ti-chevron-right bc-sep" aria-hidden="true"></i>
+    <button
+      *ngIf="currentView === 'detail'"
+      class="bc-link"
+      (click)="backToStream()"
+    >
+      {{ selectedCard?.course?.name || 'Course' }}
+    </button>
+    <span *ngIf="currentView === 'stream'" class="bc-current">
+      {{ selectedCard?.course?.name || 'Course' }}
+    </span>
+    <ng-container *ngIf="currentView === 'detail'">
+      <i class="ti ti-chevron-right bc-sep" aria-hidden="true"></i>
+      <span class="bc-current">{{ selectedActivity?.title }}</span>
+    </ng-container>
+  </nav>
+
   <!-- ── Cards view ── -->
   <ng-container *ngIf="view === 'cards'">
     <header>
@@ -36,7 +59,10 @@
   <!-- ── Stream view ── -->
   <ng-container *ngIf="view === 'stream' && selectedCard">
     <header class="stream-header">
-      <button class="back-btn" (click)="goBack()">← Back</button>
+      <button class="back-btn" (click)="backToCourses()">
+        <i class="ti ti-arrow-left" aria-hidden="true"></i>
+        Back to courses
+      </button>
       <div>
         <h2 class="page-title">{{ selectedCard.course.name }}</h2>
         <p class="page-subtitle">{{ selectedCard.course.semester }}</p>
@@ -45,12 +71,42 @@
 
     <p class="muted" *ngIf="loading">Loading activities…</p>
 
+    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;" *ngIf="!loading && streamActivities.length > 0">
+      <button
+        type="button"
+        class="filter-chip"
+        [class.active]="!showBookmarkedOnly"
+        (click)="showBookmarkedOnly = false"
+      >
+        All activities
+      </button>
+      <button
+        type="button"
+        class="filter-chip"
+        [class.active]="showBookmarkedOnly"
+        (click)="showBookmarkedOnly = true"
+      >
+        <i class="ti ti-bookmark-filled"></i>
+        Bookmarked
+        <span class="chip-count" *ngIf="bookmarkedIds.size > 0">{{ bookmarkedIds.size }}</span>
+      </button>
+    </div>
+
     <section class="stream-list" *ngIf="!loading">
       <div
         class="stream-item"
-        *ngFor="let a of streamActivities"
+        *ngFor="let a of filteredActivities"
         (click)="openActivity(a)"
       >
+        <button
+          type="button"
+          class="bookmark-btn"
+          [class.active]="isBookmarked(a.id)"
+          (click)="toggleBookmark(a.id, $event)"
+          [attr.aria-label]="isBookmarked(a.id) ? 'Remove bookmark' : 'Add bookmark'"
+        >
+          <i class="ti" [class.ti-bookmark]="!isBookmarked(a.id)" [class.ti-bookmark-filled]="isBookmarked(a.id)"></i>
+        </button>
         <div class="stream-item-left">
           <span class="stream-type-badge">{{ a.type }}</span>
           <div>
@@ -64,8 +120,9 @@
         <span class="stream-arrow">›</span>
       </div>
 
-      <div class="empty-card" *ngIf="streamActivities.length === 0">
-        <p class="empty-text">No activities posted yet for this course.</p>
+      <div class="empty-card" *ngIf="filteredActivities.length === 0 && !loading">
+        <p class="empty-text" *ngIf="!showBookmarkedOnly">No activities posted yet for this course.</p>
+        <p class="empty-text" *ngIf="showBookmarkedOnly">No bookmarked activities yet.</p>
       </div>
     </section>
   </ng-container>
@@ -73,7 +130,10 @@
   <!-- ── Detail view ── -->
   <ng-container *ngIf="view === 'detail' && selectedActivity">
     <header class="stream-header">
-      <button class="back-btn" (click)="goBack()">← Back</button>
+      <button class="back-btn" (click)="backToStream()">
+        <i class="ti ti-arrow-left" aria-hidden="true"></i>
+        Back to activities
+      </button>
       <div>
         <h2 class="page-title">{{ selectedActivity.title }}</h2>
         <p class="page-subtitle">{{ selectedCard?.course?.name }}</p>
@@ -151,7 +211,18 @@
 
       <!-- Submission panel -->
       <article class="submission-panel">
-        <h4>Your submission</h4>
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+          <h4 style="margin: 0;">Your submission</h4>
+          <button
+            type="button"
+            class="btn outline ask-btn"
+            (click)="openQuestionModal()"
+            *ngIf="selectedActivity"
+          >
+            <i class="ti ti-help-circle" aria-hidden="true"></i>
+            Ask a question
+          </button>
+        </div>
 
         <div class="status-row">
           <span class="status-label">Status:</span>
@@ -175,6 +246,18 @@
               ({{ getScorePercentage(selectedActivity) }})
             </span>
           </span>
+        </div>
+
+        <!-- Teacher feedback display -->
+        <div class="feedback-card"
+          *ngIf="canSeeScorerAnswers(selectedActivity)
+            && submissions[selectedActivity.id]?.feedback
+            && submissions[selectedActivity.id]?.feedback?.trim()">
+          <div class="feedback-header">
+            <i class="ti ti-message-circle" aria-hidden="true"></i>
+            <span class="feedback-title">Teacher's feedback</span>
+          </div>
+          <p class="feedback-text">{{ submissions[selectedActivity.id]?.feedback }}</p>
         </div>
 
         <p class="score-hidden-notice" *ngIf="!canSeeScorerAnswers(selectedActivity) && submissions[selectedActivity.id]?.submitted">
@@ -257,4 +340,30 @@
       </article>
     </section>
   </ng-container>
+
+  <!-- Ask a Question Modal -->
+  <div class="modal-backdrop" *ngIf="showQuestionModal" (click)="closeQuestionModal()">
+    <div class="modal-card" (click)="$event.stopPropagation()">
+      <h3 class="modal-title">Ask about "{{ selectedActivity?.title }}"</h3>
+      <p class="modal-subtitle">Your teacher will receive a notification and respond when they're available.</p>
+      <textarea
+        [(ngModel)]="questionDraft"
+        rows="5"
+        placeholder="Type your question here..."
+        class="modal-textarea"
+      ></textarea>
+      <div class="modal-actions">
+        <button type="button" class="btn subtle" (click)="closeQuestionModal()">Cancel</button>
+        <button
+          type="button"
+          class="btn primary"
+          (click)="sendQuestion()"
+          [disabled]="sendingQuestion || !questionDraft.trim()"
+        >
+          <i class="ti ti-send" aria-hidden="true"></i>
+          {{ sendingQuestion ? 'Sending...' : 'Send question' }}
+        </button>
+      </div>
+    </div>
+  </div>
 </div>

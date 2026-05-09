@@ -6,6 +6,16 @@
         Manage year levels and sections under each program.
       </p>
     </div>
+    <div class="expand-buttons" *ngIf="!loading && programs.length > 0">
+      <button type="button" class="btn small subtle" (click)="expandAll()">
+        <i class="ti ti-arrows-expand"></i>
+        Expand all
+      </button>
+      <button type="button" class="btn small subtle" (click)="collapseAll()" [disabled]="expandedProgramIds.size === 0">
+        <i class="ti ti-arrows-minimize"></i>
+        Collapse all
+      </button>
+    </div>
   </header>
 
   <p class="muted center" *ngIf="loading">Loading…</p>
@@ -20,8 +30,8 @@
 
       <!-- Program row -->
       <div class="tree-row program-row">
-        <button class="expand-btn" (click)="toggleProgram(p.id)">
-          {{ expandedProgramId === p.id ? '▾' : '▸' }}
+        <button class="expand-btn" (click)="toggleProgram(p.id)" [attr.aria-expanded]="isProgramExpanded(p.id)">
+          <i class="ti" [class.ti-chevron-down]="isProgramExpanded(p.id)" [class.ti-chevron-right]="!isProgramExpanded(p.id)"></i>
         </button>
         <span class="tree-label program-label">{{ p.name }}</span>
         <span class="count-badge">
@@ -30,7 +40,7 @@
       </div>
 
       <!-- Program content -->
-      <div class="program-content" *ngIf="expandedProgramId === p.id">
+      <div class="program-content" *ngIf="isProgramExpanded(p.id)">
 
         <!-- Seed defaults button -->
         <div
@@ -82,8 +92,8 @@
               <button class="btn small subtle" (click)="cancelEditYearLevel()">Cancel</button>
             </ng-container>
             <ng-template #ylView>
-              <button class="expand-btn" (click)="toggleYearLevel(yl.id)">
-                {{ expandedYearLevelId === yl.id ? '▾' : '▸' }}
+              <button class="expand-btn" (click)="toggleYearLevel(yl.id)" [attr.aria-expanded]="isYearLevelExpanded(yl.id)">
+                <i class="ti" [class.ti-chevron-down]="isYearLevelExpanded(yl.id)" [class.ti-chevron-right]="!isYearLevelExpanded(yl.id)"></i>
               </button>
               <span class="tree-label year-label">{{ yl.name }}</span>
               <span class="count-badge">
@@ -99,7 +109,7 @@
           <!-- Sections under year level -->
           <div
             class="sections-content"
-            *ngIf="expandedYearLevelId === yl.id"
+            *ngIf="isYearLevelExpanded(yl.id)"
           >
             <!-- Add section -->
             <div class="inline-form indent">

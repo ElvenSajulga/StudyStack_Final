@@ -99,10 +99,69 @@
   color: #6b7280;
 }
 
+// Toggle switch styles
+.toggle-switch {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  position: relative;
+  width: 50px;
+  height: 30px;
+
+  input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+
+  .toggle-track {
+    width: 44px;
+    height: 24px;
+    border-radius: 12px;
+    background: var(--color-border-secondary);
+    transition: background 0.2s;
+    position: relative;
+    display: block;
+  }
+
+  input[type="checkbox"]:checked + .toggle-track {
+    background: var(--color-primary, #1A56DB);
+  }
+
+  .toggle-thumb {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: white;
+    transition: left 0.2s;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  }
+
+  .toggle-thumb.thumb-on {
+    left: 23px;
+  }
+
+  .toggle-thumb.thumb-off {
+    left: 3px;
+  }
+}
+
+.security-text {
+  margin: 0 0 12px 0;
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
 .btn-row {
   display: flex;
-  justify-content: flex-end;
-  margin-top: 8px;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
 }
 
 .btn {
@@ -111,13 +170,55 @@
   font-size: 0.85rem;
   font-weight: 500;
   padding: 8px 16px;
-  cursor: not-allowed;
-  opacity: 0.7;
+  cursor: pointer;
+  transition: filter 0.15s, opacity 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 }
 
 .btn.primary {
   background: linear-gradient(135deg, #22c55e, #16a34a);
   color: #f9fafb;
+
+  &:hover:not(:disabled) {
+    filter: brightness(1.05);
+  }
+}
+
+.btn.subtle {
+  background: transparent;
+  color: var(--color-text-secondary);
+  border: 0.5px solid var(--color-border-tertiary);
+
+  &:hover:not(:disabled) {
+    color: var(--color-text-primary);
+    border-color: var(--color-border-secondary);
+  }
+}
+
+.unsaved-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(217, 119, 6, 0.12);
+  color: #D97706;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+
+  i {
+    font-size: 13px;
+  }
 }
 
 @media (max-width: 768px) {

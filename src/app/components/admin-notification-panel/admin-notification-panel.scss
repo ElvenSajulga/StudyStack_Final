@@ -1,0 +1,238 @@
+.admin-notification-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+/* ── Bell button ── */
+.notification-bell {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 1.25rem;
+  color: #6b7280;
+  transition: color 0.2s ease;
+  position: relative;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &:hover {
+    color: #111827;
+  }
+}
+
+/* ── Notification badge ── */
+.notification-badge {
+  position: absolute;
+  top: 4px;
+  right: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  background: #ef4444;
+  color: #ffffff;
+  border-radius: 50%;
+  font-size: 0.7rem;
+  font-weight: 600;
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);
+}
+
+/* ── Notification panel ── */
+.notification-panel {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  width: 380px;
+  max-height: 600px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+  border: 1px solid #e5e7eb;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── Panel header ── */
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f9fafb;
+  flex-shrink: 0;
+}
+
+.panel-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.mark-all-read {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: #2563eb;
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: #eff6ff;
+    color: #1d4ed8;
+  }
+}
+
+/* ── Panel content ── */
+.panel-content {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Notifications list ── */
+.notifications-list {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Notification item ── */
+.notification-item {
+  display: flex;
+  gap: 12px;
+  padding: 12px 16px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border-bottom: 1px solid #f3f4f6;
+  text-align: left;
+
+  &:hover {
+    background: #f9fafb;
+  }
+
+  &.unread {
+    background: #eff6ff;
+
+    &:hover {
+      background: #dbeafe;
+    }
+  }
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.notification-icon {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: #f3f4f6;
+  color: #6b7280;
+  font-size: 1.2rem;
+}
+
+.notification-item.unread .notification-icon {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.notification-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.notification-title {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.notification-message {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+  color: #6b7280;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notification-time {
+  margin: 4px 0 0;
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+/* ── Notification status ── */
+.notification-status {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+}
+
+.unread-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #2563eb;
+}
+
+/* ── Empty state ── */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 40px 24px;
+  color: #9ca3af;
+  text-align: center;
+
+  i {
+    font-size: 2.5rem;
+    opacity: 0.5;
+  }
+
+  p {
+    margin: 0;
+    font-size: 0.9rem;
+  }
+}
+
+/* ── Panel overlay (click to close) ── */
+.panel-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+}
+
+/* ── Responsive ── */
+@media (max-width: 480px) {
+  .notification-panel {
+    width: calc(100vw - 32px);
+    max-height: 70vh;
+    right: 16px;
+  }
+}

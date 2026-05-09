@@ -116,6 +116,126 @@
   }
 }
 
+/* ── Course filter bar ── */
+.course-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 0;
+  margin-bottom: 4px;
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 99px;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  color: #374151;
+  transition: all 0.15s ease;
+}
+
+.filter-chip:hover {
+  background: #f9fafb;
+}
+
+.filter-chip.active {
+  background: rgba(26, 86, 219, 0.1);
+  color: #1A56DB;
+  border-color: rgba(26, 86, 219, 0.3);
+}
+
+/* ── Course group sections ── */
+.course-group {
+  margin-bottom: 20px;
+}
+
+.course-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: #f3f4f6;
+  border-radius: 8px 8px 0 0;
+  border: 1px solid #e5e7eb;
+  border-bottom: none;
+}
+
+.course-group-name {
+  margin: 0;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.course-group-avg {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 3px;
+}
+
+.course-group-avg.avg-high {
+  background: rgba(14, 159, 138, 0.15);
+  color: #0E9F8A;
+}
+
+.course-group-avg.avg-mid {
+  background: rgba(217, 119, 6, 0.15);
+  color: #D97706;
+}
+
+.course-group-avg.avg-low {
+  background: rgba(190, 24, 93, 0.15);
+  color: #BE185D;
+}
+
+.course-group .table-card {
+  border-radius: 0 0 8px 8px;
+  box-shadow: none;
+}
+
+/* ── Table columns ── */
+.num-col {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Type badges ── */
+.type-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.type-quiz {
+  background: rgba(26, 86, 219, 0.12);
+  color: #1A56DB;
+}
+
+.type-output {
+  background: rgba(83, 74, 183, 0.12);
+  color: #534AB7;
+}
+
+/* ── Utility classes ── */
+.muted-small {
+  font-size: 11px;
+  color: #9ca3af;
+}
+
 .pill-high, .pill-mid, .pill-low {
   font-size: 0.75rem;
   font-weight: 500;
@@ -127,3 +247,269 @@
 .pill-high { background: #E1F5EE; color: #085041; }
 .pill-mid  { background: #FAEEDA; color: #633806; }
 .pill-low  { background: #FCEBEB; color: #791F1F; }
+
+/* ── Feedback toggle and display ── */
+.feedback-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: 0.5px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+  color: #1A56DB;
+  transition: all 0.15s ease;
+}
+
+.feedback-toggle-btn:hover {
+  background: rgba(26, 86, 219, 0.08);
+  border-color: #1A56DB;
+}
+
+.feedback-toggle-btn i {
+  font-size: 12px;
+}
+
+.muted-cell {
+  color: #9ca3af;
+}
+
+.feedback-row td {
+  background: rgba(26, 86, 219, 0.04) !important;
+  padding: 10px 16px !important;
+  border-top: 0.5px dashed #c7d2fe !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+.feedback-cell {
+  background: white;
+  border: 0.5px solid rgba(26, 86, 219, 0.2);
+  border-left: 3px solid #1A56DB;
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+.feedback-cell-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.feedback-cell-header i {
+  font-size: 13px;
+  color: #1A56DB;
+}
+
+.feedback-cell-header span {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #1A56DB;
+}
+
+.feedback-cell-text {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #111827;
+  white-space: pre-wrap;
+}
+
+/* ── Grade Analytics ── */
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.summary-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.summary-label {
+  font-size: 11px;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.summary-value {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.summary-value.val-high {
+  color: #0E9F8A;
+}
+
+.summary-value.val-mid {
+  color: #D97706;
+}
+
+.summary-value.val-low {
+  color: #BE185D;
+}
+
+.summary-value.val-neutral {
+  color: #111827;
+}
+
+.section-heading {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 10px 0;
+}
+
+.course-averages,
+.trend-chart-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 14px 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.course-avg-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.course-avg-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: #f9fafb;
+  border-radius: 6px;
+}
+
+.course-avg-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.course-avg-name {
+  margin: 0;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.course-avg-meta {
+  margin: 2px 0 0 0;
+  font-size: 11px;
+  color: #6b7280;
+}
+
+.course-avg-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.trend-icon {
+  font-size: 14px;
+}
+
+.trend-icon i {
+  font-size: 16px;
+}
+
+.trend-icon:has(.ti-trending-up) {
+  color: #0E9F8A;
+}
+
+.trend-icon:has(.ti-trending-down) {
+  color: #BE185D;
+}
+
+.trend-icon.stable {
+  color: #6b7280;
+}
+
+.course-avg-percent {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  min-width: 50px;
+  text-align: right;
+}
+
+.course-avg-percent.pct-high {
+  color: #0E9F8A;
+}
+
+.course-avg-percent.pct-mid {
+  color: #D97706;
+}
+
+.course-avg-percent.pct-low {
+  color: #BE185D;
+}
+
+.trend-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bar-row {
+  display: grid;
+  grid-template-columns: 60px 1fr 50px;
+  gap: 10px;
+  align-items: center;
+}
+
+.bar-date {
+  font-size: 11px;
+  color: #6b7280;
+}
+
+.bar-track {
+  height: 8px;
+  background: #f3f4f6;
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.3s ease;
+}
+
+.bar-fill.bar-high {
+  background: #0E9F8A;
+}
+
+.bar-fill.bar-mid {
+  background: #D97706;
+}
+
+.bar-fill.bar-low {
+  background: #BE185D;
+}
+
+.bar-percent {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: right;
+}

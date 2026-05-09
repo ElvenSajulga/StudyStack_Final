@@ -1,9 +1,7 @@
 <div class="student-page">
   <header>
     <h2 class="page-title">Settings</h2>
-    <p class="page-subtitle">
-      Adjust how StudyStack behaves for your student account.
-    </p>
+    <p class="page-subtitle">Adjust how StudyStack behaves for your student account.</p>
   </header>
 
   <section class="card">
@@ -14,65 +12,63 @@
 
     <div class="settings-grid">
       <div class="toggle-row">
-        <div>
+        <div class="toggle-info">
           <p class="toggle-label">Show deadlines in dashboard</p>
-          <p class="toggle-caption">
-            Display upcoming activity deadlines on your main dashboard.
-          </p>
+          <p class="toggle-caption">Display upcoming activity deadlines on your main dashboard.</p>
         </div>
-        <input type="checkbox" checked />
+        <label class="toggle-switch">
+          <input type="checkbox" [(ngModel)]="preferences.showDeadlinesInDashboard" />
+          <span class="toggle-track"></span>
+          <span class="toggle-thumb" [class.thumb-on]="preferences.showDeadlinesInDashboard"></span>
+        </label>
       </div>
 
       <div class="toggle-row">
-        <div>
+        <div class="toggle-info">
           <p class="toggle-label">Email me when a teacher posts a new activity</p>
-          <p class="toggle-caption">
-            In a real deployment this would send an email notification from your school.
-          </p>
+          <p class="toggle-caption">Receive an email when a teacher creates a new activity in your enrolled courses.</p>
         </div>
-        <input type="checkbox" />
+        <label class="toggle-switch">
+          <input type="checkbox" [(ngModel)]="preferences.emailOnNewActivity" />
+          <span class="toggle-track"></span>
+          <span class="toggle-thumb" [class.thumb-on]="preferences.emailOnNewActivity"></span>
+        </label>
       </div>
 
       <div class="toggle-row">
-        <div>
+        <div class="toggle-info">
           <p class="toggle-label">Email me when my grade is updated</p>
-          <p class="toggle-caption">
-            Receive a notification when a teacher checks your submissions.
-          </p>
+          <p class="toggle-caption">Receive a notification when a teacher checks your submissions.</p>
         </div>
-        <input type="checkbox" />
+        <label class="toggle-switch">
+          <input type="checkbox" [(ngModel)]="preferences.emailOnGradeUpdate" />
+          <span class="toggle-track"></span>
+          <span class="toggle-thumb" [class.thumb-on]="preferences.emailOnGradeUpdate"></span>
+        </label>
       </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn primary" type="button" [disabled]="!hasChanges" (click)="savePreferences()">
+        Save preferences
+      </button>
+      <span class="unsaved-pill" *ngIf="hasChanges">Unsaved changes</span>
     </div>
   </section>
 
   <section class="card">
     <header>
       <h3>Account security</h3>
-      <p class="card-description">
-        Use this section in the future to update your password. For now, changes are handled by the
-        school administrator.
-      </p>
+      <p class="card-description">For security, password changes are managed through your email.</p>
     </header>
 
-    <div class="settings-grid">
-      <label class="field">
-        <span class="field-label">Current password</span>
-        <input type="password" placeholder="Enter current password" disabled />
-      </label>
-
-      <label class="field">
-        <span class="field-label">New password</span>
-        <input type="password" placeholder="Set a new password" disabled />
-      </label>
-
-      <label class="field">
-        <span class="field-label">Confirm new password</span>
-        <input type="password" placeholder="Repeat new password" disabled />
-      </label>
-    </div>
+    <p class="reset-info">Click below to receive a password reset link via email.</p>
 
     <div class="btn-row">
-      <button class="btn primary" type="button" disabled>Update password</button>
+      <button class="btn subtle" type="button" (click)="sendPasswordReset()">
+        <i class="ti ti-mail" aria-hidden="true"></i>
+        Send password reset email
+      </button>
     </div>
   </section>
 </div>

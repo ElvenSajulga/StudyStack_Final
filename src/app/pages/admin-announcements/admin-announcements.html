@@ -1,0 +1,111 @@
+<div class="admin-page admin-announcements">
+  <header class="page-header">
+    <div>
+      <h2 class="page-title">Announcements</h2>
+      <p class="page-subtitle">Create and manage system announcements for students and teachers.</p>
+    </div>
+    <div class="metric-pill">
+      <span class="metric-label">Total announcements</span>
+      <span class="metric-value">{{ totalAnnouncements }}</span>
+    </div>
+  </header>
+
+  <section class="content-grid">
+
+    <!-- Create announcement form -->
+    <article class="card form-card">
+      <header class="card-header">
+        <h3>Create announcement</h3>
+        <p class="card-description">
+          Post a new announcement for students and teachers.
+        </p>
+      </header>
+
+      <form (ngSubmit)="createAnnouncement()" class="card-body">
+        <div class="form-grid">
+          <label class="field field-full">
+            <span class="field-label">Title</span>
+            <input type="text" name="title" [(ngModel)]="addForm.title" placeholder="Announcement title" required />
+          </label>
+
+          <label class="field field-full">
+            <span class="field-label">Message</span>
+            <textarea name="message" [(ngModel)]="addForm.message" placeholder="Announcement message" rows="5" required></textarea>
+          </label>
+
+          <label class="field">
+            <span class="field-label">Target Audience</span>
+            <select name="audience" [(ngModel)]="addForm.audience">
+              <option value="all-students">All Students</option>
+              <option value="all-teachers">All Teachers</option>
+              <option value="program">By Program</option>
+            </select>
+          </label>
+
+          <label class="field" *ngIf="addForm.audience === 'program'">
+            <span class="field-label">Program</span>
+            <select name="programId" [(ngModel)]="addForm.programId">
+              <option value="">— Select program —</option>
+              <option *ngFor="let p of programs" [value]="p.id">{{ p.name }}</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">
+            Post announcement
+          </button>
+        </div>
+      </form>
+    </article>
+
+    <!-- Announcements list -->
+    <article class="card table-card">
+      <header class="card-header">
+        <div>
+          <h3>Recent announcements</h3>
+          <p class="card-description">All announcements sorted by date.</p>
+        </div>
+        <p class="muted" *ngIf="announcements.length">Showing {{ announcements.length }} announcements</p>
+      </header>
+
+      <section class="card-body" *ngIf="announcements.length > 0; else emptyState">
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Title</th>
+                <th>Message Preview</th>
+                <th>Posted By</th>
+                <th>Date</th>
+                <th class="actions-col"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let row of rows">
+                <td class="title-cell">
+                  <span class="title-text">{{ row.announcement.title }}</span>
+                </td>
+                <td class="message-cell">{{ row.messageTruncated }}</td>
+                <td class="posted-by-cell">{{ row.postedBy }}</td>
+                <td class="date-cell">{{ row.dateFormatted }}</td>
+                <td class="actions-cell">
+                  <button type="button" class="btn btn-subtle btn-danger" (click)="deleteAnnouncement(row.announcement.id)" title="Delete announcement">
+                    <i class="ti ti-trash"></i>
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <ng-template #emptyState>
+        <div class="empty-state">
+          <p>No announcements yet.</p>
+          <p class="muted">Create one using the form on the left to get started.</p>
+        </div>
+      </ng-template>
+    </article>
+  </section>
+</div>

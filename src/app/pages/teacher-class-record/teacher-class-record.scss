@@ -11,6 +11,125 @@
   color: var(--color-text-primary);
 }
 
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+
+  .page-header-titles {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .page-subtitle {
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--color-text-secondary);
+  }
+
+  .page-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  border-radius: 3px;
+  padding: 7px 14px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  letter-spacing: 0.01em;
+  background: transparent;
+  color: var(--color-text-primary);
+
+  i {
+    font-size: 16px;
+    line-height: 1;
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(26, 86, 219, 0.18);
+  }
+}
+
+.btn-subtle {
+  background: var(--color-background-primary);
+  border-color: var(--color-border-tertiary);
+  color: var(--color-text-secondary);
+
+  &:hover {
+    background: var(--color-background-secondary);
+    color: var(--color-text-primary);
+  }
+}
+
+.print-header {
+  display: none;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.search-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  min-width: 280px;
+
+  .search-icon {
+    position: absolute;
+    left: 10px;
+    color: var(--color-text-tertiary);
+    font-size: 16px;
+    pointer-events: none;
+  }
+}
+
+.search-input {
+  width: 100%;
+  height: 36px;
+  background: var(--color-background-primary);
+  border: 1px solid var(--color-border-tertiary);
+  border-radius: 3px;
+  padding: 0 12px 0 32px;
+  font-size: 0.875rem;
+  color: var(--color-text-primary);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+  &:focus {
+    outline: none;
+    border-color: var(--color-primary, #1A56DB);
+    box-shadow: 0 0 0 3px rgba(26, 86, 219, 0.12);
+  }
+
+  &::placeholder {
+    color: var(--color-text-tertiary);
+  }
+}
+
+.muted {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
 .card {
   background: var(--color-background-primary);
   border-radius: 12px;
@@ -61,7 +180,61 @@ th {
   top: 0;
 }
 
+th.sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s ease, color 0.15s ease;
+
+  &:hover {
+    color: var(--color-text-secondary);
+
+    .sort-icon {
+      color: var(--color-text-secondary);
+    }
+  }
+}
+
+.sort-icon {
+  font-size: 13px;
+  margin-left: 4px;
+  color: var(--color-text-tertiary);
+  vertical-align: middle;
+}
+
+th.sorted,
+td.sorted {
+  background: var(--color-background-info, rgba(26, 86, 219, 0.08)) !important;
+  color: var(--color-text-info, var(--color-primary, #1A56DB));
+}
+
+th.sorted .sort-icon {
+  color: var(--color-text-info, var(--color-primary, #1A56DB));
+}
+
+.sticky-col {
+  position: sticky;
+  background: var(--color-background-primary);
+  z-index: 2;
+}
+
+th.sticky-col {
+  background: var(--color-background-secondary);
+  z-index: 3;
+}
+
+.col-0 {
+  left: 0;
+}
+
+.col-1 {
+  left: 90px;
+  box-shadow: 2px 0 6px rgba(0, 0, 0, 0.05);
+}
+
 tbody tr:hover {
+  .sticky-col {
+    background: var(--color-background-secondary);
+  }
   background: var(--color-background-secondary);
 }
 
@@ -79,6 +252,14 @@ td.score-cell {
   font-weight: 500;
 }
 
+.no-results {
+  text-align: center;
+  padding: 32px 16px;
+  color: var(--color-text-tertiary);
+  font-style: italic;
+  font-size: 0.875rem;
+}
+
 .empty-state {
   padding: 48px 24px;
   text-align: center;
@@ -90,4 +271,137 @@ td.score-cell {
   font-size: 0.82rem;
   color: var(--color-text-tertiary);
   margin-top: 4px;
+}
+
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 1cm;
+  }
+
+  :host {
+    display: block;
+    background: #fff;
+  }
+
+  // Hide app shell chrome (use ng-deep to pierce component encapsulation)
+  ::ng-deep .sidebar,
+  ::ng-deep .topbar,
+  ::ng-deep app-sidebar,
+  ::ng-deep app-topbar,
+  ::ng-deep nav {
+    display: none !important;
+  }
+
+  ::ng-deep body {
+    background: #fff !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .page-header .page-header-actions,
+  .page-header .btn,
+  .toolbar {
+    display: none !important;
+  }
+
+  .page-header h2 {
+    display: none;
+  }
+
+  .print-header {
+    display: block;
+    margin-bottom: 12px;
+    font-size: 12px;
+    color: #000;
+
+    .school-name {
+      margin: 0 0 4px;
+      font-size: 11px;
+      color: #555;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: 18px;
+      font-weight: 600;
+      color: #000;
+    }
+
+    .print-meta {
+      margin: 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      font-size: 12px;
+      color: #333;
+
+      strong {
+        color: #000;
+        margin-right: 4px;
+      }
+    }
+  }
+
+  .card {
+    border: 1px solid #ccc;
+    border-radius: 0;
+    box-shadow: none;
+    overflow: visible;
+  }
+
+  .card-header {
+    display: none;
+  }
+
+  .table-wrapper {
+    overflow: visible;
+  }
+
+  table {
+    font-size: 10px;
+    width: 100%;
+
+    th,
+    td {
+      padding: 4px 6px;
+      border: 0.5px solid #999;
+      white-space: normal;
+    }
+
+    th {
+      background: #f0f0f0 !important;
+      color: #000 !important;
+      position: static;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    tbody tr:hover {
+      background: transparent !important;
+
+      .sticky-col {
+        background: transparent !important;
+      }
+    }
+
+    th.sticky-col,
+    td.sticky-col {
+      position: static;
+      box-shadow: none;
+      background: transparent !important;
+    }
+
+    th.sorted,
+    td.sorted {
+      background: transparent !important;
+      color: inherit !important;
+    }
+
+    .sort-icon {
+      display: none;
+    }
+  }
 }

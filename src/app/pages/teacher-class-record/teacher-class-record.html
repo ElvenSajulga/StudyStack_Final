@@ -1,7 +1,50 @@
 <div class="teacher-class-record">
-  <h2>Class record</h2>
+  <div class="print-header">
+    <p class="school-name">StudyStack Academic Management System</p>
+    <h1>Class Record</h1>
+    <p class="print-meta">
+      <span *ngIf="courseName"><strong>Course:</strong> {{ courseName }}</span>
+      <span *ngIf="courseSection"><strong>Section:</strong> {{ courseSection }}</span>
+      <span><strong>Generated:</strong> {{ printDate }}</span>
+    </p>
+  </div>
+
+  <header class="page-header">
+    <div class="page-header-titles">
+      <h2>Class Record</h2>
+      <p class="page-subtitle" *ngIf="courseName">
+        {{ courseName }}<span *ngIf="courseSection"> – {{ courseSection }}</span>
+      </p>
+    </div>
+    <div class="page-header-actions" *ngIf="students.length > 0 && activities.length > 0">
+      <button type="button" class="btn btn-subtle" (click)="exportCsv()" aria-label="Export CSV">
+        <i class="ti ti-download" aria-hidden="true"></i>
+        <span>Export CSV</span>
+      </button>
+      <button type="button" class="btn btn-subtle" (click)="printView()" aria-label="Print">
+        <i class="ti ti-printer" aria-hidden="true"></i>
+        <span>Print</span>
+      </button>
+    </div>
+  </header>
 
   <section *ngIf="students.length > 0 && activities.length > 0; else emptyState">
+    <div class="toolbar">
+      <div class="search-input-wrapper">
+        <i class="ti ti-search search-icon" aria-hidden="true"></i>
+        <input
+          type="text"
+          class="search-input"
+          [(ngModel)]="searchQuery"
+          placeholder="Search students…"
+          aria-label="Search students"
+        />
+      </div>
+      <span class="muted">
+        Showing {{ filteredStudents.length }} of {{ students.length }} {{ students.length === 1 ? 'student' : 'students' }}
+      </span>
+    </div>
+
     <article class="card">
       <header class="card-header">
         <h3>Scores per activity</h3>
@@ -11,17 +54,41 @@
         <table>
           <thead>
             <tr>
-              <th>Student</th>
-              <th *ngFor="let a of activities">
+              <th class="sticky-col col-0">Student ID</th>
+              <th class="sticky-col col-1">Name</th>
+              <th
+                *ngFor="let a of activities"
+                class="sortable"
+                [class.sorted]="isSortedBy(a.id)"
+                (click)="sortByActivity(a.id)"
+              >
                 {{ a.title }}
+                <i
+                  class="ti sort-icon"
+                  [ngClass]="{
+                    'ti-arrows-sort': !isSortedBy(a.id),
+                    'ti-sort-ascending': isSortedBy(a.id) && sortDirFor(a.id) === 'asc',
+                    'ti-sort-descending': isSortedBy(a.id) && sortDirFor(a.id) === 'desc'
+                  }"
+                  aria-hidden="true"
+                ></i>
               </th>
               <th class="total-col">Total score</th>
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let s of students">
-              <td>{{ s.lastname }}, {{ s.firstname }} {{ s.middlename }}</td>
-              <td *ngFor="let a of activities">
+            <tr *ngIf="filteredStudents.length === 0">
+              <td [attr.colspan]="activities.length + 3" class="no-results">
+                No students match your search.
+              </td>
+            </tr>
+            <tr *ngFor="let s of filteredStudents">
+              <td class="sticky-col col-0">{{ s.studentID }}</td>
+              <td class="sticky-col col-1">{{ s.lastname }}, {{ s.firstname }} {{ s.middlename }}</td>
+              <td
+                *ngFor="let a of activities"
+                [class.sorted]="isSortedBy(a.id)"
+              >
                 {{ scoreFor(s, a) ?? '-' }}
               </td>
               <td class="total-col">

@@ -4,6 +4,7 @@
     <p class="page-subtitle">Configure how the StudyStack admin portal behaves.</p>
   </header>
 
+  <!-- General Settings Card -->
   <section class="card">
     <header>
       <h3>General</h3>
@@ -13,29 +14,30 @@
     <div class="settings-grid">
       <label class="field">
         <span class="field-label">Portal name</span>
-        <input type="text" value="StudyStack Admin Portal" />
+        <input type="text" [(ngModel)]="settings.general.portalName" />
       </label>
 
       <label class="field">
         <span class="field-label">Support email</span>
-        <input type="email" value="support@example.com" />
+        <input type="email" [(ngModel)]="settings.general.supportEmail" />
       </label>
 
       <label class="field">
         <span class="field-label">Academic year</span>
-        <input type="text" value="2025–2026" />
+        <input type="text" [(ngModel)]="settings.general.academicYear" />
       </label>
 
       <label class="field">
         <span class="field-label">Default status for new accounts</span>
-        <select>
-          <option>Active</option>
-          <option>Inactive</option>
+        <select [(ngModel)]="settings.general.defaultNewAccountStatus">
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
         </select>
       </label>
     </div>
   </section>
 
+  <!-- Preferences Card -->
   <section class="card">
     <header>
       <h3>Preferences</h3>
@@ -43,33 +45,147 @@
     </header>
 
     <div>
+      <!-- Dark sidebar toggle -->
       <div class="toggle-row">
         <div>
           <p class="toggle-label">Dark sidebar theme</p>
           <p class="toggle-caption">Use a dark theme for the admin navigation.</p>
         </div>
-        <input type="checkbox" checked />
+        <label class="toggle-switch">
+          <input
+            type="checkbox"
+            [(ngModel)]="settings.preferences.darkSidebarTheme"
+          />
+          <span class="toggle-track"></span>
+        </label>
       </div>
 
+      <!-- Email on teacher activity toggle -->
       <div class="toggle-row">
         <div>
           <p class="toggle-label">Email me when a teacher creates an activity</p>
           <p class="toggle-caption">Helpful while you are still setting up the system.</p>
         </div>
-        <input type="checkbox" />
+        <label class="toggle-switch">
+          <input
+            type="checkbox"
+            [(ngModel)]="settings.preferences.emailOnTeacherActivity"
+          />
+          <span class="toggle-track"></span>
+        </label>
       </div>
 
+      <!-- Email on student enroll toggle -->
       <div class="toggle-row">
         <div>
           <p class="toggle-label">Email me when a student enrolls</p>
           <p class="toggle-caption">Summary emails about new student accounts.</p>
         </div>
-        <input type="checkbox" />
+        <label class="toggle-switch">
+          <input
+            type="checkbox"
+            [(ngModel)]="settings.preferences.emailOnStudentEnroll"
+          />
+          <span class="toggle-track"></span>
+        </label>
       </div>
     </div>
 
+    <!-- Save button with unsaved changes indicator -->
     <div class="btn-row">
-      <button class="btn primary" type="button">Save changes</button>
+      <div class="unsaved-badge" *ngIf="hasChanges">
+        <span class="badge-warning">Unsaved changes</span>
+      </div>
+      <button
+        class="btn primary"
+        type="button"
+        (click)="saveSettings()"
+        [disabled]="!hasChanges"
+      >
+        Save changes
+      </button>
+    </div>
+  </section>
+
+  <!-- Academic Calendar Card -->
+  <section class="card" *ngIf="calendar">
+    <header>
+      <h3>Academic Calendar</h3>
+      <p class="card-description">Define academic semesters and enrollment periods.</p>
+    </header>
+
+    <div class="settings-grid">
+      <label class="field">
+        <span class="field-label">Academic year</span>
+        <input type="text" placeholder="e.g. 2025-2026" [(ngModel)]="calendar.academicYear" />
+      </label>
+
+      <label class="field">
+        <span class="field-label">Semester 1 start date</span>
+        <input type="date" [(ngModel)]="calendar.sem1Start" />
+      </label>
+
+      <label class="field">
+        <span class="field-label">Semester 1 end date</span>
+        <input type="date" [(ngModel)]="calendar.sem1End" />
+      </label>
+
+      <label class="field">
+        <span class="field-label">Semester 2 start date</span>
+        <input type="date" [(ngModel)]="calendar.sem2Start" />
+      </label>
+
+      <label class="field">
+        <span class="field-label">Semester 2 end date</span>
+        <input type="date" [(ngModel)]="calendar.sem2End" />
+      </label>
+
+      <label class="field">
+        <span class="field-label">Enrollment window opens</span>
+        <input type="date" [(ngModel)]="calendar.enrollmentOpen" />
+      </label>
+
+      <label class="field">
+        <span class="field-label">Enrollment window closes</span>
+        <input type="date" [(ngModel)]="calendar.enrollmentClose" />
+      </label>
+    </div>
+
+    <!-- Save button with unsaved changes indicator -->
+    <div class="btn-row">
+      <div class="unsaved-badge" *ngIf="hasCalendarChanges">
+        <span class="badge-warning">Unsaved changes</span>
+      </div>
+      <button
+        class="btn primary"
+        type="button"
+        (click)="saveCalendar()"
+        [disabled]="!hasCalendarChanges"
+      >
+        Save calendar
+      </button>
+    </div>
+  </section>
+
+  <!-- Danger Zone Card -->
+  <section class="card danger-zone-card">
+    <header>
+      <h3>Danger Zone</h3>
+      <p class="card-description">Irreversible actions. Use with caution.</p>
+    </header>
+
+    <div class="danger-action">
+      <div>
+        <p class="danger-label">Reset all academic data</p>
+        <p class="danger-caption">Delete all courses, sections, enrollments, and related academic data.</p>
+      </div>
+      <button
+        class="btn btn-danger"
+        type="button"
+        (click)="resetAcademicData()"
+      >
+        Reset data
+      </button>
     </div>
   </section>
 </div>

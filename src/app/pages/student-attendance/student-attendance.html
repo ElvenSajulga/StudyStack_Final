@@ -6,6 +6,40 @@
     </p>
   </header>
 
+  <!-- Summary stats -->
+  <section class="att-summary" *ngIf="allActivities.length > 0">
+    <article class="att-stat att-rate">
+      <span class="att-label">Attendance rate</span>
+      <span class="att-value" [class]="'rate-' + getRateColorClass()">
+        {{ attendanceRate | number:'1.0-0' }}%
+      </span>
+    </article>
+    <article class="att-stat">
+      <span class="att-label">Present</span>
+      <span class="att-value rate-high">{{ presentCount }}</span>
+    </article>
+    <article class="att-stat">
+      <span class="att-label">Late</span>
+      <span class="att-value rate-mid">{{ lateCount }}</span>
+    </article>
+    <article class="att-stat">
+      <span class="att-label">Absent</span>
+      <span class="att-value rate-low">{{ absentCount }}</span>
+    </article>
+  </section>
+
+  <!-- Course filter -->
+  <div class="filter-bar" *ngIf="availableCourses.length > 0">
+    <label class="field">
+      <span class="field-label">Filter by course</span>
+      <select [(ngModel)]="selectedCourseId" (ngModelChange)="onFilterChange()">
+        <option value="">All courses</option>
+        <option *ngFor="let c of availableCourses" [value]="c.id">{{ c.name }}</option>
+      </select>
+    </label>
+    <span class="muted">{{ activities.length }} activity(ies)</span>
+  </div>
+
   <section *ngIf="activities.length > 0; else emptyState">
     <div class="table-card">
       <table>
@@ -22,7 +56,12 @@
             <td data-label="Activity">{{ a.title }}</td>
             <td data-label="Type">{{ a.type }}</td>
             <td data-label="Deadline">{{ a.deadline | date: 'short' }}</td>
-            <td data-label="Status">{{ attendanceStatus(a) }}</td>
+            <td data-label="Status">
+              <span class="status-badge" [class]="'st-' + statusClass(a)">
+                <i class="ti" [class.ti-check]="statusClass(a) === 'present'" [class.ti-clock]="statusClass(a) === 'late'" [class.ti-x]="statusClass(a) === 'absent'"></i>
+                {{ statusClass(a) | titlecase }}
+              </span>
+            </td>
           </tr>
         </tbody>
       </table>

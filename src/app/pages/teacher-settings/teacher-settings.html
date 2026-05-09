@@ -20,7 +20,11 @@
             Display upcoming deadlines for your created activities on the teacher dashboard.
           </p>
         </div>
-        <input type="checkbox" checked />
+        <label class="toggle-switch">
+          <input type="checkbox" [(ngModel)]="preferences.showUpcomingActivities" />
+          <span class="toggle-track"></span>
+          <span class="toggle-thumb" [ngClass]="getThumbClass(preferences.showUpcomingActivities)"></span>
+        </label>
       </div>
 
       <div class="toggle-row">
@@ -30,7 +34,11 @@
             In a real deployment this would send an email whenever a student submits an activity.
           </p>
         </div>
-        <input type="checkbox" />
+        <label class="toggle-switch">
+          <input type="checkbox" [(ngModel)]="preferences.emailOnSubmit" />
+          <span class="toggle-track"></span>
+          <span class="toggle-thumb" [ngClass]="getThumbClass(preferences.emailOnSubmit)"></span>
+        </label>
       </div>
 
       <div class="toggle-row">
@@ -40,8 +48,21 @@
             Receive a summary when the submission window for an activity has closed.
           </p>
         </div>
-        <input type="checkbox" />
+        <label class="toggle-switch">
+          <input type="checkbox" [(ngModel)]="preferences.emailOnClose" />
+          <span class="toggle-track"></span>
+          <span class="toggle-thumb" [ngClass]="getThumbClass(preferences.emailOnClose)"></span>
+        </label>
       </div>
+    </div>
+
+    <div class="btn-row">
+      <span class="unsaved-pill" *ngIf="hasChanges">
+        <i class="ti ti-alert-circle"></i> Unsaved changes
+      </span>
+      <button class="btn primary" (click)="savePreferences()" [disabled]="!hasChanges">
+        Save preferences
+      </button>
     </div>
   </section>
 
@@ -49,30 +70,18 @@
     <header>
       <h3>Account security</h3>
       <p class="card-description">
-        Use this section in the future to update your password. For now, changes are handled by the
-        school administrator.
+        For security, password changes are managed through your email. Click below to receive a password reset link.
       </p>
     </header>
 
-    <div class="settings-grid">
-      <label class="field">
-        <span class="field-label">Current password</span>
-        <input type="password" placeholder="Enter current password" disabled />
-      </label>
-
-      <label class="field">
-        <span class="field-label">New password</span>
-        <input type="password" placeholder="Set a new password" disabled />
-      </label>
-
-      <label class="field">
-        <span class="field-label">Confirm new password</span>
-        <input type="password" placeholder="Repeat new password" disabled />
-      </label>
-    </div>
+    <p class="security-text">
+      We'll send a password reset email to your registered address. Follow the instructions in the email to create a new password.
+    </p>
 
     <div class="btn-row">
-      <button class="btn primary" type="button" disabled>Update password</button>
+      <button class="btn subtle" type="button" (click)="sendPasswordReset()">
+        <i class="ti ti-mail" aria-hidden="true"></i> Send password reset email
+      </button>
     </div>
   </section>
 </div>

@@ -31,6 +31,7 @@ export class StudentAnnouncement implements OnInit, OnDestroy {
   teachers: TeacherAccount[] = [];
 
   loading = false;
+  readIds: Set<string> = new Set();
 
   private readonly platformId = inject(PLATFORM_ID);
   private readonly zone = inject(NgZone);
@@ -59,8 +60,55 @@ export class StudentAnnouncement implements OnInit, OnDestroy {
     return this.auth.getCurrentUser()?.studentID;
   }
 
+  private get storageKey(): string {
+    const uid = this.studentID || 'anonymous';
+    return `ss_read_announcements_${uid}`;
+  }
+
+  private loadReadState(): void {
+    if (!isPlatformBrowser(this.platformId)) return;
+    try {
+      const stored = localStorage.getItem(this.storageKey);
+      this.readIds = new Set(stored ? JSON.parse(stored) : []);
+    } catch {
+      this.readIds = new Set();
+    }
+  }
+
+  private saveReadState(): void {
+    if (!isPlatformBrowser(this.platformId)) return;
+    try {
+      localStorage.setItem(this.storageKey, JSON.stringify(Array.from(this.readIds)));
+    } catch {
+      // localStorage might be unavailable
+    }
+  }
+
+  isUnread(id: string | number): boolean {
+    return !this.readIds.has(String(id));
+  }
+
+  markAsRead(id: string | number): void {
+    this.readIds.add(String(id));
+    this.saveReadState();
+    this.cdr.detectChanges();
+  }
+
+  markAllAsRead(): void {
+    for (const a of this.filteredAnnouncements) {
+      this.readIds.add(String(a.id));
+    }
+    this.saveReadState();
+    this.cdr.detectChanges();
+  }
+
+  get unreadCount(): number {
+    return this.filteredAnnouncements.filter(a => this.isUnread(a.id)).length;
+  }
+
   private async init(): Promise<void> {
     this.loading = true;
+    this.loadReadState();
     await this.teacherService.reloadFromServer();
     this.teachers = this.teacherService.getAll();
 

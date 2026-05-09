@@ -7,6 +7,7 @@ import { TeacherDashboard } from './layouts/teacher/teacher-dashboard/teacher-da
 
 import { AdminProfile } from './pages/admin-profile/admin-profile';
 import { AdminSettings } from './pages/admin-settings/admin-settings';
+import { AdminAuditLog } from './pages/admin-audit-log/admin-audit-log';
 import { StudentProfile } from './pages/student-profile/student-profile';
 import { StudentSettings } from './pages/student-settings/student-settings';
 import { TeacherProfile } from './pages/teacher-profile/teacher-profile';
@@ -19,6 +20,7 @@ import { AdminSubjects } from './pages/admin-subjects/admin-subjects';
 import { AdminEnrollments } from './pages/admin-enrollments/admin-enrollments';
 import { AdminSections } from './pages/admin-sections/admin-sections';
 import { AdminCourses } from './pages/admin-courses/admin-courses';
+import { AdminAnnouncements } from './pages/admin-announcements/admin-announcements';
 
 import { StudentActivity } from './pages/student-activity/student-activity';
 import { StudentAnnouncement } from './pages/student-announcement/student-announcement';
@@ -29,6 +31,7 @@ import { TeacherActivity } from './pages/teacher-activity/teacher-activity';
 import { TeacherAnnouncement } from './pages/teacher-announcement/teacher-announcement';
 import { TeacherAttendance } from './pages/teacher-attendance/teacher-attendance';
 import { TeacherClassRecord } from './pages/teacher-class-record/teacher-class-record';
+import { TeacherStudents } from './pages/teacher-students/teacher-students';
 
 import { HelpCenter } from './pages/help-center/help-center';
 
@@ -117,6 +120,18 @@ export const routes: Routes = [
     canActivate: [authGuard, roleGuard],
     data: { roles: ['admin'] },
   },
+  {
+    path: 'admin-announcements',
+    component: AdminAnnouncements,
+    canActivate: [authGuard, roleGuard],
+    data: { roles: ['admin'] },
+  },
+  {
+    path: 'admin-audit-log',
+    component: AdminAuditLog,
+    canActivate: [authGuard, roleGuard],
+    data: { roles: ['admin'] },
+  },
 
   // ── Student routes ─────────────────────────────────────────────────────────
   {
@@ -202,6 +217,12 @@ export const routes: Routes = [
   {
     path: 'teacher-class-record',
     component: TeacherClassRecord,
+    canActivate: [authGuard, roleGuard],
+    data: { roles: ['teacher'] },
+  },
+  {
+    path: 'teacher-students',
+    component: TeacherStudents,
     canActivate: [authGuard, roleGuard],
     data: { roles: ['teacher'] },
   },

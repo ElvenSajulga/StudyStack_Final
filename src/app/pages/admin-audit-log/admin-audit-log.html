@@ -1,0 +1,136 @@
+<div class="admin-page">
+  <header class="page-header">
+    <div>
+      <h2 class="page-title">Audit Log</h2>
+      <p class="page-subtitle">
+        Track all administrative actions and system changes.
+      </p>
+    </div>
+  </header>
+
+  <!-- Loading state -->
+  <p class="muted center" *ngIf="loading">Loading audit logs…</p>
+
+  <ng-container *ngIf="!loading">
+    <!-- Filter bar -->
+    <div class="filter-bar">
+      <div class="filter-group">
+        <label for="filterAction">Action</label>
+        <select
+          id="filterAction"
+          [(ngModel)]="filterAction"
+          (change)="onFilterChange()"
+        >
+          <option value="">All actions</option>
+          <option value="create">Created</option>
+          <option value="update">Updated</option>
+          <option value="delete">Deleted</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label for="filterEntityType">Entity Type</label>
+        <select
+          id="filterEntityType"
+          [(ngModel)]="filterEntityType"
+          (change)="onFilterChange()"
+        >
+          <option value="">All types</option>
+          <option value="student">Student</option>
+          <option value="teacher">Teacher</option>
+          <option value="enrollment">Enrollment</option>
+          <option value="announcement">Announcement</option>
+          <option value="course">Course</option>
+          <option value="section">Section</option>
+        </select>
+      </div>
+
+      <div class="filter-group search-group">
+        <label for="searchQuery">Search</label>
+        <input
+          id="searchQuery"
+          type="text"
+          placeholder="Actor name, description, or ID…"
+          [(ngModel)]="searchQuery"
+          (input)="onFilterChange()"
+        />
+      </div>
+    </div>
+
+    <!-- Empty state -->
+    <div class="empty-state card" *ngIf="sortedLogs.length === 0">
+      <p>No audit logs found.</p>
+    </div>
+
+    <!-- Table -->
+    <div class="table-container card" *ngIf="sortedLogs.length > 0">
+      <table class="audit-table">
+        <thead>
+          <tr>
+            <th>Timestamp</th>
+            <th>Actor</th>
+            <th>Action</th>
+            <th>Entity Type</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let log of paginatedLogs; let even = even" [class.even]="even">
+            <td class="timestamp">
+              {{ log.timestamp | date: 'medium' }}
+            </td>
+            <td class="actor">{{ log.actorName }}</td>
+            <td class="action">
+              <span class="badge" [ngClass]="getActionBadgeClass(log.action)">
+                {{ getActionLabel(log.action) }}
+              </span>
+            </td>
+            <td class="entity-type">
+              <span class="badge badge-neutral">
+                {{ getEntityTypeLabel(log.entityType) }}
+              </span>
+            </td>
+            <td class="description">{{ log.description }}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Pagination -->
+      <div class="pagination" *ngIf="totalPages > 1">
+        <button
+          type="button"
+          class="btn-pagination"
+          (click)="prevPage()"
+          [disabled]="currentPage === 1"
+        >
+          <i class="ti ti-chevron-left"></i>
+        </button>
+
+        <div class="page-numbers">
+          <button
+            type="button"
+            class="page-number"
+            *ngFor="let page of [].constructor(totalPages); let i = index"
+            (click)="goToPage(i + 1)"
+            [class.active]="currentPage === i + 1"
+          >
+            {{ i + 1 }}
+          </button>
+        </div>
+
+        <button
+          type="button"
+          class="btn-pagination"
+          (click)="nextPage()"
+          [disabled]="currentPage === totalPages"
+        >
+          <i class="ti ti-chevron-right"></i>
+        </button>
+
+        <div class="pagination-info">
+          {{ displayCount.start }}–{{ displayCount.end }} of {{ displayCount.total }}
+        </div>
+      </div>
+    </div>
+  </ng-container>
+</div>

@@ -75,6 +75,132 @@
   color: #6b7280;
 }
 
+/* ── Attendance summary stats ── */
+.att-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.att-stat {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.att-stat.att-rate {
+  background: linear-gradient(135deg, white, #f9fafb);
+}
+
+.att-label {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7280;
+}
+
+.att-value {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.att-value.rate-high {
+  color: #0E9F8A;
+}
+
+.att-value.rate-mid {
+  color: #D97706;
+}
+
+.att-value.rate-low {
+  color: #BE185D;
+}
+
+/* ── Filter bar ── */
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.filter-bar .field {
+  flex: 0 0 auto;
+}
+
+.field-label {
+  display: block;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 4px;
+}
+
+.filter-bar select {
+  padding: 8px 10px;
+  border: 0.5px solid #e5e7eb;
+  border-radius: 6px;
+  background: white;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.filter-bar select:focus {
+  outline: none;
+  border-color: #1A56DB;
+  box-shadow: 0 0 0 3px rgba(26, 86, 219, 0.1);
+}
+
+.muted {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+/* ── Status badges ── */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.status-badge i {
+  font-size: 12px;
+}
+
+.status-badge.st-present {
+  background: rgba(14, 159, 138, 0.12);
+  color: #0E9F8A;
+}
+
+.status-badge.st-late {
+  background: rgba(217, 119, 6, 0.12);
+  color: #D97706;
+}
+
+.status-badge.st-absent {
+  background: rgba(190, 24, 93, 0.12);
+  color: #BE185D;
+}
+
 @media (max-width: 768px) {
   .table-card table,
   .table-card thead,

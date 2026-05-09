@@ -1,4 +1,4 @@
-<div class="student-dashboard">
+<div class="student-page student-dashboard">
   <div class="page-header">
     <div>
       <h1 class="page-title">Dashboard</h1>
@@ -6,82 +6,123 @@
     </div>
   </div>
 
-  <section class="stats-grid">
-    <article class="card stat-card">
-      <div class="stat-content">
-        <h3>On-Time Submissions</h3>
-        <p class="stat-number">{{ presentCount }}</p>
-        <p class="stat-caption">Completed on schedule</p>
-        <span class="badge badge-success">
-          <i class="ti ti-check"></i>
-        </span>
-      </div>
+  <!-- Today's focus callout -->
+  <section class="focus-callout" *ngIf="nextDeadline" [attr.data-urgency]="getDeadlineUrgency()">
+    <div class="focus-icon">
+      <i class="ti"
+         [class.ti-alert-circle]="getDeadlineUrgency() === 'urgent'"
+         [class.ti-clock]="getDeadlineUrgency() === 'soon'"
+         [class.ti-calendar-event]="getDeadlineUrgency() === 'later'"></i>
+    </div>
+    <div class="focus-content">
+      <p class="focus-label">Today's focus</p>
+      <h3 class="focus-title">{{ nextDeadline.title }}</h3>
+      <p class="focus-meta">
+        Due {{ nextDeadline.closeAt | date: 'EEEE, MMM d' }} at {{ nextDeadline.closeAt | date: 'h:mm a' }}
+        <span class="focus-time-left">· {{ hoursUntilDeadline() }} hours left</span>
+      </p>
+    </div>
+    <a routerLink="/student-activity" class="btn btn-primary">
+      Open <i class="ti ti-arrow-right"></i>
+    </a>
+  </section>
+
+  <!-- Stats bento -->
+  <section class="bento-grid">
+    <article class="stat-tile">
+      <span class="stat-tile-icon"><i class="ti ti-trophy"></i></span>
+      <span class="stat-tile-label">Overall Average</span>
+      <span class="stat-tile-value">{{ overallAveragePercent | number:'1.0-0' }}%</span>
+      <span class="stat-tile-caption">Across all graded activities</span>
     </article>
 
-    <article class="card stat-card">
-      <div class="stat-content">
-        <h3>Late Submissions</h3>
-        <p class="stat-number">{{ lateCount }}</p>
-        <p class="stat-caption">Submitted after deadline</p>
-        <span class="badge badge-warning">
-          <i class="ti ti-clock"></i>
-        </span>
-      </div>
+    <article class="stat-tile">
+      <span class="stat-tile-icon" style="background: var(--blue-50); color: var(--blue-600);">
+        <i class="ti ti-check"></i>
+      </span>
+      <span class="stat-tile-label">On-Time Rate</span>
+      <span class="stat-tile-value">{{ onTimeRate | number:'1.0-0' }}%</span>
+      <span class="stat-tile-caption">{{ presentCount }} on-time submissions</span>
     </article>
 
-    <article class="card stat-card">
-      <div class="stat-content">
-        <h3>Missing Submissions</h3>
-        <p class="stat-number">{{ absentCount }}</p>
-        <p class="stat-caption">No valid submission</p>
-        <span class="badge badge-danger">
-          <i class="ti ti-x"></i>
-        </span>
-      </div>
+    <article class="stat-tile">
+      <span class="stat-tile-icon" style="background: var(--violet-50); color: var(--violet-600);">
+        <i class="ti ti-calendar-week"></i>
+      </span>
+      <span class="stat-tile-label">This Week</span>
+      <span class="stat-tile-value">{{ submissionsThisWeek }}</span>
+      <span class="stat-tile-caption">Activities submitted</span>
     </article>
 
-    <article class="card stat-card">
-      <div class="stat-content">
-        <h3>Open Activities</h3>
-        <p class="stat-number">{{ openActivities }}</p>
-        <p class="stat-caption">Still accepting submissions</p>
-        <span class="badge badge-info">
-          <i class="ti ti-file-text"></i>
-        </span>
-      </div>
+    <article class="stat-tile">
+      <span class="stat-tile-icon" style="background: var(--amber-50); color: var(--amber-500);">
+        <i class="ti ti-file-text"></i>
+      </span>
+      <span class="stat-tile-label">Open Activities</span>
+      <span class="stat-tile-value">{{ openActivities }}</span>
+      <span class="stat-tile-caption">Still accepting submissions</span>
     </article>
   </section>
 
-  <section class="content-sections">
-    <article class="card">
-      <div class="card-header">
-        <h2 class="card-title">Upcoming Activities</h2>
+  <!-- Calendar + content sections in bento -->
+  <section class="bento-grid">
+    <article class="card item-large calendar-card">
+      <div class="card-header calendar-header">
+        <h2 class="card-title">
+          <i class="ti ti-calendar-event" aria-hidden="true"></i>
+          Deadline Calendar
+        </h2>
+        <div class="month-nav">
+          <button class="month-nav-btn" (click)="prevMonth()" aria-label="Previous month">
+            <i class="ti ti-chevron-left"></i>
+          </button>
+          <span class="month-label">{{ monthLabel }}</span>
+          <button class="month-nav-btn" (click)="nextMonth()" aria-label="Next month">
+            <i class="ti ti-chevron-right"></i>
+          </button>
+        </div>
       </div>
-      <ng-container *ngIf="upcomingActivities.length > 0; else noUpcoming">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Activity</th>
-              <th>Due Date</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let activity of upcomingActivities; let even = even" [class.even]="even">
-              <td>{{ activity.title }}</td>
-              <td>{{ activity.closeAt | date: 'short' }}</td>
-              <td>
-                <span class="badge" [ngClass]="isUrgent(activity.closeAt) ? 'badge-danger' : 'badge-info'">
-                  {{ getDaysLeft(activity.closeAt) }}
-                </span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </ng-container>
-      <ng-template #noUpcoming>
-        <p class="empty-state">No upcoming activities at this time.</p>
-      </ng-template>
+
+      <div class="calendar-body">
+        <div class="weekday-row">
+          <div class="weekday">Sun</div><div class="weekday">Mon</div><div class="weekday">Tue</div>
+          <div class="weekday">Wed</div><div class="weekday">Thu</div><div class="weekday">Fri</div><div class="weekday">Sat</div>
+        </div>
+        <div class="calendar-grid">
+          <button
+            class="calendar-day"
+            *ngFor="let day of calendarDays"
+            [class.outside]="!day.isCurrentMonth"
+            [class.today]="day.isToday"
+            [class.has-activities]="day.activities.length > 0"
+            [disabled]="day.activities.length === 0"
+            (click)="selectDay(day)">
+            <span class="day-num">{{ day.dateNum }}</span>
+            <span class="day-dots" *ngIf="day.activities.length > 0">
+              <span class="dot" *ngFor="let a of day.activities.slice(0, 3)" [title]="a.title"></span>
+              <span class="dot-more" *ngIf="day.activities.length > 3">+{{ day.activities.length - 3 }}</span>
+            </span>
+          </button>
+        </div>
+      </div>
+
+      <div class="day-detail-panel" *ngIf="selectedDay">
+        <div class="day-detail-header">
+          <h4>{{ selectedDay.date | date: 'EEEE, MMM d' }}</h4>
+          <button class="day-detail-close" (click)="closeSelectedDay()" aria-label="Close">
+            <i class="ti ti-x"></i>
+          </button>
+        </div>
+        <div class="day-activity-list">
+          <div class="day-activity-item" *ngFor="let a of selectedDay.activities">
+            <i class="ti" [class.ti-help-circle]="a.type === 'quiz'" [class.ti-pencil]="a.type === 'output'"></i>
+            <div class="day-activity-text">
+              <p class="day-activity-title">{{ a.title }}</p>
+              <p class="day-activity-time">Due {{ a.closeAt | date: 'shortTime' }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
     </article>
 
     <article class="card">
@@ -89,28 +130,90 @@
         <h2 class="card-title">Recent Announcements</h2>
       </div>
       <ng-container *ngIf="latestAnnouncements.length; else noAnnouncements">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Title</th>
-              <th>Posted</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let a of latestAnnouncements; let even = even" [class.even]="even">
-              <td>
-                <div class="announcement-cell">
-                  <strong>{{ a.title }}</strong>
-                  <small>{{ a.message }}</small>
-                </div>
-              </td>
-              <td>{{ a.createdAt | date: 'short' }}</td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="announcement-list">
+          <div class="announcement-row" *ngFor="let a of latestAnnouncements">
+            <strong>{{ a.title }}</strong>
+            <p>{{ a.message }}</p>
+            <small>{{ a.createdAt | date: 'short' }}</small>
+          </div>
+        </div>
       </ng-container>
       <ng-template #noAnnouncements>
         <p class="empty-state">No announcements yet.</p>
+      </ng-template>
+    </article>
+  </section>
+
+  <!-- My Courses progress -->
+  <section class="my-courses-section" *ngIf="courseProgress.length > 0">
+    <h2 class="section-heading">My Courses</h2>
+    <div class="bento-grid">
+      <article class="card course-progress-card" *ngFor="let cp of courseProgress" [attr.data-status]="cp.status">
+        <div class="cp-header">
+          <h3>{{ cp.courseName }}</h3>
+          <span class="badge" [ngClass]="{
+            'badge-success': cp.status === 'on-track',
+            'badge-warning': cp.status === 'attention',
+            'badge-danger':  cp.status === 'at-risk'
+          }">
+            {{ cp.status === 'on-track' ? 'On track' : cp.status === 'attention' ? 'Needs attention' : 'At risk' }}
+          </span>
+        </div>
+        <p class="cp-teacher">{{ cp.teacherName }}</p>
+
+        <div class="cp-progress-bar-wrap">
+          <div class="cp-progress-bar-track">
+            <div class="cp-progress-bar-fill" [style.width.%]="cp.completionPercent"></div>
+          </div>
+          <span class="cp-progress-label">{{ cp.completedActivities }} / {{ cp.totalActivities }} done</span>
+        </div>
+
+        <div class="cp-metrics">
+          <div class="cp-metric">
+            <span class="cp-metric-label">Average</span>
+            <span class="cp-metric-value">{{ cp.averageScore | number:'1.0-0' }}%</span>
+          </div>
+          <div class="cp-metric">
+            <span class="cp-metric-label">Attendance</span>
+            <span class="cp-metric-value">{{ cp.attendanceRate | number:'1.0-0' }}%</span>
+          </div>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- Upcoming activities table -->
+  <section class="bento-grid">
+    <article class="card item-full">
+      <div class="card-header">
+        <h2 class="card-title">Upcoming Activities</h2>
+      </div>
+      <ng-container *ngIf="upcomingActivities.length > 0; else noUpcoming">
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th class="col-text">Activity</th>
+                <th class="col-text">Due Date</th>
+                <th class="col-status">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let activity of upcomingActivities">
+                <td class="col-text">{{ activity.title }}</td>
+                <td class="col-text">{{ activity.closeAt | date: 'short' }}</td>
+                <td class="col-status">
+                  <span class="badge" [ngClass]="isUrgent(activity.closeAt) ? 'badge-danger' : 'badge-info'">
+                    {{ getDaysLeft(activity.closeAt) }}
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </ng-container>
+      <ng-template #noUpcoming>
+        <p class="empty-state">No upcoming activities at this time.</p>
       </ng-template>
     </article>
   </section>

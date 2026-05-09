@@ -1,20 +1,25 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, HostListener } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { AuthService } from './services/auth.service';
 import { BadgeService, StudentBadges, TeacherBadges } from './services/badge.service';
+import { ThemeService } from './services/theme.service';
 import { NotificationPanel } from './components/notification-panel/notification-panel';
+import { AdminNotificationPanel } from './components/admin-notification-panel/admin-notification-panel';
+import { TeacherNotificationPanel } from './components/teacher-notification-panel/teacher-notification-panel';
+import { AdminGlobalSearch } from './components/admin-global-search/admin-global-search';
 import Swal from 'sweetalert2';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive, NotificationPanel],
+  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive, NotificationPanel, AdminNotificationPanel, TeacherNotificationPanel, AdminGlobalSearch],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })
 export class App implements OnInit, OnDestroy {
   academicOpen = false;
+  sidebarOpen = false;
   studentBadges: StudentBadges = { activities: 0, grades: 0, announcements: 0 };
   teacherBadges: TeacherBadges = { activities: 0 };
   userEmail = '';
@@ -23,6 +28,7 @@ export class App implements OnInit, OnDestroy {
     public readonly auth: AuthService,
     private readonly router: Router,
     private readonly badgeService: BadgeService,
+    public readonly themeService: ThemeService,
   ) {
     this.loadUserEmail();
   }
@@ -48,6 +54,30 @@ export class App implements OnInit, OnDestroy {
     this.academicOpen = !this.academicOpen;
   }
 
+  toggleSidebar(): void {
+    this.sidebarOpen = !this.sidebarOpen;
+  }
+
+  closeSidebar(): void {
+    this.sidebarOpen = false;
+  }
+
+  toggleDarkMode(): void {
+    this.themeService.toggleTheme();
+  }
+
+  @HostListener('document:keydown.escape')
+  onEscapeKey(): void {
+    this.closeSidebar();
+  }
+
+  @HostListener('window:resize')
+  onWindowResize(): void {
+    if (window.innerWidth > 1024 && this.sidebarOpen) {
+      this.sidebarOpen = false;
+    }
+  }
+
   private syncBadges(): void {
     setInterval(() => {
       this.studentBadges = this.badgeService.studentBadges;
@@ -64,9 +94,7 @@ export class App implements OnInit, OnDestroy {
   onAnnouncementsClick(): void {
     const user = this.auth.getCurrentUser();
     if (user?.role === 'student' && user.studentID) {
-      const studentAccounts = (this as any).badgeService.constructor.name; // Quick way to check
-      // Mark announcements as seen - this will be called when user navigates to announcements
-      // The component will also call this
+      const studentAccounts = (this as any).badgeService.constructor.name;
     }
   }
 

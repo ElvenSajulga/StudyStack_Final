@@ -4,7 +4,18 @@
   gap: 24px;
 }
 
-.page-header { display: flex; justify-content: space-between; align-items: center; }
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.expand-buttons {
+  display: flex;
+  gap: 8px;
+}
 .page-title { margin: 0; font-size: 1.4rem; font-weight: 600; color: #111827; }
 .page-subtitle { margin: 4px 0 0; font-size: 0.9rem; color: #6b7280; }
 
@@ -54,10 +65,23 @@
 .expand-btn {
   background: none;
   border: none;
-  font-size: 0.9rem;
   cursor: pointer;
   color: #6b7280;
   padding: 2px 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  transition: color 0.2s ease;
+  flex-shrink: 0;
+
+  &:hover {
+    color: #374151;
+  }
+
+  &[aria-expanded="true"] {
+    color: #2563eb;
+  }
 }
 
 .tree-label { font-size: 0.9rem; color: #111827; flex: 1; }
@@ -82,6 +106,18 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    max-height: 100%;
+  }
 }
 
 .year-level-block {
@@ -89,6 +125,7 @@
   border-radius: 10px;
   overflow: hidden;
   margin-top: 4px;
+  transition: all 0.2s ease;
 }
 
 .sections-content {
@@ -97,6 +134,7 @@
   flex-direction: column;
   gap: 4px;
   background: #fafafa;
+  animation: slideDown 0.2s ease-out;
 }
 
 /* ── seed row ── */

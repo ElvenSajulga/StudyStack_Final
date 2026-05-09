@@ -6,45 +6,149 @@
     </p>
   </header>
 
-  <section *ngIf="activities.length > 0; else emptyState">
-    <div class="table-card">
-      <table>
-        <thead>
-          <tr>
-            <th>Activity</th>
-            <th>Type</th>
-            <th>Score</th>
-            <th>Max points</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let a of activities">
-            <td data-label="Activity">{{ a.title }}</td>
-            <td data-label="Type">{{ a.type }}</td>
-            <td data-label="Score">
-              <strong>{{ scoreForActivity(a) ?? '—' }}</strong>
-            </td>
-            <td data-label="Max points">{{ a.maxPoints ?? '—' }}</td>
-            <td data-label="Grade">
-              <ng-container *ngIf="scoreForActivity(a) != null && a.maxPoints">
-                <span [ngClass]="{
-                  'pill-high': (scoreForActivity(a)! / a.maxPoints) >= 0.75,
-                  'pill-mid':  (scoreForActivity(a)! / a.maxPoints) >= 0.5 && (scoreForActivity(a)! / a.maxPoints) < 0.75,
-                  'pill-low':  (scoreForActivity(a)! / a.maxPoints) < 0.5
-                }">
-                  {{ ((scoreForActivity(a)! / a.maxPoints) * 100) | number:'1.0-0' }}%
-                </span>
-              </ng-container>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <p class="total">
-      <strong>Total score:</strong> {{ totalScore }}
-    </p>
+  <!-- Overall summary stats -->
+  <section class="summary-grid" *ngIf="submissions.length > 0">
+    <article class="summary-card">
+      <span class="summary-label">Overall average</span>
+      <span class="summary-value" [class]="'val-' + getColorClass(overallAveragePercent)">
+        {{ overallAveragePercent | number:'1.0-0' }}%
+      </span>
+    </article>
+    <article class="summary-card">
+      <span class="summary-label">Graded activities</span>
+      <span class="summary-value val-neutral">{{ submissions.length }}</span>
+    </article>
+    <article class="summary-card">
+      <span class="summary-label">Total points</span>
+      <span class="summary-value val-neutral">{{ totalScore }}</span>
+    </article>
   </section>
+
+  <!-- Per-course averages -->
+  <section class="course-averages" *ngIf="courseAverages.length > 0">
+    <h3 class="section-heading">By Course</h3>
+    <div class="course-avg-list">
+      <div class="course-avg-item" *ngFor="let ca of courseAverages">
+        <div class="course-avg-info">
+          <p class="course-avg-name">{{ ca.courseName }}</p>
+          <p class="course-avg-meta">{{ ca.gradedCount }} of {{ ca.activitiesCount }} graded</p>
+        </div>
+        <div class="course-avg-stats">
+          <span class="trend-icon" *ngIf="ca.trend === 'up'"><i class="ti ti-trending-up"></i></span>
+          <span class="trend-icon" *ngIf="ca.trend === 'down'"><i class="ti ti-trending-down"></i></span>
+          <span class="trend-icon stable" *ngIf="ca.trend === 'stable'"><i class="ti ti-minus"></i></span>
+          <span class="course-avg-percent" [class]="'pct-' + getColorClass(ca.averagePercent)">
+            {{ ca.averagePercent | number:'1.0-0' }}%
+          </span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Score trend mini-chart -->
+  <section class="trend-chart-card" *ngIf="scoreHistory.length >= 2">
+    <h3 class="section-heading">Recent Performance</h3>
+    <div class="trend-chart">
+      <div class="bar-row" *ngFor="let h of scoreHistory">
+        <span class="bar-date">{{ h.date | date: 'MMM d' }}</span>
+        <div class="bar-track">
+          <div class="bar-fill" [class]="'bar-' + getColorClass(h.percent)" [style.width.%]="h.percent"></div>
+        </div>
+        <span class="bar-percent">{{ h.percent | number:'1.0-0' }}%</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Course filter chips -->
+  <div class="course-filter-bar" *ngIf="availableCourses.length > 0">
+    <button
+      class="filter-chip"
+      [class.active]="!selectedCourseId"
+      (click)="selectedCourseId = ''"
+    >
+      All courses
+    </button>
+    <button
+      *ngFor="let c of availableCourses"
+      class="filter-chip"
+      [class.active]="selectedCourseId === c.id"
+      (click)="selectedCourseId = c.id"
+    >
+      {{ c.name }}
+    </button>
+  </div>
+
+  <!-- Grouped course sections -->
+  <ng-container *ngIf="filteredRows.length > 0; else emptyState">
+    <ng-container *ngFor="let group of rowsByCourse | keyvalue">
+      <section class="course-group">
+        <header class="course-group-header">
+          <h3 class="course-group-name">{{ group.value[0].courseName }}</h3>
+          <span class="course-group-avg" [class]="'avg-' + getColorClass(courseAverageFor(group.key))">
+            Average: {{ courseAverageFor(group.key) | number:'1.0-0' }}%
+          </span>
+        </header>
+
+        <div class="table-card">
+          <table>
+            <thead>
+              <tr>
+                <th>Activity</th>
+                <th>Type</th>
+                <th class="num-col">Score</th>
+                <th class="num-col">Percentage</th>
+                <th>Feedback</th>
+              </tr>
+            </thead>
+            <tbody>
+              <ng-container *ngFor="let a of group.value">
+                <tr>
+                  <td data-label="Activity">{{ a.activity.title }}</td>
+                  <td data-label="Type">
+                    <span class="type-badge" [class]="'type-' + a.activity.type">{{ a.activity.type }}</span>
+                  </td>
+                  <td data-label="Score" class="num-col">
+                    <strong>{{ a.submission?.score ?? '—' }}</strong>
+                    <span class="muted-small" *ngIf="a.activity.maxPoints">/ {{ a.activity.maxPoints }}</span>
+                  </td>
+                  <td data-label="Percentage" class="num-col">
+                    <span *ngIf="a.percent != null" [class]="'pill-' + getColorClass(a.percent)">
+                      {{ a.percent | number:'1.0-0' }}%
+                    </span>
+                    <span *ngIf="a.percent == null" class="muted-small">—</span>
+                  </td>
+                  <td data-label="Feedback">
+                    <button
+                      *ngIf="hasFeedback(a.activity.id)"
+                      type="button"
+                      class="feedback-toggle-btn"
+                      (click)="toggleFeedback(a.activity.id)"
+                      [attr.aria-expanded]="isFeedbackExpanded(a.activity.id)"
+                    >
+                      <i class="ti ti-message-circle"></i>
+                      <i class="ti" [class.ti-chevron-down]="!isFeedbackExpanded(a.activity.id)" [class.ti-chevron-up]="isFeedbackExpanded(a.activity.id)"></i>
+                    </button>
+                    <span *ngIf="!hasFeedback(a.activity.id)" class="muted-cell">—</span>
+                  </td>
+                </tr>
+                <tr class="feedback-row" *ngIf="isFeedbackExpanded(a.activity.id) && hasFeedback(a.activity.id)">
+                  <td [attr.colspan]="6">
+                    <div class="feedback-cell">
+                      <div class="feedback-cell-header">
+                        <i class="ti ti-message-circle"></i>
+                        <span>Teacher's feedback</span>
+                      </div>
+                      <p class="feedback-cell-text">{{ feedbackForActivity(a.activity.id) }}</p>
+                    </div>
+                  </td>
+                </tr>
+              </ng-container>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </ng-container>
+  </ng-container>
 
   <ng-template #emptyState>
     <section class="empty-card">

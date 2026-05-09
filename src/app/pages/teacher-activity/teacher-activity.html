@@ -34,9 +34,13 @@
 
   <!-- ══ LIST VIEW ══════════════════════════════════════════════════════ -->
   <ng-container *ngIf="view === 'list' && selectedCourseCard">
+    <div class="breadcrumb">
+      <button class="breadcrumb-link" (click)="goBackToCourses()">Activities</button>
+      <i class="ti ti-chevron-right" aria-hidden="true"></i>
+      <span class="breadcrumb-current">{{ selectedCourseCard.course.name }}</span>
+    </div>
     <header class="page-header">
       <div>
-        <button class="back-btn" (click)="goBackToCourses()">← Back</button>
         <h2 class="page-title">{{ selectedCourseCard.course.name }}</h2>
         <p class="page-subtitle">Create and manage activities for this course.</p>
       </div>
@@ -73,6 +77,12 @@
 
         <!-- footer: actions -->
         <div class="ac-actions" style="border-top:0.5px solid var(--color-border-tertiary); padding-top:10px; margin-top:4px">
+          <button class="btn outline" (click)="openEditActivity(a)">
+            <i class="ti ti-pencil" aria-hidden="true"></i> Edit
+          </button>
+          <button class="btn outline" (click)="openDuplicateModal(a)" aria-label="Duplicate activity">
+            <i class="ti ti-copy" aria-hidden="true"></i> Duplicate
+          </button>
           <button class="btn outline" (click)="openGrading(a)">
             <i class="ti ti-eye" aria-hidden="true"></i> View submissions
           </button>
@@ -103,10 +113,17 @@
   </ng-container>
 
   <!-- ══ CREATE VIEW ════════════════════════════════════════════════════ -->
-  <ng-container *ngIf="view === 'create'">
+  <ng-container *ngIf="view === 'create' && selectedCourseCard">
+    <div class="breadcrumb">
+      <button class="breadcrumb-link" (click)="goBackToCourses()">Activities</button>
+      <i class="ti ti-chevron-right" aria-hidden="true"></i>
+      <button class="breadcrumb-link" (click)="backToList()">{{ selectedCourseCard.course.name }}</button>
+      <i class="ti ti-chevron-right" aria-hidden="true"></i>
+      <span class="breadcrumb-current">New activity</span>
+    </div>
     <header class="page-header">
       <div>
-        <button class="back-btn" (click)="backToList()">← Back</button>
+        <button class="back-btn" (click)="backToList()"><i class="ti ti-arrow-left" aria-hidden="true"></i> Back</button>
         <h2 class="page-title">New activity</h2>
       </div>
     </header>
@@ -165,12 +182,107 @@
     </div>
   </ng-container>
 
-  <!-- ══ QUIZ BUILDER ═══════════════════════════════════════════════════ -->
-  <ng-container *ngIf="view === 'quiz-builder'">
+  <!-- ══ EDIT VIEW ══════════════════════════════════════════════════════ -->
+  <ng-container *ngIf="view === 'edit' && editingActivity && selectedCourseCard">
+    <div class="breadcrumb">
+      <button class="breadcrumb-link" (click)="goBackToCourses()">Activities</button>
+      <i class="ti ti-chevron-right" aria-hidden="true"></i>
+      <button class="breadcrumb-link" (click)="backToList()">{{ selectedCourseCard.course.name }}</button>
+      <i class="ti ti-chevron-right" aria-hidden="true"></i>
+      <span class="breadcrumb-current">Edit</span>
+    </div>
     <header class="page-header">
       <div>
-        <button class="back-btn" (click)="backToList()">← Back to activities</button>
-        <h2 class="page-title">Quiz builder — {{ selectedActivity?.title }}</h2>
+        <button class="back-btn" (click)="backToList()">
+          <i class="ti ti-arrow-left" aria-hidden="true"></i> Back
+        </button>
+        <h2 class="page-title">Edit activity — {{ editingActivity.title }}</h2>
+      </div>
+    </header>
+
+    <div class="form-card">
+      <div class="form-grid">
+        <label class="field full">
+          <span class="field-label">Title *</span>
+          <input type="text" [(ngModel)]="form.title" placeholder="e.g. Quiz 1: Basics" />
+        </label>
+
+        <label class="field full">
+          <span class="field-label">Description</span>
+          <textarea rows="3" [(ngModel)]="form.description" placeholder="Instructions or notes for students"></textarea>
+        </label>
+
+        <label class="field">
+          <span class="field-label">Activity type</span>
+          <select [(ngModel)]="form.type" disabled>
+            <option value="quiz">Quiz</option>
+            <option value="output">Output-based</option>
+          </select>
+          <span class="field-hint">
+            <i class="ti ti-info-circle" aria-hidden="true"></i>
+            Activity type cannot be changed after creation.
+          </span>
+        </label>
+
+        <label class="field" *ngIf="form.type === 'output'">
+          <span class="field-label">Max points</span>
+          <input type="number" [(ngModel)]="form.maxPoints" min="1" placeholder="e.g. 100" />
+        </label>
+
+        <label class="field checkbox" *ngIf="form.type === 'quiz'">
+          <input
+            type="checkbox"
+            [(ngModel)]="form.shuffleQuestions"
+            [disabled]="editingHasSubmissions"
+          />
+          <span class="field-label">
+            Shuffle questions for each student
+            <span class="field-hint" *ngIf="editingHasSubmissions" style="display:block; margin-top:4px;">
+              <i class="ti ti-info-circle" aria-hidden="true"></i>
+              Locked because students have already submitted.
+            </span>
+          </span>
+        </label>
+
+        <label class="field">
+          <span class="field-label">Deadline *</span>
+          <input type="datetime-local" [(ngModel)]="form.deadline" />
+        </label>
+
+        <label class="field">
+          <span class="field-label">Close time *</span>
+          <input type="datetime-local" [(ngModel)]="form.closeAt" />
+          <span class="field-hint">
+            <i class="ti ti-info-circle" aria-hidden="true"></i>
+            Must be after the deadline. Students cannot submit after this time.
+          </span>
+        </label>
+      </div>
+
+      <div class="form-actions">
+        <button class="btn subtle" (click)="backToList()" [disabled]="savingEdit">Cancel</button>
+        <button class="btn primary" (click)="saveEditActivity()" [disabled]="savingEdit">
+          {{ savingEdit ? 'Saving...' : 'Save changes' }}
+        </button>
+      </div>
+    </div>
+  </ng-container>
+
+  <!-- ══ QUIZ BUILDER ═══════════════════════════════════════════════════ -->
+  <ng-container *ngIf="view === 'quiz-builder' && selectedCourseCard && selectedActivity">
+    <div class="breadcrumb">
+      <button class="breadcrumb-link" (click)="goBackToCourses()">Activities</button>
+      <i class="ti ti-chevron-right" aria-hidden="true"></i>
+      <button class="breadcrumb-link" (click)="backToList()">{{ selectedCourseCard.course.name }}</button>
+      <i class="ti ti-chevron-right" aria-hidden="true"></i>
+      <button class="breadcrumb-link" (click)="backToList()">{{ selectedActivity.title }}</button>
+      <i class="ti ti-chevron-right" aria-hidden="true"></i>
+      <span class="breadcrumb-current">Quiz builder</span>
+    </div>
+    <header class="page-header">
+      <div>
+        <button class="back-btn" (click)="backToList()"><i class="ti ti-arrow-left" aria-hidden="true"></i> Back</button>
+        <h2 class="page-title">Quiz builder — {{ selectedActivity.title }}</h2>
         <p class="page-subtitle">Total: {{ totalQuizPoints }} pts across {{ questions.length }} question(s)</p>
       </div>
       <button class="btn primary" (click)="saveQuiz()" [disabled]="savingQuiz">
@@ -237,23 +349,32 @@
   </ng-container>
 
   <!-- ══ GRADING VIEW ═══════════════════════════════════════════════════ -->
-  <ng-container *ngIf="view === 'grade'">
+  <ng-container *ngIf="view === 'grade' && selectedCourseCard && gradingActivity">
+    <div class="breadcrumb">
+      <button class="breadcrumb-link" (click)="goBackToCourses()">Activities</button>
+      <i class="ti ti-chevron-right" aria-hidden="true"></i>
+      <button class="breadcrumb-link" (click)="backToList()">{{ selectedCourseCard.course.name }}</button>
+      <i class="ti ti-chevron-right" aria-hidden="true"></i>
+      <button class="breadcrumb-link" (click)="backToList()">{{ gradingActivity.title }}</button>
+      <i class="ti ti-chevron-right" aria-hidden="true"></i>
+      <span class="breadcrumb-current">Submissions</span>
+    </div>
     <header class="page-header">
       <div>
-        <button class="back-btn" (click)="backToList()">← Back</button>
-        <h2 class="page-title">{{ gradingActivity?.title }}</h2>
+        <button class="back-btn" (click)="backToList()"><i class="ti ti-arrow-left" aria-hidden="true"></i> Back</button>
+        <h2 class="page-title">{{ gradingActivity.title }}</h2>
         <p class="page-subtitle">
-          {{ gradingActivity?.type | titlecase }} &nbsp;·&nbsp;
+          {{ gradingActivity.type | titlecase }} &nbsp;·&nbsp;
           {{ submissions.length }} submission(s)
-          <span *ngIf="gradingActivity?.maxPoints"> &nbsp;·&nbsp; {{ gradingActivity?.maxPoints }} pts</span>
+          <span *ngIf="gradingActivity.maxPoints"> &nbsp;·&nbsp; {{ gradingActivity.maxPoints }} pts</span>
         </p>
       </div>
       <button
         class="btn primary"
         (click)="releaseScores()"
-        [disabled]="releasingScores || gradingActivity?.scoresReleased"
+        [disabled]="releasingScores || gradingActivity.scoresReleased"
       >
-        {{ gradingActivity?.scoresReleased ? 'Scores released ✓' : releasingScores ? 'Releasing...' : 'Release scores' }}
+        {{ gradingActivity.scoresReleased ? 'Scores released ✓' : releasingScores ? 'Releasing...' : 'Release scores' }}
       </button>
     </header>
 
@@ -280,8 +401,22 @@
       <!-- Main grading panel -->
       <main class="grade-panel" *ngIf="selectedSubmission; else noSelection">
 
+        <!-- Grading progress -->
+        <div class="grade-progress" *ngIf="totalSubmissions > 0">
+          <p class="grade-progress-text">
+            Graded {{ gradedCount }} / {{ totalSubmissions }}
+          </p>
+          <div class="progress-bar-wrap" role="progressbar"
+            [attr.aria-valuenow]="gradedCount"
+            [attr.aria-valuemin]="0"
+            [attr.aria-valuemax]="totalSubmissions"
+          >
+            <div class="progress-bar-fill" [style.width.%]="gradingProgress"></div>
+          </div>
+        </div>
+
         <!-- Quiz grading -->
-        <ng-container *ngIf="gradingActivity?.type === 'quiz'">
+        <ng-container *ngIf="gradingActivity.type === 'quiz'">
           <div class="grade-section">
             <h4 class="section-title">Student answers</h4>
             <div class="quiz-review" *ngFor="let q of gradingQuestions; let i = index">
@@ -307,7 +442,7 @@
         </ng-container>
 
         <!-- Output grading -->
-        <ng-container *ngIf="gradingActivity?.type === 'output'">
+        <ng-container *ngIf="gradingActivity.type === 'output'">
           <div class="grade-section">
             <h4 class="section-title">Student submission</h4>
             <p class="submission-text">{{ selectedSubmission.content || 'No text submitted.' }}</p>
@@ -325,8 +460,8 @@
           <div class="grade-section">
             <h4 class="section-title">Grade this submission</h4>
             <label class="field">
-              <span class="field-label">Score (out of {{ gradingActivity?.maxPoints }})</span>
-              <input type="number" [(ngModel)]="gradeScore" min="0" [max]="gradingActivity?.maxPoints ?? 100" />
+              <span class="field-label">Score (out of {{ gradingActivity.maxPoints }})</span>
+              <input type="number" [(ngModel)]="gradeScore" min="0" [max]="gradingActivity.maxPoints ?? 100" />
             </label>
             <label class="field" style="margin-top: 12px;">
               <span class="field-label">Feedback (optional)</span>
@@ -340,6 +475,34 @@
           Submitted: {{ selectedSubmission.submittedAt | date:'MMM d, y h:mm a' }}
           <span *ngIf="!selectedSubmission.submitted"> (Unsubmitted)</span>
         </p>
+
+        <!-- Prev / Next navigation -->
+        <div class="grade-nav" *ngIf="totalSubmissions > 1">
+          <button
+            class="btn subtle sm"
+            [disabled]="selectedSubmissionIndex <= 0"
+            (click)="prevSubmission()"
+            aria-label="Previous submission"
+          >
+            <i class="ti ti-arrow-left" aria-hidden="true"></i>
+            <span>Previous</span>
+          </button>
+          <span class="grade-nav-center">
+            {{ selectedSubmissionIndex + 1 }} of {{ totalSubmissions }}
+          </span>
+          <button
+            class="btn subtle sm"
+            [disabled]="selectedSubmissionIndex >= totalSubmissions - 1"
+            (click)="nextSubmission()"
+            aria-label="Next submission"
+          >
+            <span>Next</span>
+            <i class="ti ti-arrow-right" aria-hidden="true"></i>
+          </button>
+        </div>
+        <p class="key-hint" *ngIf="totalSubmissions > 1">
+          Use ← → arrow keys to navigate
+        </p>
       </main>
 
       <ng-template #noSelection>
@@ -349,5 +512,59 @@
       </ng-template>
     </div>
   </ng-container>
+
+  <!-- ══ DUPLICATE MODAL ════════════════════════════════════════════════ -->
+  <div class="modal-backdrop" *ngIf="showDuplicateModal" (click)="closeDuplicateModal()">
+    <div
+      class="modal-card"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="duplicate-modal-title"
+      (click)="$event.stopPropagation()"
+    >
+      <h3 id="duplicate-modal-title" class="modal-title">Duplicate activity</h3>
+
+      <p class="modal-source-info" *ngIf="duplicateSourceActivity">
+        Source: <strong>{{ duplicateSourceActivity.title }}</strong>
+        <span class="badge" style="margin-left:6px"
+          [class.quiz]="duplicateSourceActivity.type==='quiz'"
+          [class.output]="duplicateSourceActivity.type==='output'"
+        >
+          {{ duplicateSourceActivity.type }}
+        </span>
+      </p>
+
+      <label class="field full" style="margin-top:12px">
+        <span class="field-label">Target course *</span>
+        <select [(ngModel)]="duplicateTargetCourseId" [disabled]="duplicating">
+          <option value="" disabled>— Select a course —</option>
+          <option *ngFor="let card of otherCourseCards" [value]="card.course.id">
+            {{ card.course.name }}<span *ngIf="card.course.semester"> — {{ card.course.semester }}</span>
+          </option>
+        </select>
+        <span class="field-hint" *ngIf="hasOnlyOneCourse">
+          <i class="ti ti-info-circle" aria-hidden="true"></i>
+          You only have one course. The copy will be added to it.
+        </span>
+      </label>
+
+      <p class="modal-note" *ngIf="duplicateSourceActivity?.type === 'quiz'">
+        <i class="ti ti-info-circle" aria-hidden="true"></i>
+        Quiz questions will also be copied.
+      </p>
+
+      <p class="modal-note muted-note">
+        <i class="ti ti-info-circle" aria-hidden="true"></i>
+        The copy will not have a deadline or close time set. You'll need to set them before students can submit.
+      </p>
+
+      <div class="modal-actions">
+        <button class="btn subtle" (click)="closeDuplicateModal()" [disabled]="duplicating">Cancel</button>
+        <button class="btn primary" (click)="duplicateActivity()" [disabled]="duplicating || !duplicateTargetCourseId">
+          {{ duplicating ? 'Duplicating...' : 'Duplicate' }}
+        </button>
+      </div>
+    </div>
+  </div>
 
 </div>
