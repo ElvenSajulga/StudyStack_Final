@@ -31,8 +31,11 @@ export class AdminStudents implements OnInit {
 
   // Search, Sort, and Pagination
   searchQuery = '';
+  statusFilter: 'all' | 'active' | 'inactive' = 'all';
+  programFilter = '';
   sortField = 'lastname';
   sortDir: 'asc' | 'desc' = 'asc';
+  pageSizeOptions = [10, 15, 25, 50];
   pageSize = 15;
   currentPage = 1;
 
@@ -103,16 +106,16 @@ export class AdminStudents implements OnInit {
 
   // Getters for search, sort, and pagination
   get filteredRecords(): StudentAccount[] {
-    if (!this.searchQuery) {
-      return this.students;
-    }
-
-    const query = this.searchQuery.toLowerCase();
-    return this.students.filter(s =>
-      s.firstname.toLowerCase().includes(query) ||
-      s.lastname.toLowerCase().includes(query) ||
-      s.studentID.toLowerCase().includes(query)
-    );
+    const query = this.searchQuery.toLowerCase().trim();
+    return this.students.filter(s => {
+      const matchesQuery = !query ||
+        s.firstname.toLowerCase().includes(query) ||
+        s.lastname.toLowerCase().includes(query) ||
+        s.studentID.toLowerCase().includes(query);
+      const matchesStatus = this.statusFilter === 'all' || s.status === this.statusFilter;
+      const matchesProgram = !this.programFilter || s.program === this.programNameById(this.programFilter);
+      return matchesQuery && matchesStatus && matchesProgram;
+    });
   }
 
   get sortedRecords(): StudentAccount[] {
@@ -187,6 +190,14 @@ export class AdminStudents implements OnInit {
   }
 
   onSearchChange(): void {
+    this.currentPage = 1;
+  }
+
+  onFiltersChange(): void {
+    this.currentPage = 1;
+  }
+
+  onPageSizeChange(): void {
     this.currentPage = 1;
   }
 

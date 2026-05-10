@@ -7,6 +7,7 @@ import { AuthService } from '../../services/auth.service';
 import { StudentAccount, StudentAccountService } from '../../services/student-account.service';
 
 interface StudentCourseEntry {
+  courseId: string;
   courseName: string;
   sectionName: string;
 }
@@ -33,6 +34,7 @@ export class TeacherStudents implements OnInit {
   loading = false;
 
   searchQuery = '';
+  selectedSubject = 'all';
   sortField: SortField = 'name';
   sortDir: 'asc' | 'desc' = 'asc';
 
@@ -106,6 +108,7 @@ export class TeacherStudents implements OnInit {
         if (!student) continue;
 
         const studentCourses: StudentCourseEntry[] = enrollments.map(e => ({
+          courseId: e.courseId,
           courseName: courseById.get(e.courseId)?.name ?? 'Unknown course',
           sectionName: sectionById.get(e.sectionId)?.name ?? 'Unknown section',
         }));
@@ -154,6 +157,10 @@ export class TeacherStudents implements OnInit {
     const query = this.searchQuery.trim().toLowerCase();
     let list = this.rows;
 
+    if (this.selectedSubject !== 'all') {
+      list = list.filter(r => r.courses.some(c => c.courseName === this.selectedSubject));
+    }
+
     if (query) {
       list = list.filter(r => {
         const haystack = `${r.student.firstname ?? ''} ${r.student.lastname ?? ''} ${r.student.studentID ?? ''}`.toLowerCase();
@@ -175,6 +182,25 @@ export class TeacherStudents implements OnInit {
     }
 
     return sorted;
+  }
+
+  get subjectCategories(): Array<{ name: string; count: number }> {
+    const bySubject = new Map<string, Set<string>>();
+    for (const row of this.rows) {
+      for (const course of row.courses) {
+        const current = bySubject.get(course.courseName) ?? new Set<string>();
+        current.add(row.student.UID);
+        bySubject.set(course.courseName, current);
+      }
+    }
+
+    return Array.from(bySubject.entries())
+      .map(([name, students]) => ({ name, count: students.size }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  setSubjectFilter(subjectName: string): void {
+    this.selectedSubject = subjectName;
   }
 
   sortBy(field: SortField): void {

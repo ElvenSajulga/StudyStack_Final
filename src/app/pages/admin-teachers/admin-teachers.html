@@ -99,8 +99,9 @@
         </div>
       </header>
 
-      <!-- Search bar -->
-      <div class="search-bar" *ngIf="teachers.length > 0">
+      <!-- Search + filters -->
+      <div class="table-toolbar" *ngIf="teachers.length > 0">
+        <div class="search-bar">
         <i class="ti ti-search search-icon"></i>
         <input
           type="text"
@@ -109,6 +110,28 @@
           [(ngModel)]="searchQuery"
           (ngModelChange)="onSearchChange()"
         />
+        </div>
+        <label class="toolbar-field">
+          <span>Status</span>
+          <select [(ngModel)]="statusFilter" (ngModelChange)="onFiltersChange()">
+            <option value="all">All</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </label>
+        <label class="toolbar-field">
+          <span>Faculty</span>
+          <select [(ngModel)]="facultyFilter" (ngModelChange)="onFiltersChange()">
+            <option value="">All faculties</option>
+            <option *ngFor="let f of faculties" [value]="f.id">{{ f.name }}</option>
+          </select>
+        </label>
+        <label class="toolbar-field">
+          <span>Rows</span>
+          <select [(ngModel)]="pageSize" (ngModelChange)="onPageSizeChange()">
+            <option *ngFor="let size of pageSizeOptions" [ngValue]="size">{{ size }}</option>
+          </select>
+        </label>
       </div>
 
       <!-- Bulk actions bar -->
@@ -140,7 +163,7 @@
                   />
                 </th>
                 <th class="col-uid sortable" (click)="sortBy('UID')">
-                  UID
+                  <span class="sort-label">UID</span>
                   <span class="sort-icon">
                     <i *ngIf="sortField !== 'UID'" class="ti ti-arrows-sort"></i>
                     <i *ngIf="sortField === 'UID' && sortDir === 'asc'" class="ti ti-arrow-up"></i>
@@ -148,7 +171,7 @@
                   </span>
                 </th>
                 <th class="col-id sortable" (click)="sortBy('teacherID')">
-                  Teacher ID
+                  <span class="sort-label">Teacher ID</span>
                   <span class="sort-icon">
                     <i *ngIf="sortField !== 'teacherID'" class="ti ti-arrows-sort"></i>
                     <i *ngIf="sortField === 'teacherID' && sortDir === 'asc'" class="ti ti-arrow-up"></i>
@@ -156,7 +179,7 @@
                   </span>
                 </th>
                 <th class="col-name sortable" (click)="sortBy('lastname')">
-                  Name
+                  <span class="sort-label">Name</span>
                   <span class="sort-icon">
                     <i *ngIf="sortField !== 'lastname'" class="ti ti-arrows-sort"></i>
                     <i *ngIf="sortField === 'lastname' && sortDir === 'asc'" class="ti ti-arrow-up"></i>
@@ -164,7 +187,7 @@
                   </span>
                 </th>
                 <th class="col-faculty sortable" (click)="sortBy('facultyId')">
-                  Faculty
+                  <span class="sort-label">Faculty</span>
                   <span class="sort-icon">
                     <i *ngIf="sortField !== 'facultyId'" class="ti ti-arrows-sort"></i>
                     <i *ngIf="sortField === 'facultyId' && sortDir === 'asc'" class="ti ti-arrow-up"></i>
@@ -172,7 +195,7 @@
                   </span>
                 </th>
                 <th class="col-email sortable" (click)="sortBy('email')">
-                  Email
+                  <span class="sort-label">Email</span>
                   <span class="sort-icon">
                     <i *ngIf="sortField !== 'email'" class="ti ti-arrows-sort"></i>
                     <i *ngIf="sortField === 'email' && sortDir === 'asc'" class="ti ti-arrow-up"></i>
@@ -180,7 +203,7 @@
                   </span>
                 </th>
                 <th class="col-status sortable" (click)="sortBy('status')">
-                  Status
+                  <span class="sort-label">Status</span>
                   <span class="sort-icon">
                     <i *ngIf="sortField !== 'status'" class="ti ti-arrows-sort"></i>
                     <i *ngIf="sortField === 'status' && sortDir === 'asc'" class="ti ti-arrow-up"></i>

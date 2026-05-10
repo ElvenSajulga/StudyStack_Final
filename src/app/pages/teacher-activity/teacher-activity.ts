@@ -334,7 +334,8 @@ export class TeacherActivity implements OnInit {
 
   async createActivity(): Promise<void> {
     const teacherID = this.teacherID;
-    if (!teacherID || !this.selectedCourseCard) { alert('You must select a course first.'); return; }
+    const teacherUID = this.teacherUID;
+    if (!teacherID || !teacherUID || !this.selectedCourseCard) { alert('You must select a course first.'); return; }
     const title = this.form.title.trim();
     const deadline = this.form.deadline.trim();
     const closeAt = this.form.closeAt.trim();
@@ -356,7 +357,7 @@ export class TeacherActivity implements OnInit {
         type: this.form.type,
         deadline: new Date(deadline).toISOString(),
         closeAt: new Date(closeAt).toISOString(),
-        teacherID, courseId: this.selectedCourseCard.course.id, maxPoints: this.form.maxPoints,
+        teacherID, teacherUID, courseId: this.selectedCourseCard.course.id, maxPoints: this.form.maxPoints,
         shuffleQuestions: undefined,
       });
       this.view = 'list';
@@ -462,6 +463,7 @@ export class TeacherActivity implements OnInit {
       // New quiz: create activity in Firestore now, then save questions
       this.savingQuiz = true;
       const teacherID = this.teacherID!;
+      const teacherUID = this.teacherUID!;
       const nqf = this.newQuizForm;
       const totalPoints = this.questions.reduce((sum, q) => sum + q.points, 0);
 
@@ -472,6 +474,7 @@ export class TeacherActivity implements OnInit {
         deadline: new Date(nqf.deadline).toISOString(),
         closeAt: new Date(nqf.closeAt).toISOString(),
         teacherID,
+        teacherUID,
         courseId: this.selectedCourseCard!.course.id,
         maxPoints: totalPoints,
         shuffleQuestions: nqf.shuffleQuestions ?? false,
@@ -698,7 +701,8 @@ export class TeacherActivity implements OnInit {
     if (!this.duplicateSourceActivity) return;
 
     const teacherID = this.teacherID;
-    if (!teacherID) {
+    const teacherUID = this.teacherUID;
+    if (!teacherID || !teacherUID) {
       await Swal.fire({ icon: 'error', title: 'Not signed in', text: 'You must be signed in as a teacher.' });
       return;
     }
@@ -717,6 +721,7 @@ export class TeacherActivity implements OnInit {
         description: source.description ?? '',
         type: source.type,
         teacherID,
+        teacherUID,
         courseId: this.duplicateTargetCourseId,
         deadline: '',
         closeAt: '',

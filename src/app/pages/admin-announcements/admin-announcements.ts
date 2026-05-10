@@ -45,6 +45,13 @@ export class AdminAnnouncements implements OnInit {
 
   teacherSearchQuery = '';
   studentSearchQuery = '';
+  messageTemplates = [
+    { id: 'none', label: 'No template', title: '', message: '' },
+    { id: 'maintenance', label: 'System Maintenance', title: 'System Maintenance Notice', message: 'Please be advised that the portal will undergo maintenance. Services may be temporarily unavailable during the maintenance window.' },
+    { id: 'exam', label: 'Exam Reminder', title: 'Exam Reminder', message: 'This is a reminder to prepare for your upcoming examinations. Please check your course schedules and coordinate with your instructors.' },
+    { id: 'deadline', label: 'Deadline Reminder', title: 'Important Deadline Reminder', message: 'Please complete and submit all pending academic requirements before the posted deadline to avoid penalties.' },
+  ];
+  selectedTemplate = 'none';
 
   constructor(
     private readonly announcementService: AnnouncementService,
@@ -81,6 +88,7 @@ export class AdminAnnouncements implements OnInit {
 
   private async loadAll(): Promise<void> {
     this.loading = true;
+    await this.teacherService.reloadFromServer();
     this.announcements = await this.announcementService.getAllForStudents();
     this.programs = await this.academic.getPrograms();
     this.allPrograms = this.programs;
@@ -140,6 +148,24 @@ export class AdminAnnouncements implements OnInit {
     this.selectedStudents.clear();
     this.teacherSearchQuery = '';
     this.studentSearchQuery = '';
+  }
+
+  applyTemplate(templateId: string): void {
+    const template = this.messageTemplates.find(t => t.id === templateId);
+    if (!template || template.id === 'none') return;
+    if (!this.addForm.title) {
+      this.addForm.title = template.title;
+    }
+    if (!this.addForm.message) {
+      this.addForm.message = template.message;
+    }
+  }
+
+  get selectedCount(): number {
+    if (this.targetAudience === 'program') return this.selectedPrograms.size;
+    if (this.targetAudience === 'specific-teachers') return this.selectedTeachers.size;
+    if (this.targetAudience === 'specific-students') return this.selectedStudents.size;
+    return 0;
   }
 
   toggleProgram(programId: string): void {

@@ -81,7 +81,7 @@
       <div class="needs-attention-content">
         <ng-container *ngIf="attentionItems && attentionItems.length > 0; else noAttention">
           <div class="attention-items">
-            <div class="attention-item" *ngFor="let item of attentionItems">
+            <a class="attention-item" *ngFor="let item of attentionItems" [routerLink]="item.link" [queryParams]="{ focus: item.id, type: item.type }">
               <div class="attention-icon">
                 <i class="ti ti-layout-grid"></i>
               </div>
@@ -90,7 +90,7 @@
                 <p class="attention-name">{{ item.name }}</p>
               </div>
               <i class="ti ti-chevron-right"></i>
-            </div>
+            </a>
           </div>
         </ng-container>
         <ng-template #noAttention>

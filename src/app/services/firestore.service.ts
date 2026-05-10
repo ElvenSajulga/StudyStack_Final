@@ -11,9 +11,12 @@ import {
   deleteDoc,
   query,
   where,
+  onSnapshot,
   DocumentData,
   QueryConstraint,
+  Unsubscribe,
 } from '@angular/fire/firestore';
+import { Observable } from 'rxjs';
 
 @Injectable({ providedIn: 'root' })
 export class FirestoreService {
@@ -92,6 +95,41 @@ export class FirestoreService {
     return this.run(async () => {
       const ref = doc(this.firestore, collectionName, id);
       await deleteDoc(ref);
+    });
+  }
+
+  /**
+   * Real-time listener for a collection. Emits the current snapshot immediately
+   * and again whenever any document in the collection changes (created, updated,
+   * or deleted). Unsubscribes automatically when the consumer unsubscribes.
+   */
+  watchAll<T>(
+    collectionName: string,
+    constraints: QueryConstraint[] = []
+  ): Observable<T[]> {
+    return new Observable<T[]>(subscriber => {
+      let unsub: Unsubscribe | null = null;
+      runInInjectionContext(this.injector, () => {
+        try {
+          const ref = collection(this.firestore, collectionName);
+          const q = constraints.length ? query(ref, ...constraints) : query(ref);
+          unsub = onSnapshot(
+            q,
+            snap => {
+              const items = snap.docs.map(
+                d => ({ id: d.id, ...d.data() } as T)
+              );
+              subscriber.next(items);
+            },
+            err => subscriber.error(err),
+          );
+        } catch (e) {
+          subscriber.error(e);
+        }
+      });
+      return () => {
+        if (unsub) unsub();
+      };
     });
   }
 }

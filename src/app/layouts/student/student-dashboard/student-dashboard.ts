@@ -1,4 +1,4 @@
-import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, OnDestroy, OnInit, ChangeDetectorRef, NgZone, inject, PLATFORM_ID } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import {
@@ -8,9 +8,11 @@ import {
   AttendanceStatus,
 } from '../../../services/activity.service';
 import { Announcement, AnnouncementService } from '../../../services/announcement.service';
-import { AcademicService } from '../../../services/academic.service';
+import { AcademicService, Course, Enrollment } from '../../../services/academic.service';
 import { AuthService } from '../../../services/auth.service';
 import { TeacherAccountService } from '../../../services/teacher-account.service';
+import { isPlatformBrowser } from '@angular/common';
+import { Subscription } from 'rxjs';
 
 interface CalendarDay {
   date: Date;
@@ -39,7 +41,7 @@ interface CourseProgress {
   templateUrl: './student-dashboard.html',
   styleUrl: './student-dashboard.scss',
 })
-export class StudentDashboard implements OnInit {
+export class StudentDashboard implements OnInit, OnDestroy {
   presentCount     = 0;
   lateCount        = 0;
   absentCount      = 0;
@@ -58,6 +60,15 @@ export class StudentDashboard implements OnInit {
 
   userName = '';
   today = new Date();
+  private readonly platformId = inject(PLATFORM_ID);
+  private readonly zone = inject(NgZone);
+  private refreshTimer?: ReturnType<typeof setInterval>;
+  private activitiesSub?: Subscription;
+  private submissionsSub?: Subscription;
+  private currentEnrollments: Enrollment[] = [];
+  private currentTeacherUIDs: string[] = [];
+  private allEnrolledActivities: Activity[] = [];
+  private allSubmissions: ActivitySubmission[] = [];
 
   constructor(
     private readonly activityService: ActivityService,
@@ -74,7 +85,151 @@ export class StudentDashboard implements OnInit {
       const parsed = JSON.parse(user);
       this.userName = parsed.name || 'Student';
     }
-    void this.init();
+    void this.initRealtime();
+  }
+
+  ngOnDestroy(): void {
+    if (this.refreshTimer != null) clearInterval(this.refreshTimer);
+    this.activitiesSub?.unsubscribe();
+    this.submissionsSub?.unsubscribe();
+  }
+
+  /**
+   * Sets up real-time listeners for activities and submissions so the dashboard
+   * automatically reflects newly posted teacher activities, scores, and
+   * submissions without a manual refresh.
+   */
+  private async initRealtime(): Promise<void> {
+    const sid = this.studentID;
+    if (!sid) return;
+
+    try {
+      this.currentEnrollments = await this.academic.getEnrollmentsByStudentID(sid);
+      this.currentTeacherUIDs = [...new Set(this.currentEnrollments.map(e => e.teacherUID))];
+
+      // Load announcements once (refreshed on the periodic safety-net interval)
+      await this.refreshAnnouncements();
+
+      if (isPlatformBrowser(this.platformId)) {
+        this.activitiesSub = this.activityService
+          .watchActivitiesForEnrolledTeacherUIDs(this.currentTeacherUIDs)
+          .subscribe({
+            next: activities => {
+              this.allEnrolledActivities = activities;
+              this.recomputeFromState();
+            },
+            error: err => {
+              console.error('[StudentDashboard] activities stream error:', err);
+              void this.activityService
+                .getActivitiesForEnrolledTeacherUIDsBulk(this.currentTeacherUIDs)
+                .then(list => {
+                  this.allEnrolledActivities = list;
+                  this.recomputeFromState();
+                });
+            },
+          });
+
+        this.submissionsSub = this.activityService
+          .watchSubmissionsForStudent(sid)
+          .subscribe({
+            next: subs => {
+              this.allSubmissions = subs;
+              this.recomputeFromState();
+            },
+          });
+
+        // Safety-net: re-pull enrollments/announcements occasionally in case
+        // the admin updates them.
+        this.zone.runOutsideAngular(() => {
+          this.refreshTimer = setInterval(() => {
+            this.zone.run(() => void this.safetyNetRefresh());
+          }, 60000);
+        });
+      } else {
+        // SSR/no-browser fallback
+        this.allEnrolledActivities = await this.activityService
+          .getActivitiesForEnrolledTeacherUIDsBulk(this.currentTeacherUIDs);
+        this.allSubmissions = await this.activityService.getSubmissionsForStudent(sid);
+        this.recomputeFromState();
+      }
+    } catch (e) {
+      console.error('[StudentDashboard] initRealtime failed:', e);
+    }
+  }
+
+  private async safetyNetRefresh(): Promise<void> {
+    const sid = this.studentID;
+    if (!sid) return;
+    try {
+      const enrollments = await this.academic.getEnrollmentsByStudentID(sid);
+      const newUIDs = [...new Set(enrollments.map(e => e.teacherUID))];
+      const changed =
+        newUIDs.length !== this.currentTeacherUIDs.length ||
+        newUIDs.some(u => !this.currentTeacherUIDs.includes(u));
+
+      this.currentEnrollments = enrollments;
+
+      if (changed) {
+        this.currentTeacherUIDs = newUIDs;
+        this.activitiesSub?.unsubscribe();
+        this.activitiesSub = this.activityService
+          .watchActivitiesForEnrolledTeacherUIDs(this.currentTeacherUIDs)
+          .subscribe(activities => {
+            this.allEnrolledActivities = activities;
+            this.recomputeFromState();
+          });
+      }
+
+      await this.refreshAnnouncements();
+      this.recomputeFromState();
+    } catch (e) {
+      console.warn('[StudentDashboard] safetyNetRefresh failed:', e);
+    }
+  }
+
+  private async refreshAnnouncements(): Promise<void> {
+    if (this.currentTeacherUIDs.length === 0) {
+      this.latestAnnouncements = [];
+      return;
+    }
+    try {
+      const perTeacher = await Promise.all(
+        this.currentTeacherUIDs.map(uid => this.announcementService.getForTeacher(uid))
+      );
+      const seen = new Set<string | number>();
+      const all = perTeacher
+        .flat()
+        .filter(a => { if (seen.has(a.id)) return false; seen.add(a.id); return true; })
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      this.latestAnnouncements = all.slice(0, 3);
+    } catch (e) {
+      console.warn('refreshAnnouncements failed:', e);
+    }
+  }
+
+  /**
+   * Rebuilds all derived dashboard state (stats, calendar, course progress,
+   * upcoming activities) from the latest cached enrollments + activities +
+   * submissions. Cheap because everything is in-memory.
+   */
+  private recomputeFromState(): void {
+    this.computeStatsFromCache();
+    this.buildCourseProgressFromCache();
+
+    const now = new Date();
+    const openActivities = this.allEnrolledActivities.filter(a => now <= new Date(a.closeAt));
+
+    this.upcomingActivities = openActivities
+      .slice()
+      .sort((a, b) => new Date(a.closeAt).getTime() - new Date(b.closeAt).getTime())
+      .slice(0, 5);
+
+    this.allUpcomingActivities = openActivities
+      .slice()
+      .sort((a, b) => new Date(a.closeAt).getTime() - new Date(b.closeAt).getTime());
+
+    this.buildCalendar();
+    this.cdr.detectChanges();
   }
 
   getGreeting(): string {
@@ -88,57 +243,6 @@ export class StudentDashboard implements OnInit {
     return this.auth.getCurrentUser()?.studentID;
   }
 
-  private async init(): Promise<void> {
-    await this.computeStats();
-    await this.buildCourseProgress();
-
-    // ── Announcements: only from teachers the student is enrolled under ──────
-    const sid = this.studentID;
-    if (sid) {
-      const enrollments = await this.academic.getEnrollmentsByStudentID(sid);
-      const teacherUIDs = [...new Set(enrollments.map(e => e.teacherUID))];
-
-      if (teacherUIDs.length > 0) {
-        const perTeacher = await Promise.all(
-          teacherUIDs.map(uid => this.announcementService.getForTeacher(uid))
-        );
-        const seen = new Set<string | number>();
-        const all = perTeacher
-          .flat()
-          .filter(a => { if (seen.has(a.id)) return false; seen.add(a.id); return true; })
-          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-        this.latestAnnouncements = all.slice(0, 3);
-
-        // ── Get upcoming activities (open activities) ──────────────────
-        const enrolledActivities = await this.activityService
-          .getActivitiesForEnrolledTeacherUIDs(teacherUIDs);
-        const now = new Date();
-        const openActivities = enrolledActivities.filter(a => now <= new Date(a.closeAt));
-
-        this.upcomingActivities = openActivities
-          .sort((a, b) => new Date(a.closeAt).getTime() - new Date(b.closeAt).getTime())
-          .slice(0, 5);
-
-        // ── Store ALL upcoming activities for calendar ──────────────────
-        this.allUpcomingActivities = openActivities
-          .sort((a, b) => new Date(a.closeAt).getTime() - new Date(b.closeAt).getTime());
-      } else {
-        this.latestAnnouncements = [];
-        this.upcomingActivities = [];
-        this.allUpcomingActivities = [];
-      }
-    } else {
-      this.latestAnnouncements = [];
-      this.upcomingActivities = [];
-      this.allUpcomingActivities = [];
-    }
-
-    // ── Build calendar ────────────────────────────────────────────────────────
-    this.buildCalendar();
-
-    this.cdr.detectChanges();
-  }
 
   getDaysLeft(closeAt: string): string {
     const now = new Date();
@@ -250,57 +354,59 @@ export class StudentDashboard implements OnInit {
     this.selectedDay = null;
   }
 
-  private async buildCourseProgress(): Promise<void> {
-    const sid = this.studentID;
-    if (!sid) {
+  /**
+   * Builds course-progress cards from already-cached activities/submissions.
+   * Uses the resilient teacher matcher so cards still appear even when
+   * UID↔teacherID mapping is partially missing.
+   */
+  private buildCourseProgressFromCache(): void {
+    if (this.currentEnrollments.length === 0) {
       this.courseProgress = [];
       return;
     }
 
-    try {
-      const enrollments = await this.academic.getEnrollmentsByStudentID(sid);
-      const courses = await this.academic.getCourses();
-      const teachers = this.teacherAccountService.getAll();
-      const submissions = await this.activityService.getSubmissionsForStudent(sid);
+    const teachers = this.teacherAccountService.getAll();
+    const uidToTeacherName: Record<string, string> = {};
+    const uidToTeacherID: Record<string, string> = {};
+    for (const teacher of teachers) {
+      const fullName = `${teacher.firstname} ${teacher.lastname}`.trim();
+      uidToTeacherName[teacher.UID] = fullName || teacher.name || 'Unknown';
+      uidToTeacherID[teacher.UID] = teacher.teacherID;
+    }
 
-      // Build courseId → courseName map
+    void (async () => {
+      let courses: Course[];
+      try {
+        courses = await this.academic.getCourses();
+      } catch {
+        courses = [];
+      }
       const courseIdToName: Record<string, string> = {};
-      for (const course of courses) {
-        courseIdToName[course.id] = course.name;
-      }
+      for (const course of courses) courseIdToName[course.id] = course.name;
 
-      // Build UID → teacher name map
-      const uidToTeacherName: Record<string, string> = {};
-      for (const teacher of teachers) {
-        const fullName = `${teacher.firstname} ${teacher.lastname}`.trim();
-        uidToTeacherName[teacher.UID] = fullName || teacher.name || 'Unknown';
-      }
-
-      // Process each enrollment
       const progress: CourseProgress[] = [];
-      for (const enrollment of enrollments) {
+      const now = new Date();
+
+      for (const enrollment of this.currentEnrollments) {
         const courseName = courseIdToName[enrollment.courseId] || 'Unknown';
         const teacherName = uidToTeacherName[enrollment.teacherUID] || 'Unknown';
+        const teacherID = uidToTeacherID[enrollment.teacherUID];
 
-        // Get activities for this teacher
-        const enrolledActivities = await this.activityService
-          .getActivitiesForEnrolledTeacherUIDs([enrollment.teacherUID]);
-
-        // Count only closed activities (closeAt < now)
-        const now = new Date();
-        const closedActivities = enrolledActivities.filter(a => new Date(a.closeAt) < now);
+        const teacherActivities = this.allEnrolledActivities.filter(a =>
+          (a.teacherUID && a.teacherUID === enrollment.teacherUID) ||
+          (teacherID && a.teacherID === teacherID) ||
+          a.teacherID === enrollment.teacherUID
+        );
+        const closedActivities = teacherActivities.filter(a => new Date(a.closeAt) < now);
         const totalActivities = closedActivities.length;
+        if (totalActivities === 0) continue;
 
-        if (totalActivities === 0) continue; // Skip if no closed activities
-
-        // Count completed submissions
-        const courseSubmissions = submissions.filter(s =>
+        const courseSubmissions = this.allSubmissions.filter(s =>
           closedActivities.some(a => a.id === s.activityId) && s.submitted
         );
         const completedActivities = courseSubmissions.length;
-        const completionPercent = totalActivities > 0 ? (completedActivities / totalActivities) * 100 : 0;
+        const completionPercent = (completedActivities / totalActivities) * 100;
 
-        // Calculate average score
         const gradedSubmissions = courseSubmissions.filter(s => s.graded && s.score != null);
         let averageScore = 0;
         if (gradedSubmissions.length > 0) {
@@ -312,29 +418,22 @@ export class StudentDashboard implements OnInit {
           averageScore = scores.reduce((sum, score) => sum + score, 0) / scores.length;
         }
 
-        // Calculate attendance rate
-        let attendanceRate = 0;
         let presentCount = 0;
         let lateCount = 0;
         let totalCount = 0;
         for (const activity of closedActivities) {
-          const sub = submissions.find(s => s.activityId === activity.id);
+          const sub = this.allSubmissions.find(s => s.activityId === activity.id);
           const status = this.activityService.getAttendanceStatus(activity, sub);
           if (status === 'present') presentCount++;
           if (status === 'late') lateCount++;
           totalCount++;
         }
-        attendanceRate = totalCount > 0 ? ((presentCount + lateCount) / totalCount) * 100 : 0;
+        const attendanceRate = totalCount > 0 ? ((presentCount + lateCount) / totalCount) * 100 : 0;
 
-        // Determine status
         let status: 'on-track' | 'attention' | 'at-risk';
-        if (averageScore >= 80) {
-          status = 'on-track';
-        } else if (averageScore >= 60) {
-          status = 'attention';
-        } else {
-          status = 'at-risk';
-        }
+        if (averageScore >= 80) status = 'on-track';
+        else if (averageScore >= 60) status = 'attention';
+        else status = 'at-risk';
 
         progress.push({
           courseId: enrollment.courseId,
@@ -348,111 +447,61 @@ export class StudentDashboard implements OnInit {
           status,
         });
       }
-
       this.courseProgress = progress;
-    } catch (e) {
-      console.warn('buildCourseProgress failed:', e);
-      this.courseProgress = [];
-    }
+      this.cdr.detectChanges();
+    })();
   }
 
-  private async computeStats(): Promise<void> {
-    const sid = this.studentID;
-
-    this.presentCount   = 0;
-    this.lateCount      = 0;
-    this.absentCount    = 0;
+  /**
+   * Computes stat tiles (open count, attendance, on-time rate, next deadline)
+   * directly from the cached activities + submissions. Synchronous: no
+   * network access — runs whenever the streams emit.
+   */
+  private computeStatsFromCache(): void {
+    this.presentCount = 0;
+    this.lateCount = 0;
+    this.absentCount = 0;
     this.openActivities = 0;
+    this.overallAveragePercent = 0;
+    this.submissionsThisWeek = 0;
 
-    if (!sid) return;
-
-    // ── Step 1: Resolve the teachers this student is enrolled under ───────────
-    // enrollments store teacherUID (the UID field of the teacher account,
-    // e.g. "teacher1"), while activities are stored with teacherID (the
-    // teacherID credential, e.g. "T-0001").  We need to resolve the mapping.
-    const enrollments = await this.academic.getEnrollmentsByStudentID(sid);
-    if (enrollments.length === 0) return;
-
-    // Unique teacher UIDs from enrollments (e.g. "teacher1", "teacher2")
-    const enrolledTeacherUIDs = [...new Set(enrollments.map(e => e.teacherUID))];
-
-    // ── Step 2: Fetch all activities and keep only those whose teacherID
-    //           belongs to one of the enrolled teachers.
-    // Activities store teacherID as the TeacherAccount.teacherID value
-    // (e.g. "T-0001"), NOT the UID.  The enrollment stores the teacher's UID.
-    // The TeacherAccountService cache gives us the bridge: UID → teacherID.
-    //
-    // However, to stay service-layer clean we resolve this by fetching
-    // activities per enrolled teacher using their teacherID, which requires
-    // knowing the mapping.  The safest approach with the current architecture:
-    // pull all activities, then cross-filter by matching teacherID to the
-    // teacher accounts that correspond to enrolled UIDs.
-    //
-    // We use AcademicService.getEnrollmentsByStudentID which returns teacherUID.
-    // The ActivityService.getActivitiesForTeacher(teacherID) expects the
-    // TeacherAccount.teacherID field.  We resolve via the teacher cache.
-
-    // Resolve enrolled UIDs → TeacherAccount.teacherID values
-    // Import TeacherAccountService is intentionally avoided here to keep this
-    // component lean; instead we fetch activities per enrolledTeacherUID via a
-    // different path: since the enrollment record contains teacherUID, and the
-    // activity record contains teacherID (the credential ID), we need the
-    // mapping.  The cleanest fix is to fetch activities for EACH enrolled
-    // teacher by their teacherID field, which we can obtain from the teacher
-    // accounts cache already loaded globally.
-    //
-    // We delegate the resolution to the new helper on ActivityService.
-    const enrolledActivities = await this.activityService
-      .getActivitiesForEnrolledTeacherUIDs(enrolledTeacherUIDs);
-
-    // ── Step 3: Count open activities ─────────────────────────────────────────
-    const now = new Date();
-    for (const a of enrolledActivities) {
-      if (now <= new Date(a.closeAt)) {
-        this.openActivities++;
-      }
-    }
-
-    // ── Step 4: Attendance stats from this student's submissions ──────────────
     const submissionsByActivityId: Record<string, ActivitySubmission | undefined> = {};
-    const subs = await this.activityService.getSubmissionsForStudent(sid);
-    for (const sub of subs) {
+    for (const sub of this.allSubmissions) {
       submissionsByActivityId[sub.activityId] = sub;
     }
 
-    for (const a of enrolledActivities) {
+    const now = new Date();
+    for (const a of this.allEnrolledActivities) {
+      if (now <= new Date(a.closeAt)) this.openActivities++;
       const status: AttendanceStatus = this.activityService.getAttendanceStatus(
         a,
         submissionsByActivityId[a.id],
       );
       if (status === 'present') this.presentCount++;
-      if (status === 'late')    this.lateCount++;
-      if (status === 'absent')  this.absentCount++;
+      if (status === 'late') this.lateCount++;
+      if (status === 'absent') this.absentCount++;
     }
 
-    // ── Calculate overall average percentage ──────────────────────────────────
-    const graded = subs.filter(s => s.graded && s.score != null);
-    if (graded.length > 0 && enrolledActivities.length > 0) {
+    const graded = this.allSubmissions.filter(s => s.graded && s.score != null);
+    if (graded.length > 0 && this.allEnrolledActivities.length > 0) {
       const percentages = graded.map(s => {
-        const a = enrolledActivities.find(x => x.id === s.activityId);
+        const a = this.allEnrolledActivities.find(x => x.id === s.activityId);
         if (!a || !a.maxPoints) return 0;
         return (s.score! / a.maxPoints) * 100;
       });
       this.overallAveragePercent = percentages.reduce((sum, p) => sum + p, 0) / percentages.length;
     }
 
-    // ── Count submissions from this week ──────────────────────────────────────
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    this.submissionsThisWeek = subs.filter(s => s.submitted && new Date(s.submittedAt) >= sevenDaysAgo).length;
+    this.submissionsThisWeek = this.allSubmissions
+      .filter(s => s.submitted && new Date(s.submittedAt) >= sevenDaysAgo).length;
 
-    // ── Find next deadline (closest upcoming) ─────────────────────────────────
-    const upcoming = enrolledActivities
-      .filter(a => new Date(a.closeAt) > new Date())
+    const upcoming = this.allEnrolledActivities
+      .filter(a => new Date(a.closeAt) > now)
       .sort((a, b) => new Date(a.closeAt).getTime() - new Date(b.closeAt).getTime());
     this.nextDeadline = upcoming[0] ?? null;
 
-    // ── Calculate on-time rate ───────────────────────────────────────────────
     const totalActivities = this.presentCount + this.lateCount + this.absentCount;
     this.onTimeRate = totalActivities > 0 ? (this.presentCount / totalActivities) * 100 : 0;
   }

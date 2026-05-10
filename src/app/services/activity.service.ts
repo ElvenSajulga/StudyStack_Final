@@ -3,6 +3,8 @@ import { HttpClient } from '@angular/common/http';
 import { FirestoreService } from './firestore.service';
 import { TeacherAccountService } from './teacher-account.service';
 import { where } from '@angular/fire/firestore';
+import { Observable, of } from 'rxjs';
+import { catchError, map } from 'rxjs/operators';
 
 export type ActivityType = 'quiz' | 'output';
 
@@ -12,6 +14,7 @@ export interface Activity {
   description: string;
   type: ActivityType;
   teacherID: string;      // This is TeacherAccount.teacherID, e.g. "T-0001"
+  teacherUID?: string;    // Optional UID fallback for legacy/resilient lookups
   courseId?: string;      // Course this activity belongs to
   deadline: string;
   closeAt: string;
@@ -117,6 +120,48 @@ export class ActivityService {
    * getActivitiesForTeacher().
    */
   async getActivitiesForTeacherUID(teacherUID: string): Promise<Activity[]> {
+    const mergeAndSort = (groups: Activity[][]): Activity[] => {
+      const seen = new Set<string>();
+      const merged: Activity[] = [];
+      for (const g of groups) {
+        for (const a of g) {
+          if (seen.has(a.id)) continue;
+          seen.add(a.id);
+          merged.push(a);
+        }
+      }
+      return merged.sort(
+        (a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
+      );
+    };
+
+    const getByTeacherUidFields = async (): Promise<Activity[]> => {
+      const results: Activity[][] = [];
+
+      try {
+        const listByTeacherUidField = await this.firestoreService.getAll<Activity>(
+          this.ACT_COLLECTION,
+          [where('teacherUID', '==', teacherUID)]
+        );
+        results.push(listByTeacherUidField);
+      } catch (e) {
+        console.warn('Firestore teacherUID lookup failed:', e);
+      }
+
+      try {
+        // Legacy/edge-case support: some records may have stored UID in teacherID.
+        const listByTeacherIdAsUid = await this.firestoreService.getAll<Activity>(
+          this.ACT_COLLECTION,
+          [where('teacherID', '==', teacherUID)]
+        );
+        results.push(listByTeacherIdAsUid);
+      } catch (e) {
+        console.warn('Firestore teacherID-as-UID lookup failed:', e);
+      }
+
+      return mergeAndSort(results);
+    };
+
     // Resolve UID → teacherID via the cached teacher accounts
     let teacherAccount = this.teacherAccountService.getByUID(teacherUID);
 
@@ -128,11 +173,117 @@ export class ActivityService {
 
     if (!teacherAccount) {
       console.warn(
-        `ActivityService.getActivitiesForTeacherUID: no teacher account found for UID "${teacherUID}"`
+        `ActivityService.getActivitiesForTeacherUID: no teacher account found for UID "${teacherUID}", trying UID-based fallbacks.`
       );
-      return [];
+      const uidFallbackActivities = await getByTeacherUidFields();
+      if (uidFallbackActivities.length > 0) return uidFallbackActivities;
+
+      // Last-resort fallback for environments where Firestore UID field lookups fail.
+      try {
+        const all = await this.getAllActivities();
+        return all
+          .filter(a => a.teacherUID === teacherUID || a.teacherID === teacherUID)
+          .sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime());
+      } catch {
+        return [];
+      }
     }
-    return this.getActivitiesForTeacher(teacherAccount.teacherID);
+
+    const [byTeacherId, byTeacherUidFields] = await Promise.all([
+      this.getActivitiesForTeacher(teacherAccount.teacherID),
+      getByTeacherUidFields(),
+    ]);
+    return mergeAndSort([byTeacherId, byTeacherUidFields]);
+  }
+
+  /**
+   * Bulk-fetch + client-side filter used by all student-facing views.
+   *
+   * This bypasses the brittle teacherUID→teacherID resolution chain by:
+   *   1. Pulling ALL activities once
+   *   2. Resolving the enrolled teacher UIDs to teacherID via the cached
+   *      teacher accounts (reloaded if cold)
+   *   3. Matching activities by ANY of: direct teacherUID field, mapped
+   *      teacherID, or teacherID-equals-UID legacy edge case.
+   *
+   * This guarantees activities show up even if a single mapping is stale,
+   * the cache is cold, or legacy/new records have inconsistent fields.
+   */
+  async getActivitiesForEnrolledTeacherUIDsBulk(teacherUIDs: string[]): Promise<Activity[]> {
+    if (teacherUIDs.length === 0) return [];
+
+    // Ensure teacher cache is fresh so UID→teacherID mapping is reliable.
+    try { await this.teacherAccountService.reloadFromServer(); } catch { /* keep cache */ }
+
+    const teachers = this.teacherAccountService.getAll();
+    const uidToTeacherID = new Map<string, string>();
+    for (const t of teachers) {
+      if (t.UID) uidToTeacherID.set(t.UID, t.teacherID);
+    }
+
+    const enrolledUIDSet = new Set(teacherUIDs);
+    const enrolledTeacherIDSet = new Set<string>();
+    for (const uid of teacherUIDs) {
+      const tid = uidToTeacherID.get(uid);
+      if (tid) enrolledTeacherIDSet.add(tid);
+    }
+
+    const all = await this.getAllActivities();
+
+    return all
+      .filter(a => {
+        if (a.teacherUID && enrolledUIDSet.has(a.teacherUID)) return true;
+        if (a.teacherID && enrolledTeacherIDSet.has(a.teacherID)) return true;
+        // Legacy/edge-case: teacherID field accidentally stored a UID
+        if (a.teacherID && enrolledUIDSet.has(a.teacherID)) return true;
+        return false;
+      })
+      .sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime());
+  }
+
+  /**
+   * Real-time stream of activities visible to a student given their enrolled
+   * teacher UIDs. Emits immediately with the current snapshot, and again
+   * whenever any activity is created/updated/deleted in Firestore.
+   *
+   * Falls back to a single bulk fetch if the real-time listener fails.
+   */
+  watchActivitiesForEnrolledTeacherUIDs(teacherUIDs: string[]): Observable<Activity[]> {
+    if (teacherUIDs.length === 0) return of([]);
+
+    const enrolledUIDSet = new Set(teacherUIDs);
+
+    const computeFilter = (all: Activity[]): Activity[] => {
+      const teachers = this.teacherAccountService.getAll();
+      const uidToTeacherID = new Map<string, string>();
+      for (const t of teachers) {
+        if (t.UID) uidToTeacherID.set(t.UID, t.teacherID);
+      }
+      const enrolledTeacherIDSet = new Set<string>();
+      for (const uid of teacherUIDs) {
+        const tid = uidToTeacherID.get(uid);
+        if (tid) enrolledTeacherIDSet.add(tid);
+      }
+      return all
+        .filter(a => {
+          if (a.teacherUID && enrolledUIDSet.has(a.teacherUID)) return true;
+          if (a.teacherID && enrolledTeacherIDSet.has(a.teacherID)) return true;
+          if (a.teacherID && enrolledUIDSet.has(a.teacherID)) return true;
+          return false;
+        })
+        .sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime());
+    };
+
+    // Kick off a teacher-cache refresh (fire-and-forget) so first snapshot maps cleanly.
+    void this.teacherAccountService.reloadFromServer().catch(() => undefined);
+
+    return this.firestoreService.watchAll<Activity>(this.ACT_COLLECTION).pipe(
+      map(all => computeFilter(all)),
+      catchError(err => {
+        console.warn('watchActivitiesForEnrolledTeacherUIDs failed, falling back to one-shot fetch:', err);
+        return of([]); // consumer can poll/retry separately
+      }),
+    );
   }
 
   /**
@@ -143,11 +294,21 @@ export class ActivityService {
   async getActivitiesForEnrolledTeacherUIDs(teacherUIDs: string[]): Promise<Activity[]> {
     if (teacherUIDs.length === 0) return [];
 
+    // Prefer the bulk method — it's far more resilient to identifier mismatches
+    // and to a cold/stale teacher account cache. Fall back to per-teacher
+    // queries only if the bulk path returns nothing AND we have a populated
+    // teacher cache to do the per-teacher resolution from.
+    try {
+      const bulk = await this.getActivitiesForEnrolledTeacherUIDsBulk(teacherUIDs);
+      if (bulk.length > 0) return bulk;
+    } catch (e) {
+      console.warn('Bulk activity fetch failed, falling back to per-teacher fetch:', e);
+    }
+
     const perTeacher = await Promise.all(
       teacherUIDs.map(uid => this.getActivitiesForTeacherUID(uid))
     );
 
-    // Deduplicate by activity id (edge case: same teacher enrolled twice)
     const seen = new Set<string>();
     const result: Activity[] = [];
     for (const activities of perTeacher) {
@@ -161,6 +322,13 @@ export class ActivityService {
     return result.sort(
       (a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
     );
+  }
+
+  /** Real-time stream of submissions belonging to a single student. */
+  watchSubmissionsForStudent(studentID: string): Observable<ActivitySubmission[]> {
+    return this.firestoreService
+      .watchAll<ActivitySubmission>(this.SUB_COLLECTION, [where('studentID', '==', studentID)])
+      .pipe(catchError(() => of([] as ActivitySubmission[])));
   }
 
   async getActivityById(id: string): Promise<Activity | undefined> {

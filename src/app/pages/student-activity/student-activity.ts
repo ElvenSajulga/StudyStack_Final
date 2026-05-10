@@ -7,6 +7,7 @@ import { AcademicService, Course, Enrollment } from '../../services/academic.ser
 import { QuizService, QuizQuestion } from '../../services/quiz.service';
 import { StudentQuestionService } from '../../services/student-question.service';
 import { TeacherAccountService } from '../../services/teacher-account.service';
+import { Subscription } from 'rxjs';
 import Swal from 'sweetalert2';
 
 interface CourseCard {
@@ -56,6 +57,11 @@ export class StudentActivity implements OnInit, OnDestroy {
   private readonly platformId = inject(PLATFORM_ID);
   private readonly zone = inject(NgZone);
   private refreshTimer?: ReturnType<typeof setInterval>;
+  private activitiesSub?: Subscription;
+  private submissionsSub?: Subscription;
+  private currentEnrollments: Enrollment[] = [];
+  private currentCourses: Course[] = [];
+  private allActivities: Activity[] = [];
 
   constructor(
     private readonly activityService: ActivityService,
@@ -69,23 +75,184 @@ export class StudentActivity implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.loadBookmarks();
-    void this.loadCourseCards();
-    if (isPlatformBrowser(this.platformId)) {
-      this.zone.runOutsideAngular(() => {
-        this.refreshTimer = setInterval(() => {
-          this.zone.run(() => void this.loadCourseCards());
-        }, 30000);
+    void this.initRealtime();
+  }
+
+  /**
+   * Sets up real-time Firestore listeners for activities and submissions, plus
+   * a low-frequency safety-net refresh in case the realtime channel drops.
+   *
+   * The activity stream re-emits whenever ANY activity changes in Firestore,
+   * so freshly created teacher activities reflect on the student side
+   * immediately — no manual refresh required.
+   */
+  private async initRealtime(): Promise<void> {
+    const sid = this.studentID;
+    if (!sid) return;
+
+    this.loading = true;
+    this.loadError = '';
+
+    try {
+      const [enrollments, courses] = await Promise.all([
+        this.academic.getEnrollmentsByStudentID(sid),
+        this.academic.getCourses(),
+      ]);
+      this.currentEnrollments = enrollments;
+      this.currentCourses = courses;
+
+      const teacherUIDs = [...new Set(enrollments.map(e => e.teacherUID))];
+
+      if (isPlatformBrowser(this.platformId)) {
+        // Real-time activities stream
+        this.activitiesSub = this.activityService
+          .watchActivitiesForEnrolledTeacherUIDs(teacherUIDs)
+          .subscribe({
+            next: activities => {
+              this.allActivities = activities;
+              this.recomputeFromState();
+            },
+            error: err => {
+              console.error('[StudentActivity] activities stream error:', err);
+              // Fallback: one-shot bulk fetch
+              void this.activityService
+                .getActivitiesForEnrolledTeacherUIDsBulk(teacherUIDs)
+                .then(list => {
+                  this.allActivities = list;
+                  this.recomputeFromState();
+                });
+            },
+          });
+
+        // Real-time submissions stream
+        this.submissionsSub = this.activityService
+          .watchSubmissionsForStudent(sid)
+          .subscribe({
+            next: subs => {
+              this.submissions = {};
+              for (const sub of subs) {
+                this.submissions[sub.activityId] = sub;
+                if (!this.draftContent[sub.activityId]) {
+                  this.draftContent[sub.activityId] = sub.content ?? '';
+                }
+              }
+              this.recomputeFromState();
+            },
+          });
+
+        // Safety-net polling — re-pulls enrollments in case admin changes them
+        this.zone.runOutsideAngular(() => {
+          this.refreshTimer = setInterval(() => {
+            this.zone.run(() => void this.refreshEnrollments());
+          }, 60000);
+        });
+      } else {
+        // SSR or no real-time support — single fetch
+        const list = await this.activityService
+          .getActivitiesForEnrolledTeacherUIDsBulk(teacherUIDs);
+        this.allActivities = list;
+        const subs = await this.activityService.getSubmissionsForStudent(sid);
+        for (const sub of subs) {
+          this.submissions[sub.activityId] = sub;
+          if (!this.draftContent[sub.activityId]) {
+            this.draftContent[sub.activityId] = sub.content ?? '';
+          }
+        }
+        this.recomputeFromState();
+      }
+    } catch (err: unknown) {
+      console.error('[StudentActivity] initRealtime failed:', err);
+      this.loadError = err instanceof Error ? err.message : 'Failed to load activities. Please try again.';
+    } finally {
+      this.loading = false;
+      this.cdr.detectChanges();
+    }
+  }
+
+  private async refreshEnrollments(): Promise<void> {
+    const sid = this.studentID;
+    if (!sid) return;
+    try {
+      const enrollments = await this.academic.getEnrollmentsByStudentID(sid);
+      const teacherUIDs = [...new Set(enrollments.map(e => e.teacherUID))];
+      const oldUIDs = [...new Set(this.currentEnrollments.map(e => e.teacherUID))];
+      this.currentEnrollments = enrollments;
+
+      // If enrolled teacher set changed, re-subscribe to the activities stream
+      const changed =
+        teacherUIDs.length !== oldUIDs.length ||
+        teacherUIDs.some(u => !oldUIDs.includes(u));
+
+      if (changed) {
+        this.activitiesSub?.unsubscribe();
+        this.activitiesSub = this.activityService
+          .watchActivitiesForEnrolledTeacherUIDs(teacherUIDs)
+          .subscribe(activities => {
+            this.allActivities = activities;
+            this.recomputeFromState();
+          });
+      }
+      this.recomputeFromState();
+    } catch (e) {
+      console.warn('refreshEnrollments failed:', e);
+    }
+  }
+
+  /**
+   * Rebuilds course cards and the open course's stream from the current
+   * cached data. Called whenever activities, submissions, or enrollments
+   * change.
+   */
+  private recomputeFromState(): void {
+    const submittedIds = new Set(
+      Object.values(this.submissions)
+        .filter((s): s is ActivitySubmission => !!s)
+        .map(s => s.activityId)
+    );
+
+    const cards: CourseCard[] = [];
+    for (const e of this.currentEnrollments) {
+      const course = this.currentCourses.find(c => c.id === e.courseId);
+      if (!course) continue;
+
+      const teacherActivities = this.allActivities.filter(a =>
+        this.activityBelongsToTeacherUID(a, e.teacherUID)
+      );
+
+      const now = new Date();
+      const pending = teacherActivities.filter(
+        a => !submittedIds.has(a.id) && new Date(a.closeAt) > now,
+      ).length;
+
+      cards.push({
+        course,
+        enrollment: e,
+        teacherUID: e.teacherUID,
+        pendingCount: pending,
       });
     }
-    // Debug logging
-    setTimeout(() => {
-      console.log('[StudentActivity] Loaded data:', {
-        courseCardsCount: this.courseCards.length,
-        streamActivitiesCount: this.streamActivities.length,
-        courseCards: this.courseCards,
-        uniqueCourses: this.getUniqueCourses(),
-      });
-    }, 1000);
+    this.courseCards = cards;
+
+    // If the student has opened a course, refresh that course's stream too
+    if (this.selectedCard) {
+      const teacherUID = this.selectedCard.teacherUID;
+      this.streamActivities = this.allActivities
+        .filter(a => this.activityBelongsToTeacherUID(a, teacherUID))
+        .sort(
+          (a, b) => new Date(b.deadline).getTime() - new Date(a.deadline).getTime(),
+        );
+    }
+
+    this.cdr.detectChanges();
+  }
+
+  /** Resilient teacher-UID matcher used everywhere on the student side. */
+  private activityBelongsToTeacherUID(activity: Activity, teacherUID: string): boolean {
+    if (activity.teacherUID && activity.teacherUID === teacherUID) return true;
+    const teacher = this.teacherAccountService.getByUID(teacherUID);
+    if (teacher && activity.teacherID === teacher.teacherID) return true;
+    if (activity.teacherID === teacherUID) return true;
+    return false;
   }
 
   private get studentID(): string | undefined {
@@ -137,61 +304,7 @@ export class StudentActivity implements OnInit, OnDestroy {
   }
 
   retryLoad(): void {
-    void this.loadCourseCards();
-  }
-
-  private async loadCourseCards(): Promise<void> {
-    const sid = this.studentID;
-    if (!sid) return;
-
-    this.loading = true;
-    this.loadError = '';
-
-    try {
-      const [enrollments, courses] = await Promise.all([
-        this.academic.getEnrollmentsByStudentID(sid),
-        this.academic.getCourses(),
-      ]);
-
-      const subs = await this.activityService.getSubmissionsForStudent(sid);
-      const submittedIds = new Set(subs.map(s => s.activityId));
-
-      const cards: CourseCard[] = [];
-      for (const e of enrollments) {
-        const course = courses.find(c => c.id === e.courseId);
-        if (!course) continue;
-
-        const activities = await this.activityService
-          .getActivitiesForTeacherUID(e.teacherUID);
-
-        const now = new Date();
-        const pending = activities.filter(
-          a => !submittedIds.has(a.id) && new Date(a.closeAt) > now,
-        ).length;
-
-        cards.push({
-          course,
-          enrollment: e,
-          teacherUID: e.teacherUID,
-          pendingCount: pending,
-        });
-      }
-
-      this.courseCards = cards;
-
-      for (const sub of subs) {
-        this.submissions[sub.activityId] = sub;
-        if (!this.draftContent[sub.activityId]) {
-          this.draftContent[sub.activityId] = sub.content ?? '';
-        }
-      }
-    } catch (err: unknown) {
-      console.error('[StudentActivity] loadCourseCards failed:', err);
-      this.loadError = err instanceof Error ? err.message : 'Failed to load activities. Please try again.';
-    } finally {
-      this.loading = false;
-      this.cdr.detectChanges();
-    }
+    void this.initRealtime();
   }
 
   // ── navigation ────────────────────────────────────────────────────────────────
@@ -199,18 +312,8 @@ export class StudentActivity implements OnInit, OnDestroy {
   async openCourse(card: CourseCard): Promise<void> {
     this.selectedCard = card;
     this.view = 'stream';
-    await this.loadStream(card);
-  }
-
-  private async loadStream(card: CourseCard): Promise<void> {
-    this.loading = true;
-    const all = await this.activityService
-      .getActivitiesForTeacherUID(card.teacherUID);
-    this.streamActivities = all.sort(
-      (a, b) => new Date(b.deadline).getTime() - new Date(a.deadline).getTime(),
-    );
-    this.loading = false;
-    this.cdr.detectChanges();
+    // Stream comes from the live activities cache — no refetch needed.
+    this.recomputeFromState();
   }
 
   async openActivity(activity: Activity): Promise<void> {
@@ -574,5 +677,7 @@ export class StudentActivity implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     if (this.refreshTimer != null) clearInterval(this.refreshTimer);
+    this.activitiesSub?.unsubscribe();
+    this.submissionsSub?.unsubscribe();
   }
 }

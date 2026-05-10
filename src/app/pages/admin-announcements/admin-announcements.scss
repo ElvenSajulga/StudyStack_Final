@@ -149,6 +149,17 @@
   line-height: 1.5;
 }
 
+.helper-text {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+}
+
+.selection-summary {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
 .form-actions {
   display: flex;
   justify-content: flex-end;

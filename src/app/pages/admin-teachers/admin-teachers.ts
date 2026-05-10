@@ -30,8 +30,11 @@ export class AdminTeachers implements OnInit {
 
   // Search, Sort, and Pagination
   searchQuery = '';
+  statusFilter: 'all' | 'active' | 'inactive' = 'all';
+  facultyFilter = '';
   sortField = 'lastname';
   sortDir: 'asc' | 'desc' = 'asc';
+  pageSizeOptions = [10, 15, 25, 50];
   pageSize = 15;
   currentPage = 1;
 
@@ -102,16 +105,16 @@ export class AdminTeachers implements OnInit {
 
   // Getters for search, sort, and pagination
   get filteredRecords(): TeacherAccount[] {
-    if (!this.searchQuery) {
-      return this.teachers;
-    }
-
-    const query = this.searchQuery.toLowerCase();
-    return this.teachers.filter(t =>
-      t.firstname.toLowerCase().includes(query) ||
-      t.lastname.toLowerCase().includes(query) ||
-      t.teacherID.toLowerCase().includes(query)
-    );
+    const query = this.searchQuery.toLowerCase().trim();
+    return this.teachers.filter(t => {
+      const matchesQuery = !query ||
+        t.firstname.toLowerCase().includes(query) ||
+        t.lastname.toLowerCase().includes(query) ||
+        t.teacherID.toLowerCase().includes(query);
+      const matchesStatus = this.statusFilter === 'all' || t.status === this.statusFilter;
+      const matchesFaculty = !this.facultyFilter || t.facultyId === this.facultyFilter;
+      return matchesQuery && matchesStatus && matchesFaculty;
+    });
   }
 
   get sortedRecords(): TeacherAccount[] {
@@ -186,6 +189,14 @@ export class AdminTeachers implements OnInit {
   }
 
   onSearchChange(): void {
+    this.currentPage = 1;
+  }
+
+  onFiltersChange(): void {
+    this.currentPage = 1;
+  }
+
+  onPageSizeChange(): void {
     this.currentPage = 1;
   }
 

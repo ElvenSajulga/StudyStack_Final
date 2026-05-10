@@ -98,6 +98,18 @@ export class AdminCourses implements OnInit {
     return this.courses.filter(c => c.programId === this.filterProgramId);
   }
 
+  get groupedCourses(): Array<{ program: Program; courses: Course[] }> {
+    const filtered = this.filteredCourses;
+    return this.programs
+      .map(program => ({
+        program,
+        courses: filtered
+          .filter(c => c.programId === program.id)
+          .sort((a, b) => a.name.localeCompare(b.name)),
+      }))
+      .filter(group => group.courses.length > 0);
+  }
+
   programName(id: string): string {
     return this.programs.find(p => p.id === id)?.name ?? '—';
   }

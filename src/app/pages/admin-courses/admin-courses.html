@@ -79,7 +79,13 @@
 
   <!-- Course list -->
   <section class="course-list" *ngIf="!loading && !showCourseForm">
-    <div class="course-block" *ngFor="let c of filteredCourses">
+    <div class="program-group" *ngFor="let group of groupedCourses">
+      <div class="program-group-header">
+        <h3>{{ group.program.name }}</h3>
+        <span>{{ group.courses.length }} course(s)</span>
+      </div>
+
+      <div class="course-block" *ngFor="let c of group.courses">
 
       <!-- Course header row -->
       <div class="course-row" (click)="toggleCourse(c.id)">
@@ -158,6 +164,7 @@
             && assignmentsForCourse(c.id).length > 0">
           All sections have been assigned.
         </p>
+      </div>
       </div>
     </div>
   </section>

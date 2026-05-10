@@ -29,6 +29,8 @@
   border: 1px solid var(--border);
   cursor: pointer;
   transition: background-color var(--t-base), border-color var(--t-base);
+  text-decoration: none;
+  color: inherit;
 
   &:hover {
     background: var(--color-primary-pale);

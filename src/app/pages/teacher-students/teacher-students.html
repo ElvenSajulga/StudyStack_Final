@@ -29,6 +29,28 @@
     </article>
   </section>
 
+  <section class="subject-filters" *ngIf="subjectCategories.length > 0">
+    <button
+      class="subject-chip"
+      [class.active]="selectedSubject === 'all'"
+      (click)="setSubjectFilter('all')"
+      type="button"
+    >
+      All subjects
+      <span class="chip-count">{{ totalStudents }}</span>
+    </button>
+    <button
+      class="subject-chip"
+      *ngFor="let subject of subjectCategories"
+      [class.active]="selectedSubject === subject.name"
+      (click)="setSubjectFilter(subject.name)"
+      type="button"
+    >
+      {{ subject.name }}
+      <span class="chip-count">{{ subject.count }}</span>
+    </button>
+  </section>
+
   <p class="muted" *ngIf="loading">Loading students…</p>
 
   <ng-container *ngIf="!loading">
@@ -55,6 +77,7 @@
                 ></i>
               </th>
               <th>Program</th>
+              <th>Subjects</th>
               <th>Courses</th>
               <th
                 class="sortable num-col"
@@ -77,7 +100,7 @@
           </thead>
           <tbody>
             <tr *ngIf="filteredRows.length === 0">
-              <td colspan="6" class="no-results">
+              <td colspan="7" class="no-results">
                 No students match your search.
               </td>
             </tr>
@@ -88,6 +111,13 @@
                 <span *ngIf="row.student.middlename"> {{ row.student.middlename }}</span>
               </td>
               <td>{{ row.programName || '—' }}</td>
+              <td>
+                <div class="course-badges">
+                  <span class="badge badge-neutral" *ngFor="let c of row.courses">
+                    {{ c.courseName }}
+                  </span>
+                </div>
+              </td>
               <td>
                 <div class="course-badges">
                   <span class="badge badge-info" *ngFor="let c of row.courses">

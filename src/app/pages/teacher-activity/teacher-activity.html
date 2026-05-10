@@ -153,7 +153,7 @@
           <input type="number" [(ngModel)]="form.maxPoints" min="1" placeholder="e.g. 100" />
         </label>
 
-        <label class="field checkbox" *ngIf="form.type === 'quiz'">
+        <label class="field checkbox full" *ngIf="form.type === 'quiz'">
           <input type="checkbox" [(ngModel)]="form.shuffleQuestions" />
           <span class="field-label">Shuffle questions for each student</span>
         </label>
@@ -229,7 +229,7 @@
           <input type="number" [(ngModel)]="form.maxPoints" min="1" placeholder="e.g. 100" />
         </label>
 
-        <label class="field checkbox" *ngIf="form.type === 'quiz'">
+        <label class="field checkbox full" *ngIf="form.type === 'quiz'">
           <input
             type="checkbox"
             [(ngModel)]="form.shuffleQuestions"
