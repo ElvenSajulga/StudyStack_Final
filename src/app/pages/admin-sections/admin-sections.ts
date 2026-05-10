@@ -6,8 +6,17 @@ import {
   Program,
   YearLevel,
   Section,
+  Enrollment,
 } from '../../services/academic.service';
+import { StudentAccount, StudentAccountService } from '../../services/student-account.service';
 import Swal from 'sweetalert2';
+
+interface SectionStudent {
+  studentID: string;
+  fullName: string;
+  email: string;
+  status: string;
+}
 
 @Component({
   selector: 'app-admin-sections',
@@ -36,8 +45,14 @@ export class AdminSections implements OnInit {
 
   loading = false;
 
+  // View-students modal
+  viewingSection: Section | null = null;
+  viewingStudents: SectionStudent[] = [];
+  viewingLoading = false;
+
   constructor(
     private readonly academic: AcademicService,
+    private readonly studentService: StudentAccountService,
     private readonly cdr: ChangeDetectorRef,
   ) {}
 
@@ -223,6 +238,50 @@ export class AdminSections implements OnInit {
   }
 
   cancelEditSection(): void { this.editingSectionId = null; }
+
+  // ── view students ────────────────────────────────────────────────────────────
+
+  async viewStudentsInSection(s: Section): Promise<void> {
+    this.viewingSection = s;
+    this.viewingLoading = true;
+    this.viewingStudents = [];
+    this.cdr.detectChanges();
+
+    try {
+      const enrollments: Enrollment[] = await this.academic.getEnrollmentsBySection(s.id);
+      await this.studentService.reloadFromServer();
+      const allStudents = this.studentService.getAll();
+      const byUID = new Map<string, StudentAccount>(allStudents.map(st => [st.UID, st]));
+
+      const seen = new Set<string>();
+      const list: SectionStudent[] = [];
+      for (const e of enrollments) {
+        if (seen.has(e.studentUID)) continue;
+        seen.add(e.studentUID);
+        const st = byUID.get(e.studentUID);
+        if (!st) continue;
+        list.push({
+          studentID: st.studentID,
+          fullName: `${st.firstname} ${st.lastname}`.trim(),
+          email: st.email || '—',
+          status: st.status,
+        });
+      }
+      list.sort((a, b) => a.fullName.localeCompare(b.fullName));
+      this.viewingStudents = list;
+    } catch (err) {
+      console.warn('viewStudentsInSection failed', err);
+      this.viewingStudents = [];
+    } finally {
+      this.viewingLoading = false;
+      this.cdr.detectChanges();
+    }
+  }
+
+  closeViewStudents(): void {
+    this.viewingSection = null;
+    this.viewingStudents = [];
+  }
 
   async deleteSection(s: Section): Promise<void> {
     const res = await Swal.fire({

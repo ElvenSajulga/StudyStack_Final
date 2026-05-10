@@ -154,6 +154,9 @@
                 <span class="section-dot">•</span>
                 <span class="tree-label">{{ s.name }}</span>
                 <div class="row-actions">
+                  <button class="btn small subtle" (click)="viewStudentsInSection(s)">
+                    <i class="ti ti-users"></i> View students
+                  </button>
                   <button class="btn small subtle" (click)="startEditSection(s)">Edit</button>
                   <button class="btn small danger" (click)="deleteSection(s)">Delete</button>
                 </div>
@@ -164,4 +167,46 @@
       </div>
     </div>
   </section>
+
+  <!-- View students modal -->
+  <div class="modal-overlay" *ngIf="viewingSection" (click)="closeViewStudents()">
+    <div class="modal-card" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>{{ viewingSection.name }} — Students</h3>
+        <button class="modal-close" (click)="closeViewStudents()" aria-label="Close">
+          <i class="ti ti-x"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p class="muted center" *ngIf="viewingLoading">Loading…</p>
+
+        <div *ngIf="!viewingLoading && viewingStudents.length === 0" class="students-empty">
+          No students enrolled in this section yet.
+        </div>
+
+        <table class="students-table" *ngIf="!viewingLoading && viewingStudents.length > 0">
+          <thead>
+            <tr>
+              <th>Student ID</th>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let st of viewingStudents">
+              <td>{{ st.studentID }}</td>
+              <td>{{ st.fullName }}</td>
+              <td>{{ st.email }}</td>
+              <td>
+                <span class="badge" [ngClass]="st.status === 'active' ? 'badge-success' : 'badge-neutral'">
+                  {{ st.status }}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 </div>

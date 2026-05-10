@@ -39,6 +39,7 @@ export class StudentActivity implements OnInit, OnDestroy {
   submissionLinks: Record<string, { label: string; url: string }[]> = {};
 
   loading = false;
+  loadError = '';
   newLinkLabel: Record<string, string> = {};
   newLinkUrl: Record<string, string> = {};
 
@@ -48,6 +49,9 @@ export class StudentActivity implements OnInit, OnDestroy {
   showQuestionModal = false;
   questionDraft = '';
   sendingQuestion = false;
+
+  isAnsweringQuiz = false;
+  filterBy = '';
 
   private readonly platformId = inject(PLATFORM_ID);
   private readonly zone = inject(NgZone);
@@ -73,6 +77,15 @@ export class StudentActivity implements OnInit, OnDestroy {
         }, 30000);
       });
     }
+    // Debug logging
+    setTimeout(() => {
+      console.log('[StudentActivity] Loaded data:', {
+        courseCardsCount: this.courseCards.length,
+        streamActivitiesCount: this.streamActivities.length,
+        courseCards: this.courseCards,
+        uniqueCourses: this.getUniqueCourses(),
+      });
+    }, 1000);
   }
 
   private get studentID(): string | undefined {
@@ -123,52 +136,62 @@ export class StudentActivity implements OnInit, OnDestroy {
     return this.streamActivities.filter(a => this.isBookmarked(a.id));
   }
 
+  retryLoad(): void {
+    void this.loadCourseCards();
+  }
+
   private async loadCourseCards(): Promise<void> {
     const sid = this.studentID;
     if (!sid) return;
 
     this.loading = true;
-    const [enrollments, courses] = await Promise.all([
-      this.academic.getEnrollmentsByStudentID(sid),
-      this.academic.getCourses(),
-    ]);
+    this.loadError = '';
 
-    const subs = await this.activityService.getSubmissionsForStudent(sid);
-    const submittedIds = new Set(subs.map(s => s.activityId));
+    try {
+      const [enrollments, courses] = await Promise.all([
+        this.academic.getEnrollmentsByStudentID(sid),
+        this.academic.getCourses(),
+      ]);
 
-    const cards: CourseCard[] = [];
-    for (const e of enrollments) {
-      const course = courses.find(c => c.id === e.courseId);
-      if (!course) continue;
+      const subs = await this.activityService.getSubmissionsForStudent(sid);
+      const submittedIds = new Set(subs.map(s => s.activityId));
 
-      const activities = await this.activityService
-        .getActivitiesForTeacherUID(e.teacherUID);
+      const cards: CourseCard[] = [];
+      for (const e of enrollments) {
+        const course = courses.find(c => c.id === e.courseId);
+        if (!course) continue;
 
-      const now = new Date();
-      const pending = activities.filter(
-        a => !submittedIds.has(a.id) && new Date(a.closeAt) > now,
-      ).length;
+        const activities = await this.activityService
+          .getActivitiesForTeacherUID(e.teacherUID);
 
-      cards.push({
-        course,
-        enrollment: e,
-        teacherUID: e.teacherUID,
-        pendingCount: pending,
-      });
-    }
+        const now = new Date();
+        const pending = activities.filter(
+          a => !submittedIds.has(a.id) && new Date(a.closeAt) > now,
+        ).length;
 
-    this.courseCards = cards;
-
-    // store subs for later use
-    for (const sub of subs) {
-      this.submissions[sub.activityId] = sub;
-      if (!this.draftContent[sub.activityId]) {
-        this.draftContent[sub.activityId] = sub.content ?? '';
+        cards.push({
+          course,
+          enrollment: e,
+          teacherUID: e.teacherUID,
+          pendingCount: pending,
+        });
       }
-    }
 
-    this.loading = false;
-    this.cdr.detectChanges();
+      this.courseCards = cards;
+
+      for (const sub of subs) {
+        this.submissions[sub.activityId] = sub;
+        if (!this.draftContent[sub.activityId]) {
+          this.draftContent[sub.activityId] = sub.content ?? '';
+        }
+      }
+    } catch (err: unknown) {
+      console.error('[StudentActivity] loadCourseCards failed:', err);
+      this.loadError = err instanceof Error ? err.message : 'Failed to load activities. Please try again.';
+    } finally {
+      this.loading = false;
+      this.cdr.detectChanges();
+    }
   }
 
   // ── navigation ────────────────────────────────────────────────────────────────
@@ -243,6 +266,15 @@ export class StudentActivity implements OnInit, OnDestroy {
     }
   }
 
+  selectCourse(card: CourseCard): void {
+    this.selectedCard = card;
+    this.view = 'stream';
+  }
+
+  selectActivity(activity: Activity): void {
+    this.openActivity(activity);
+  }
+
   // ── helpers ───────────────────────────────────────────────────────────────────
 
   getAttendanceStatus(activity: Activity): AttendanceStatus {
@@ -274,6 +306,115 @@ export class StudentActivity implements OnInit, OnDestroy {
     }
     const percentage = Math.round((sub.score / activity.maxPoints) * 100);
     return `${percentage}%`;
+  }
+
+  // ── course card helpers ────────────────────────────────────────────────────────
+
+  getUniqueCourses(): CourseCard[] {
+    // Return courseCards which already contain unique courses per enrollment
+    return this.courseCards;
+  }
+
+  getTotalActivities(courseId?: string): number {
+    if (!courseId) return 0;
+    return this.streamActivities.filter(a => !a.courseId || a.courseId === courseId).length;
+  }
+
+  getPendingActivities(courseId?: string): number {
+    if (!courseId) return 0;
+    return this.streamActivities.filter(a =>
+      (!a.courseId || a.courseId === courseId) &&
+      !this.submissions[a.id]?.submitted &&
+      new Date(a.closeAt) > new Date()
+    ).length;
+  }
+
+  getCompletedActivities(courseId?: string): number {
+    if (!courseId) return 0;
+    return this.streamActivities.filter(a =>
+      (!a.courseId || a.courseId === courseId) &&
+      this.submissions[a.id]?.submitted
+    ).length;
+  }
+
+  getCourseCompletionPercent(courseId?: string): number {
+    const total = this.getTotalActivities(courseId);
+    if (total === 0) return 0;
+    const completed = this.getCompletedActivities(courseId);
+    return Math.round((completed / total) * 100);
+  }
+
+  getCourseStatus(courseId?: string): 'on-track' | 'attention' | 'at-risk' {
+    if (!courseId) return 'on-track';
+    const completed = this.getCompletedActivities(courseId);
+    const total = this.getTotalActivities(courseId);
+    if (total === 0) return 'on-track';
+    const percent = (completed / total) * 100;
+    if (percent >= 80) return 'on-track';
+    if (percent >= 50) return 'attention';
+    return 'at-risk';
+  }
+
+  getCourseStatusIcon(courseId?: string): string {
+    const status = this.getCourseStatus(courseId);
+    if (status === 'on-track') return 'ti-check-circle';
+    if (status === 'attention') return 'ti-alert-circle';
+    return 'ti-x-circle';
+  }
+
+  // ── activity stream helpers ────────────────────────────────────────────────────
+
+  get filteredActivitiesByStatus(): Activity[] {
+    let filtered = this.streamActivities;
+
+    if (this.filterBy === 'pending') {
+      filtered = filtered.filter(a =>
+        !this.submissions[a.id]?.submitted && this.isOpen(a)
+      );
+    } else if (this.filterBy === 'completed') {
+      filtered = filtered.filter(a => this.submissions[a.id]?.submitted);
+    }
+
+    return filtered;
+  }
+
+  // ── quiz helpers ──────────────────────────────────────────────────────────────
+
+  startQuiz(activity: Activity): void {
+    this.isAnsweringQuiz = true;
+    const questions = this.quizQuestions[activity.id] ?? [];
+    if (!this.quizAnswers[activity.id]) {
+      this.quizAnswers[activity.id] = {};
+    }
+    for (const q of questions) {
+      if (!this.quizAnswers[activity.id][q.id]) {
+        this.quizAnswers[activity.id][q.id] = '';
+      }
+    }
+  }
+
+  cancelQuiz(): void {
+    this.isAnsweringQuiz = false;
+  }
+
+  getSubmissionStatus(): string {
+    if (!this.selectedActivity) return 'not started';
+    const sub = this.submissions[this.selectedActivity.id];
+    if (!sub) return 'not started';
+    if (!sub.submitted) return 'draft';
+    if (sub.graded) return 'graded';
+    return 'submitted';
+  }
+
+  getScorePercent(): number {
+    if (!this.selectedActivity) return 0;
+    const sub = this.submissions[this.selectedActivity.id];
+    if (!sub || !sub.score || !this.selectedActivity.maxPoints) return 0;
+    return Math.round((sub.score / this.selectedActivity.maxPoints) * 100);
+  }
+
+  isActivityOpen(activity: Activity): boolean {
+    return new Date(activity.closeAt) > new Date();
   }
 
   addLink(activity: Activity): void {

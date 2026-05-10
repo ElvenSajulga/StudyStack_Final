@@ -100,11 +100,14 @@
   --color-border-strong:  rgba(0,0,0,0.14);
   --color-border-brand:   var(--green-400);
 
-  /* legacy compat */
+  /* legacy compat — referenced by existing page SCSS */
   --color-background-primary:   var(--color-bg-surface);
   --color-background-secondary: var(--color-bg-sunken);
   --color-border-tertiary:      var(--color-border-subtle);
   --color-border-secondary:     var(--color-border-default);
+  --color-bg-base:              var(--bg-secondary);
+  --color-border:               var(--border);
+  --color-text-muted:           var(--text-tertiary);
 
   /* ── Shadows (LIGHT) ─────────────────────────────────── */
   --shadow-1:    0 1px 3px rgba(45, 90, 61, 0.08);

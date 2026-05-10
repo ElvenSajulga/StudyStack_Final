@@ -1,144 +1,369 @@
 <div class="student-activity">
 
-  <!-- ── Breadcrumb trail ── -->
-  <nav class="breadcrumb" *ngIf="currentView !== 'courses'">
-    <button class="bc-link" (click)="backToCourses()">
-      <i class="ti ti-clipboard-list" aria-hidden="true"></i>
-      Activities
-    </button>
-    <i class="ti ti-chevron-right bc-sep" aria-hidden="true"></i>
-    <button
-      *ngIf="currentView === 'detail'"
-      class="bc-link"
-      (click)="backToStream()"
-    >
-      {{ selectedCard?.course?.name || 'Course' }}
-    </button>
-    <span *ngIf="currentView === 'stream'" class="bc-current">
-      {{ selectedCard?.course?.name || 'Course' }}
-    </span>
-    <ng-container *ngIf="currentView === 'detail'">
-      <i class="ti ti-chevron-right bc-sep" aria-hidden="true"></i>
-      <span class="bc-current">{{ selectedActivity?.title }}</span>
-    </ng-container>
-  </nav>
-
-  <!-- ── Cards view ── -->
+  <!-- ── COURSES VIEW ── -->
   <ng-container *ngIf="view === 'cards'">
     <header>
       <h2 class="page-title">My Activities</h2>
-      <p class="page-subtitle">Select a course to view its activities.</p>
+      <p class="page-subtitle">Select a course to view its activities and details.</p>
     </header>
 
-    <p class="muted" *ngIf="loading">Loading…</p>
+    <div class="loading-state" *ngIf="loading">
+      <i class="ti ti-loader-2"></i>
+      <p>Loading your activities…</p>
+    </div>
 
-    <section class="course-grid" *ngIf="!loading">
-      <div
-        class="course-card"
-        *ngFor="let card of courseCards"
-        (click)="openCourse(card)"
-      >
+    <div class="error-state" *ngIf="!loading && loadError">
+      <i class="ti ti-alert-circle"></i>
+      <p>{{ loadError }}</p>
+      <button type="button" class="btn outline" (click)="retryLoad()">Retry</button>
+    </div>
+
+    <div class="courses-grid" *ngIf="!loading && !loadError && courseCards.length > 0">
+      <button class="course-card" *ngFor="let card of courseCards" (click)="openCourse(card)" type="button">
+        <!-- Card Header -->
         <div class="course-card-header">
-          <span class="course-card-name">{{ card.course.name }}</span>
-          <span class="course-card-sem">{{ card.course.semester }}</span>
+          <div class="course-badge">
+            <span class="badge-letter">{{ card.course.name.charAt(0) }}</span>
+          </div>
+          <div class="course-header-info">
+            <h3 class="course-name">{{ card.course.name }}</h3>
+            <p class="course-code">{{ card.course.semester }}</p>
+          </div>
+          <div class="course-status-indicator" [class]="'status-' + getCourseStatus(card.course.id)">
+            <i class="ti" [ngClass]="getCourseStatusIcon(card.course.id)"></i>
+          </div>
         </div>
-        <div class="course-card-body">
-          <span class="units-badge">{{ card.course.units }} units</span>
-          <span class="pending-badge" *ngIf="card.pendingCount > 0">
-            {{ card.pendingCount }} pending
-          </span>
+
+        <!-- Course Meta -->
+        <div class="course-meta">
+          <div class="meta-item">
+            <span class="meta-label">Year</span>
+            <span class="meta-value">{{ card.course.semester || '—' }}</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">Units</span>
+            <span class="meta-value">{{ card.course.units }}</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">Status</span>
+            <span class="meta-value">Active</span>
+          </div>
         </div>
-      </div>
 
-      <div class="empty-card" *ngIf="courseCards.length === 0">
-        <p class="empty-text">You are not enrolled in any courses yet.</p>
-      </div>
-    </section>
-  </ng-container>
+        <!-- Activity Stats -->
+        <div class="course-stats">
+          <div class="stat">
+            <span class="stat-number">{{ getTotalActivities(card.course.id) }}</span>
+            <span class="stat-label">Activities</span>
+          </div>
+          <div class="stat">
+            <span class="stat-number">{{ getPendingActivities(card.course.id) }}</span>
+            <span class="stat-label">Pending</span>
+          </div>
+          <div class="stat">
+            <span class="stat-number">{{ getCourseCompletionPercent(card.course.id) }}%</span>
+            <span class="stat-label">Done</span>
+          </div>
+        </div>
 
-  <!-- ── Stream view ── -->
-  <ng-container *ngIf="view === 'stream' && selectedCard">
-    <header class="stream-header">
-      <button class="back-btn" (click)="backToCourses()">
-        <i class="ti ti-arrow-left" aria-hidden="true"></i>
-        Back to courses
-      </button>
-      <div>
-        <h2 class="page-title">{{ selectedCard.course.name }}</h2>
-        <p class="page-subtitle">{{ selectedCard.course.semester }}</p>
-      </div>
-    </header>
+        <!-- Progress Bar -->
+        <div class="progress-bar-wrap">
+          <div class="progress-bar">
+            <div class="progress-fill" [style.width.%]="getCourseCompletionPercent(card.course.id)"></div>
+          </div>
+          <span class="progress-label">{{ getCompletedActivities(card.course.id) }}/{{ getTotalActivities(card.course.id) }} completed</span>
+        </div>
 
-    <p class="muted" *ngIf="loading">Loading activities…</p>
-
-    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;" *ngIf="!loading && streamActivities.length > 0">
-      <button
-        type="button"
-        class="filter-chip"
-        [class.active]="!showBookmarkedOnly"
-        (click)="showBookmarkedOnly = false"
-      >
-        All activities
-      </button>
-      <button
-        type="button"
-        class="filter-chip"
-        [class.active]="showBookmarkedOnly"
-        (click)="showBookmarkedOnly = true"
-      >
-        <i class="ti ti-bookmark-filled"></i>
-        Bookmarked
-        <span class="chip-count" *ngIf="bookmarkedIds.size > 0">{{ bookmarkedIds.size }}</span>
+        <!-- Actions -->
+        <div class="course-actions">
+          <span class="btn-text">View Activities</span>
+          <i class="ti ti-arrow-right"></i>
+        </div>
       </button>
     </div>
 
-    <section class="stream-list" *ngIf="!loading">
-      <div
-        class="stream-item"
-        *ngFor="let a of filteredActivities"
-        (click)="openActivity(a)"
-      >
-        <button
-          type="button"
-          class="bookmark-btn"
-          [class.active]="isBookmarked(a.id)"
-          (click)="toggleBookmark(a.id, $event)"
-          [attr.aria-label]="isBookmarked(a.id) ? 'Remove bookmark' : 'Add bookmark'"
-        >
-          <i class="ti" [class.ti-bookmark]="!isBookmarked(a.id)" [class.ti-bookmark-filled]="isBookmarked(a.id)"></i>
-        </button>
-        <div class="stream-item-left">
-          <span class="stream-type-badge">{{ a.type }}</span>
-          <div>
-            <p class="stream-title">{{ a.title }}</p>
-            <p class="stream-meta">
-              Deadline: {{ a.deadline | date: 'mediumDate' }} &nbsp;·&nbsp;
-              {{ getAttendanceStatus(a) | titlecase }}
-            </p>
-          </div>
-        </div>
-        <span class="stream-arrow">›</span>
-      </div>
-
-      <div class="empty-card" *ngIf="filteredActivities.length === 0 && !loading">
-        <p class="empty-text" *ngIf="!showBookmarkedOnly">No activities posted yet for this course.</p>
-        <p class="empty-text" *ngIf="showBookmarkedOnly">No bookmarked activities yet.</p>
-      </div>
+    <section class="empty-card" *ngIf="!loading && !loadError && courseCards.length === 0">
+      <p class="empty-text">You are not enrolled in any courses yet.</p>
     </section>
   </ng-container>
 
-  <!-- ── Detail view ── -->
-  <ng-container *ngIf="view === 'detail' && selectedActivity">
-    <header class="stream-header">
-      <button class="back-btn" (click)="backToStream()">
-        <i class="ti ti-arrow-left" aria-hidden="true"></i>
-        Back to activities
+  <!-- ── ACTIVITY STREAM VIEW ── -->
+  <ng-container *ngIf="view === 'stream' && selectedCard">
+    <!-- Breadcrumb Navigation -->
+    <nav class="breadcrumb">
+      <button class="bc-link" (click)="backToCourses()" type="button">
+        <i class="ti ti-arrow-left"></i>
+        Activities
       </button>
-      <div>
-        <h2 class="page-title">{{ selectedActivity.title }}</h2>
-        <p class="page-subtitle">{{ selectedCard?.course?.name }}</p>
+      <i class="ti ti-chevron-right"></i>
+      <span class="bc-current">{{ selectedCard!.course.name }}</span>
+    </nav>
+
+    <!-- Stream Header -->
+    <div class="stream-header">
+      <div class="header-info">
+        <h1 class="stream-title">{{ selectedCard.course.name }}</h1>
+        <p class="header-meta">{{ selectedCard.course.semester }} • {{ getTotalActivities(selectedCard.course.id) }} activities</p>
       </div>
-    </header>
+
+      <div class="header-filters">
+        <button class="filter-chip" [class.active]="!filterBy" (click)="filterBy = ''" type="button">
+          All
+        </button>
+        <button class="filter-chip" [class.active]="filterBy === 'pending'" (click)="filterBy = 'pending'" type="button">
+          Pending
+        </button>
+        <button class="filter-chip" [class.active]="filterBy === 'completed'" (click)="filterBy = 'completed'" type="button">
+          Completed
+        </button>
+      </div>
+    </div>
+
+    <!-- Activity List -->
+    <p class="muted" *ngIf="loading">Loading activities…</p>
+
+    <div class="activity-list" *ngIf="!loading">
+      <div class="activity-item" *ngFor="let activity of filteredActivitiesByStatus" (click)="selectActivity(activity)" [class.selected]="selectedActivity?.id === activity.id">
+        <div class="activity-type-badge" [class]="'type-' + activity.type">
+          <i class="ti" [ngClass]="activity.type === 'quiz' ? 'ti-help-circle' : 'ti-pencil'"></i>
+        </div>
+
+        <div class="activity-info">
+          <h3 class="activity-title">{{ activity.title }}</h3>
+          <div class="activity-meta">
+            <span class="meta-item">
+              <i class="ti ti-calendar"></i>
+              Due {{ activity.closeAt | date: 'MMM d, h:mm a' }}
+            </span>
+            <span class="meta-item" *ngIf="activity.maxPoints">
+              <i class="ti ti-star"></i>
+              {{ activity.maxPoints }} pts
+            </span>
+          </div>
+        </div>
+
+        <div class="activity-status">
+          <ng-container *ngIf="submissions[activity.id]?.submitted">
+            <span class="badge-success">
+              <i class="ti ti-check"></i>
+              Submitted
+            </span>
+          </ng-container>
+          <ng-container *ngIf="!submissions[activity.id]?.submitted && isActivityOpen(activity)">
+            <span class="badge-warning">
+              <i class="ti ti-clock"></i>
+              Pending
+            </span>
+          </ng-container>
+          <ng-container *ngIf="!isActivityOpen(activity)">
+            <span class="badge-danger">
+              <i class="ti ti-x"></i>
+              Closed
+            </span>
+          </ng-container>
+        </div>
+
+        <i class="ti ti-chevron-right activity-chevron"></i>
+      </div>
+
+      <div class="empty-card" *ngIf="filteredActivitiesByStatus.length === 0">
+        <p class="empty-text">
+          <span *ngIf="!filterBy">No activities found.</span>
+          <span *ngIf="filterBy === 'pending'">No pending activities.</span>
+          <span *ngIf="filterBy === 'completed'">No completed activities.</span>
+        </p>
+      </div>
+    </div>
+  </ng-container>
+
+  <!-- ── QUIZ DETAIL VIEW ── -->
+  <ng-container *ngIf="view === 'detail' && selectedActivity && selectedActivity.type === 'quiz'">
+    <!-- Breadcrumb Navigation -->
+    <nav class="breadcrumb">
+      <button class="bc-link" (click)="backToCourses()" type="button">
+        <i class="ti ti-arrow-left"></i>
+        Activities
+      </button>
+      <i class="ti ti-chevron-right"></i>
+      <button class="bc-link" (click)="backToStream()" type="button">
+        {{ selectedCard!.course.name || 'Course' }}
+      </button>
+      <i class="ti ti-chevron-right"></i>
+      <span class="bc-current">{{ selectedActivity.title }}</span>
+    </nav>
+
+    <div class="quiz-detail-container">
+      <!-- Left Panel: Quiz Info & Submission -->
+      <div class="quiz-panel">
+        <div class="quiz-card">
+          <div class="quiz-header">
+            <span class="quiz-badge">QUIZ</span>
+            <h2>{{ selectedActivity.title }}</h2>
+            <p class="quiz-course">{{ selectedCard!.course.name }}</p>
+          </div>
+
+          <!-- Quiz Details -->
+          <div class="quiz-details">
+            <div class="detail-item">
+              <span class="detail-label">Total points</span>
+              <span class="detail-value">{{ selectedActivity.maxPoints || '—' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Deadline</span>
+              <span class="detail-value">{{ selectedActivity.closeAt | date: 'MMM d, h:mm a' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Status</span>
+              <span class="detail-value" [class]="'status-' + getSubmissionStatus()">
+                {{ getSubmissionStatus() | titlecase }}
+              </span>
+            </div>
+          </div>
+
+          <!-- Description -->
+          <div class="quiz-description" *ngIf="selectedActivity.description">
+            <h3>Instructions</h3>
+            <p>{{ selectedActivity.description }}</p>
+          </div>
+
+          <!-- Submission Section -->
+          <div class="submission-section">
+            <h3>Your submission</h3>
+
+            <!-- Not Started -->
+            <ng-container *ngIf="!submissions[selectedActivity.id] || !submissions[selectedActivity.id]?.submitted">
+              <div class="submission-empty">
+                <i class="ti ti-pencil-off"></i>
+                <p>You haven't submitted this quiz yet.</p>
+              </div>
+
+              <!-- Start Button -->
+              <button type="button" class="btn-primary btn-large" (click)="startQuiz(selectedActivity)" [disabled]="!isActivityOpen(selectedActivity)">
+                <i class="ti ti-pencil"></i>
+                Answer Quiz
+              </button>
+
+              <button type="button" class="btn-secondary" *ngIf="!isActivityOpen(selectedActivity)" disabled>
+                <i class="ti ti-lock"></i>
+                Quiz Closed
+              </button>
+            </ng-container>
+
+            <!-- Submitted -->
+            <ng-container *ngIf="submissions[selectedActivity.id]?.submitted">
+              <div class="submission-success">
+                <i class="ti ti-check-circle"></i>
+                <p>You submitted this quiz</p>
+                <span class="submission-date">Submitted {{ submissions[selectedActivity.id]?.submittedAt | date: 'MMM d, h:mm a' }}</span>
+              </div>
+
+              <!-- Score (if released) -->
+              <div class="submission-score" *ngIf="submissions[selectedActivity.id]?.graded">
+                <div class="score-row">
+                  <span>Your Score</span>
+                  <span class="score-value">{{ submissions[selectedActivity.id]?.score }} / {{ selectedActivity.maxPoints }}</span>
+                </div>
+                <p class="score-percent">{{ getScorePercent() }}%</p>
+              </div>
+
+              <!-- Score Not Released -->
+              <div class="score-pending" *ngIf="!submissions[selectedActivity.id]?.graded">
+                <i class="ti ti-hourglass"></i>
+                <p>Scores haven't been released yet. Check back later.</p>
+              </div>
+
+              <!-- Feedback -->
+              <div class="feedback-card" *ngIf="submissions[selectedActivity.id]?.feedback">
+                <h4>Teacher's Feedback</h4>
+                <p>{{ submissions[selectedActivity.id]?.feedback }}</p>
+              </div>
+
+              <!-- Cannot Resubmit -->
+              <div class="submission-locked">
+                <i class="ti ti-lock"></i>
+                <p>You cannot change your answers after submitting.</p>
+              </div>
+            </ng-container>
+          </div>
+
+          <!-- Ask Question Button -->
+          <button type="button" class="btn-secondary btn-small" (click)="openQuestionModal()">
+            <i class="ti ti-help-circle"></i>
+            Ask a question
+          </button>
+        </div>
+      </div>
+
+      <!-- Right Panel: Quiz Questions (Only when answering) -->
+      <div class="quiz-questions-panel" *ngIf="isAnsweringQuiz">
+        <div class="questions-header">
+          <h3>Answer the questions</h3>
+          <button type="button" class="btn-close" (click)="cancelQuiz()">×</button>
+        </div>
+
+        <form class="quiz-form">
+          <!-- Questions -->
+          <div class="question-item" *ngFor="let q of quizQuestions[selectedActivity.id]; let i = index">
+            <div class="question-header">
+              <span class="question-number">Q{{ i + 1 }}</span>
+              <h4 class="question-text">{{ q.question }}</h4>
+              <span class="question-points">{{ q.points }} pts</span>
+            </div>
+
+            <!-- Multiple Choice -->
+            <div class="question-options" *ngIf="q.type === 'multiple-choice'">
+              <label class="option" *ngFor="let c of q.choices">
+                <input type="radio" [name]="'q' + i" [value]="c.id" [(ngModel)]="quizAnswers[selectedActivity.id][q.id]">
+                <span class="option-text">{{ c.text }}</span>
+              </label>
+            </div>
+
+            <!-- True/False -->
+            <div class="question-options" *ngIf="q.type === 'true-false'">
+              <label class="option">
+                <input type="radio" [name]="'q' + i" [value]="true" [(ngModel)]="quizAnswers[selectedActivity.id][q.id]">
+                <span class="option-text">True</span>
+              </label>
+              <label class="option">
+                <input type="radio" [name]="'q' + i" [value]="false" [(ngModel)]="quizAnswers[selectedActivity.id][q.id]">
+                <span class="option-text">False</span>
+              </label>
+            </div>
+
+            <!-- Short Answer -->
+            <div class="question-answer" *ngIf="q.type === 'short-answer'">
+              <input type="text" placeholder="Type your answer..." [(ngModel)]="quizAnswers[selectedActivity.id][q.id]" [attr.name]="'q' + i">
+            </div>
+          </div>
+
+          <!-- Submit Button -->
+          <div class="quiz-actions">
+            <button type="button" class="btn-secondary" (click)="cancelQuiz()">Cancel</button>
+            <button type="button" class="btn-primary" (click)="submit(selectedActivity)">
+              <i class="ti ti-send"></i>
+              Submit Quiz
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </ng-container>
+
+  <!-- ── OUTPUT DETAIL VIEW ── -->
+  <ng-container *ngIf="view === 'detail' && selectedActivity && selectedActivity.type !== 'quiz'">
+    <!-- Breadcrumb Navigation -->
+    <nav class="breadcrumb">
+      <button class="bc-link" (click)="backToCourses()" type="button">
+        <i class="ti ti-arrow-left"></i>
+        Activities
+      </button>
+      <i class="ti ti-chevron-right"></i>
+      <button class="bc-link" (click)="backToStream()" type="button">
+        {{ selectedCard!.course.name || 'Course' }}
+      </button>
+      <i class="ti ti-chevron-right"></i>
+      <span class="bc-current">{{ selectedActivity.title }}</span>
+    </nav>
 
     <section class="detail-grid">
       <!-- Activity info -->
@@ -167,47 +392,6 @@
           </div>
         </div>
       </article>
-
-      <!-- Quiz section -->
-      <ng-container *ngIf="selectedActivity.type === 'quiz'">
-        <article class="detail-card">
-          <h4>Questions</h4>
-          <div class="quiz-section" *ngFor="let q of quizQuestions[selectedActivity.id]; let i = index">
-            <div class="question-header">
-              <span class="q-num">Q{{ i + 1 }}</span>
-              <span class="q-points">{{ q.points }} pt{{ q.points !== 1 ? 's' : '' }}</span>
-            </div>
-            <p class="question-text">{{ q.question }}</p>
-
-            <!-- Multiple choice -->
-            <div *ngIf="q.type === 'multiple-choice'" class="choices">
-              <label class="choice-label" *ngFor="let c of q.choices">
-                <input type="radio" [name]="'q-' + q.id" [value]="c.id"
-                  [(ngModel)]="quizAnswers[selectedActivity.id][q.id]"
-                  [disabled]="!isOpen(selectedActivity)" />
-                <span>{{ c.text }}</span>
-              </label>
-            </div>
-
-            <!-- True/False -->
-            <div *ngIf="q.type === 'true-false'" class="choices">
-              <label class="choice-label" *ngFor="let c of q.choices">
-                <input type="radio" [name]="'q-' + q.id" [value]="c.id"
-                  [(ngModel)]="quizAnswers[selectedActivity.id][q.id]"
-                  [disabled]="!isOpen(selectedActivity)" />
-                <span>{{ c.text }}</span>
-              </label>
-            </div>
-
-            <!-- Short answer -->
-            <div *ngIf="q.type === 'short-answer'" class="short-answer">
-              <input type="text" placeholder="Type your answer here..."
-                [(ngModel)]="quizAnswers[selectedActivity.id][q.id]"
-                [disabled]="!isOpen(selectedActivity)" />
-            </div>
-          </div>
-        </article>
-      </ng-container>
 
       <!-- Submission panel -->
       <article class="submission-panel">
@@ -295,8 +479,8 @@
               </button>
             </div>
             <div *ngIf="submissionLinks[selectedActivity.id] && submissionLinks[selectedActivity.id].length > 0" style="margin-bottom: 12px;">
-              <div *ngFor="let link of submissionLinks[selectedActivity.id]; let i = index" style="display: flex; align-items: center; gap: 8px; padding: 8px; background: #f3f4f6; border-radius: 6px; margin-bottom: 6px;">
-                <span style="flex: 1;">{{ link.label }}: <a [href]="link.url" target="_blank" style="color: #0a7a45; text-decoration: underline;">{{ link.url }}</a></span>
+              <div *ngFor="let link of submissionLinks[selectedActivity.id]; let i = index" style="display: flex; align-items: center; gap: 8px; padding: 8px; background: var(--bg-secondary); border-radius: 6px; margin-bottom: 6px;">
+                <span style="flex: 1;">{{ link.label }}: <a [href]="link.url" target="_blank" style="color: var(--color-primary); text-decoration: underline;">{{ link.url }}</a></span>
                 <button
                   type="button"
                   class="btn danger sm"
@@ -315,20 +499,6 @@
           >
             {{ hasSubmission(selectedActivity) ? 'Update submission' : 'Submit' }}
           </button>
-        </ng-container>
-
-        <ng-container *ngIf="isOpen(selectedActivity) && selectedActivity.type === 'quiz'">
-          <button
-            type="button"
-            class="submit-btn"
-            (click)="submit(selectedActivity)"
-            [disabled]="submissions[selectedActivity.id]?.submitted"
-          >
-            {{ submissions[selectedActivity.id]?.submitted ? 'Quiz submitted ✓' : 'Submit quiz' }}
-          </button>
-          <p class="submitted-notice" *ngIf="submissions[selectedActivity.id]?.submitted">
-            Your quiz has been submitted and cannot be unsubmitted.
-          </p>
         </ng-container>
 
         <p class="closed-notice" *ngIf="!isOpen(selectedActivity)">

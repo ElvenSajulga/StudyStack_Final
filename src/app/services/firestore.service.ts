@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject, EnvironmentInjector, runInInjectionContext } from '@angular/core';
 import {
   Firestore,
   collection,
@@ -17,7 +17,12 @@ import {
 
 @Injectable({ providedIn: 'root' })
 export class FirestoreService {
-  constructor(private readonly firestore: Firestore) {}
+  private readonly firestore = inject(Firestore);
+  private readonly injector = inject(EnvironmentInjector);
+
+  private run<T>(fn: () => Promise<T>): Promise<T> {
+    return runInInjectionContext(this.injector, fn);
+  }
 
   /** Strip undefined values — Firestore rejects them */
   private clean(data: DocumentData): DocumentData {
@@ -28,17 +33,21 @@ export class FirestoreService {
     collectionName: string,
     constraints: QueryConstraint[] = []
   ): Promise<T[]> {
-    const ref = collection(this.firestore, collectionName);
-    const q = constraints.length ? query(ref, ...constraints) : query(ref);
-    const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() } as T));
+    return this.run(async () => {
+      const ref = collection(this.firestore, collectionName);
+      const q = constraints.length ? query(ref, ...constraints) : query(ref);
+      const snap = await getDocs(q);
+      return snap.docs.map(d => ({ id: d.id, ...d.data() } as T));
+    });
   }
 
   async getById<T>(collectionName: string, id: string): Promise<T | undefined> {
-    const ref = doc(this.firestore, collectionName, id);
-    const snap = await getDoc(ref);
-    if (!snap.exists()) return undefined;
-    return { id: snap.id, ...snap.data() } as T;
+    return this.run(async () => {
+      const ref = doc(this.firestore, collectionName, id);
+      const snap = await getDoc(ref);
+      if (!snap.exists()) return undefined;
+      return { id: snap.id, ...snap.data() } as T;
+    });
   }
 
   async getWhere<T>(
@@ -58,23 +67,31 @@ export class FirestoreService {
   }
 
   async set(collectionName: string, id: string, data: DocumentData): Promise<void> {
-    const ref = doc(this.firestore, collectionName, id);
-    await setDoc(ref, this.clean(data));
+    return this.run(async () => {
+      const ref = doc(this.firestore, collectionName, id);
+      await setDoc(ref, this.clean(data));
+    });
   }
 
   async add(collectionName: string, data: DocumentData): Promise<string> {
-    const ref = collection(this.firestore, collectionName);
-    const docRef = await addDoc(ref, this.clean(data));
-    return docRef.id;
+    return this.run(async () => {
+      const ref = collection(this.firestore, collectionName);
+      const docRef = await addDoc(ref, this.clean(data));
+      return docRef.id;
+    });
   }
 
   async update(collectionName: string, id: string, data: Partial<DocumentData>): Promise<void> {
-    const ref = doc(this.firestore, collectionName, id);
-    await updateDoc(ref, this.clean(data));
+    return this.run(async () => {
+      const ref = doc(this.firestore, collectionName, id);
+      await updateDoc(ref, this.clean(data));
+    });
   }
 
   async delete(collectionName: string, id: string): Promise<void> {
-    const ref = doc(this.firestore, collectionName, id);
-    await deleteDoc(ref);
+    return this.run(async () => {
+      const ref = doc(this.firestore, collectionName, id);
+      await deleteDoc(ref);
+    });
   }
 }

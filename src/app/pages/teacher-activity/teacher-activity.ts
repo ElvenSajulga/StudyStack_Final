@@ -39,6 +39,12 @@ export class TeacherActivity implements OnInit {
   questions: QuizQuestion[] = [];
   savingQuiz = false;
 
+  isNewQuiz = false;
+  newQuizForm: {
+    title: string; description: string; type: ActivityType;
+    deadline: string; closeAt: string; maxPoints?: number; shuffleQuestions?: boolean;
+  } | null = null;
+
   editingActivity: Activity | null = null;
   editingHasSubmissions = false;
   savingEdit = false;
@@ -197,6 +203,15 @@ export class TeacherActivity implements OnInit {
   }
 
   backToList(): void {
+    if (this.isNewQuiz) {
+      this.isNewQuiz = false;
+      this.newQuizForm = null;
+      this.selectedActivity = null;
+      this.questions = [];
+      this.view = 'list';
+      void this.loadActivities();
+      return;
+    }
     this.view = 'list';
     this.selectedActivity = null;
     this.gradingActivity = null;
@@ -326,18 +341,24 @@ export class TeacherActivity implements OnInit {
     if (!title || !deadline || !closeAt) { alert('Please fill in title, deadline, and close time.'); return; }
     if (new Date(closeAt) <= new Date(deadline)) { alert('Close time must be after the deadline.'); return; }
 
-    const activity = await this.activityService.createActivity({
-      title, description: this.form.description.trim(),
-      type: this.form.type,
-      deadline: new Date(deadline).toISOString(),
-      closeAt: new Date(closeAt).toISOString(),
-      teacherID, courseId: this.selectedCourseCard.course.id, maxPoints: this.form.maxPoints,
-      shuffleQuestions: this.form.type === 'quiz' ? this.form.shuffleQuestions : undefined,
-    });
-
     if (this.form.type === 'quiz') {
-      await this.openQuizBuilder(activity);
+      // For quiz: store locally and go to builder — don't write to Firestore yet
+      this.isNewQuiz = true;
+      this.newQuizForm = { ...this.form };
+      this.selectedActivity = null;
+      this.questions = [];
+      this.addQuestion();
+      this.view = 'quiz-builder';
+      this.cdr.detectChanges();
     } else {
+      await this.activityService.createActivity({
+        title, description: this.form.description.trim(),
+        type: this.form.type,
+        deadline: new Date(deadline).toISOString(),
+        closeAt: new Date(closeAt).toISOString(),
+        teacherID, courseId: this.selectedCourseCard.course.id, maxPoints: this.form.maxPoints,
+        shuffleQuestions: undefined,
+      });
       this.view = 'list';
       await this.loadActivities();
     }
@@ -437,6 +458,40 @@ export class TeacherActivity implements OnInit {
       if (!q.points || q.points <= 0) { alert('Points per question must be greater than 0.'); return; }
     }
 
+    if (this.isNewQuiz && this.newQuizForm) {
+      // New quiz: create activity in Firestore now, then save questions
+      this.savingQuiz = true;
+      const teacherID = this.teacherID!;
+      const nqf = this.newQuizForm;
+      const totalPoints = this.questions.reduce((sum, q) => sum + q.points, 0);
+
+      const newActivity = await this.activityService.createActivity({
+        title: nqf.title.trim(),
+        description: nqf.description.trim(),
+        type: 'quiz',
+        deadline: new Date(nqf.deadline).toISOString(),
+        closeAt: new Date(nqf.closeAt).toISOString(),
+        teacherID,
+        courseId: this.selectedCourseCard!.course.id,
+        maxPoints: totalPoints,
+        shuffleQuestions: nqf.shuffleQuestions ?? false,
+      });
+
+      await this.quizService.saveAllQuestions(
+        this.questions.map(q => ({ ...q, activityId: newActivity.id }))
+      );
+
+      this.isNewQuiz = false;
+      this.newQuizForm = null;
+      this.selectedActivity = null;
+      this.savingQuiz = false;
+      Swal.fire({ icon: 'success', title: 'Quiz created!', timer: 1500, showConfirmButton: false });
+      this.view = 'list';
+      await this.loadActivities();
+      return;
+    }
+
+    // Editing existing quiz
     const subs = await this.activityService.getSubmissionsForActivity(this.selectedActivity!.id);
     if (subs.length > 0) {
       const res = await Swal.fire({

@@ -269,20 +269,20 @@
   </ng-container>
 
   <!-- ══ QUIZ BUILDER ═══════════════════════════════════════════════════ -->
-  <ng-container *ngIf="view === 'quiz-builder' && selectedCourseCard && selectedActivity">
+  <ng-container *ngIf="view === 'quiz-builder' && selectedCourseCard && (selectedActivity || isNewQuiz)">
     <div class="breadcrumb">
       <button class="breadcrumb-link" (click)="goBackToCourses()">Activities</button>
       <i class="ti ti-chevron-right" aria-hidden="true"></i>
       <button class="breadcrumb-link" (click)="backToList()">{{ selectedCourseCard.course.name }}</button>
       <i class="ti ti-chevron-right" aria-hidden="true"></i>
-      <button class="breadcrumb-link" (click)="backToList()">{{ selectedActivity.title }}</button>
+      <button class="breadcrumb-link" (click)="backToList()">{{ isNewQuiz ? newQuizForm?.title : selectedActivity?.title }}</button>
       <i class="ti ti-chevron-right" aria-hidden="true"></i>
       <span class="breadcrumb-current">Quiz builder</span>
     </div>
     <header class="page-header">
       <div>
         <button class="back-btn" (click)="backToList()"><i class="ti ti-arrow-left" aria-hidden="true"></i> Back</button>
-        <h2 class="page-title">Quiz builder — {{ selectedActivity.title }}</h2>
+        <h2 class="page-title">Quiz builder — {{ isNewQuiz ? newQuizForm?.title : selectedActivity?.title }}</h2>
         <p class="page-subtitle">Total: {{ totalQuizPoints }} pts across {{ questions.length }} question(s)</p>
       </div>
       <button class="btn primary" (click)="saveQuiz()" [disabled]="savingQuiz">

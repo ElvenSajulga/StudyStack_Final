@@ -10,20 +10,20 @@
   margin: 0;
   font-size: 1.4rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .page-subtitle {
   margin: 4px 0 0;
   font-size: 0.9rem;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .table-card {
-  background: #ffffff;
+  background: var(--color-bg-surface);
   border-radius: 18px;
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   overflow: hidden;
 }
 
@@ -33,7 +33,7 @@
 }
 
 .table-card thead {
-  background: #f3f4f6;
+  background: var(--bg-secondary);
 }
 
 .table-card th,
@@ -45,34 +45,34 @@
 
 .table-card th {
   font-weight: 600;
-  color: #374151;
-  border-bottom: 1px solid #e5e7eb;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border);
 }
 
 .table-card tbody tr:nth-child(even) {
-  background: #f9fafb;
+  background: var(--bg-secondary);
 }
 
 .table-card tbody tr:hover {
-  background: #eff6ff;
+  background: var(--color-primary-pale);
 }
 
 .table-card td {
-  color: #4b5563;
+  color: var(--text-primary);
 }
 
 .empty-card {
-  background: #ffffff;
+  background: var(--color-bg-surface);
   border-radius: 18px;
   padding: 16px 18px 18px;
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
 }
 
 .empty-text,
 .student-attendance > p {
   font-size: 0.9rem;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 /* ── Attendance summary stats ── */
@@ -84,8 +84,8 @@
 }
 
 .att-stat {
-  background: white;
-  border: 1px solid #e5e7eb;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 14px 16px;
   display: flex;
@@ -95,7 +95,7 @@
 }
 
 .att-stat.att-rate {
-  background: linear-gradient(135deg, white, #f9fafb);
+  background: linear-gradient(135deg, var(--color-bg-surface), var(--bg-secondary));
 }
 
 .att-label {
@@ -104,7 +104,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .att-value {
@@ -144,15 +144,16 @@
   font-family: 'DM Sans', sans-serif;
   font-size: 12px;
   font-weight: 600;
-  color: #374151;
+  color: var(--text-primary);
   margin-bottom: 4px;
 }
 
 .filter-bar select {
   padding: 8px 10px;
-  border: 0.5px solid #e5e7eb;
+  border: 0.5px solid var(--border);
   border-radius: 6px;
-  background: white;
+  background: var(--color-bg-surface);
+  color: var(--text-primary);
   font-size: 13px;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -160,12 +161,12 @@
 
 .filter-bar select:focus {
   outline: none;
-  border-color: #1A56DB;
-  box-shadow: 0 0 0 3px rgba(26, 86, 219, 0.1);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(10, 171, 115, 0.15);
 }
 
 .muted {
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 12px;
 }
 
@@ -232,7 +233,7 @@
     content: attr(data-label);
     font-weight: 600;
     margin-right: 8px;
-    color: #374151;
+    color: var(--text-primary);
   }
 }
 

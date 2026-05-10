@@ -33,22 +33,88 @@
             <textarea name="message" [(ngModel)]="addForm.message" placeholder="Announcement message" rows="5" required></textarea>
           </label>
 
-          <label class="field">
+          <div class="field field-full">
             <span class="field-label">Target Audience</span>
-            <select name="audience" [(ngModel)]="addForm.audience">
-              <option value="all-students">All Students</option>
-              <option value="all-teachers">All Teachers</option>
-              <option value="program">By Program</option>
-            </select>
-          </label>
 
-          <label class="field" *ngIf="addForm.audience === 'program'">
-            <span class="field-label">Program</span>
-            <select name="programId" [(ngModel)]="addForm.programId">
-              <option value="">— Select program —</option>
-              <option *ngFor="let p of programs" [value]="p.id">{{ p.name }}</option>
-            </select>
-          </label>
+            <div class="audience-options">
+              <label class="radio-option">
+                <input type="radio" name="targetAudience" value="all" [(ngModel)]="targetAudience" (change)="onAudienceChange()">
+                <div class="option-content">
+                  <span class="option-title">All Users</span>
+                  <span class="option-desc">Send to all students and teachers</span>
+                </div>
+              </label>
+
+              <label class="radio-option">
+                <input type="radio" name="targetAudience" value="all-students" [(ngModel)]="targetAudience" (change)="onAudienceChange()">
+                <div class="option-content">
+                  <span class="option-title">All Students</span>
+                  <span class="option-desc">Send to every enrolled student</span>
+                </div>
+              </label>
+
+              <label class="radio-option">
+                <input type="radio" name="targetAudience" value="all-teachers" [(ngModel)]="targetAudience" (change)="onAudienceChange()">
+                <div class="option-content">
+                  <span class="option-title">All Teachers</span>
+                  <span class="option-desc">Send to every teacher</span>
+                </div>
+              </label>
+
+              <label class="radio-option">
+                <input type="radio" name="targetAudience" value="program" [(ngModel)]="targetAudience" (change)="onAudienceChange()">
+                <div class="option-content">
+                  <span class="option-title">By Program</span>
+                  <span class="option-desc">Select specific program(s)</span>
+                </div>
+              </label>
+
+              <div class="sub-options" *ngIf="targetAudience === 'program'">
+                <div class="multi-select">
+                  <label *ngFor="let program of allPrograms">
+                    <input type="checkbox" [checked]="selectedPrograms.has(program.id)" (change)="toggleProgram(program.id)">
+                    <span>{{ program.name }}</span>
+                  </label>
+                </div>
+              </div>
+
+              <label class="radio-option">
+                <input type="radio" name="targetAudience" value="specific-teachers" [(ngModel)]="targetAudience" (change)="onAudienceChange()">
+                <div class="option-content">
+                  <span class="option-title">Specific Teachers</span>
+                  <span class="option-desc">Select individual teachers</span>
+                </div>
+              </label>
+
+              <div class="sub-options" *ngIf="targetAudience === 'specific-teachers'">
+                <input type="text" placeholder="Search teachers..." [(ngModel)]="teacherSearchQuery" (input)="filterTeachers()">
+                <div class="multi-select">
+                  <label *ngFor="let teacher of filteredTeachers">
+                    <input type="checkbox" [checked]="selectedTeachers.has(teacher.UID || teacher.uid)" (change)="toggleTeacher(teacher.UID || teacher.uid)">
+                    <span>{{ teacher.firstname }} {{ teacher.lastname }}</span>
+                  </label>
+                </div>
+              </div>
+
+              <label class="radio-option">
+                <input type="radio" name="targetAudience" value="specific-students" [(ngModel)]="targetAudience" (change)="onAudienceChange()">
+                <div class="option-content">
+                  <span class="option-title">Specific Students</span>
+                  <span class="option-desc">Select individual students</span>
+                </div>
+              </label>
+
+              <div class="sub-options" *ngIf="targetAudience === 'specific-students'">
+                <input type="text" placeholder="Search students..." [(ngModel)]="studentSearchQuery" (input)="filterStudents()">
+                <div class="multi-select">
+                  <label *ngFor="let student of filteredStudents">
+                    <input type="checkbox" [checked]="isStudentSelected(student.UID)" (change)="toggleStudent(student.UID)">
+                    <span>{{ student.firstname }} {{ student.lastname }}</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="form-actions">

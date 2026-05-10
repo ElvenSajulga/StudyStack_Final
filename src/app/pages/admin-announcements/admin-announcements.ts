@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Announcement, AnnouncementService } from '../../services/announcement.service';
 import { AcademicService, Program } from '../../services/academic.service';
+import { StudentAccount, StudentAccountService } from '../../services/student-account.service';
 import { TeacherAccountService } from '../../services/teacher-account.service';
 import Swal from 'sweetalert2';
 
@@ -28,10 +29,28 @@ export class AdminAnnouncements implements OnInit {
   addForm = this.emptyAddForm();
   loading = false;
 
+  // Audience targeting
+  targetAudience: 'all' | 'all-students' | 'all-teachers' | 'program' | 'specific-teachers' | 'specific-students' = 'all-students';
+
+  allPrograms: Program[] = [];
+  allTeachers: any[] = [];
+  allStudents: StudentAccount[] = [];
+
+  selectedPrograms: Set<string> = new Set();
+  selectedTeachers: Set<string> = new Set();
+  selectedStudents: Set<string> = new Set();
+
+  filteredTeachers: any[] = [];
+  filteredStudents: StudentAccount[] = [];
+
+  teacherSearchQuery = '';
+  studentSearchQuery = '';
+
   constructor(
     private readonly announcementService: AnnouncementService,
     private readonly academic: AcademicService,
     private readonly teacherService: TeacherAccountService,
+    private readonly studentService: StudentAccountService,
     private readonly cdr: ChangeDetectorRef,
   ) {}
 
@@ -64,6 +83,12 @@ export class AdminAnnouncements implements OnInit {
     this.loading = true;
     this.announcements = await this.announcementService.getAllForStudents();
     this.programs = await this.academic.getPrograms();
+    this.allPrograms = this.programs;
+    await this.studentService.reloadFromServer();
+    this.allStudents = this.studentService.getAll();
+    this.filteredStudents = this.allStudents;
+    this.allTeachers = this.teacherService.getAll();
+    this.filteredTeachers = this.allTeachers;
     this.buildRows();
     this.loading = false;
     this.cdr.detectChanges();
@@ -77,12 +102,7 @@ export class AdminAnnouncements implements OnInit {
         ? announcement.message.substring(0, 80) + '...'
         : announcement.message;
 
-      return {
-        announcement,
-        postedBy,
-        dateFormatted,
-        messageTruncated,
-      };
+      return { announcement, postedBy, dateFormatted, messageTruncated };
     });
   }
 
@@ -95,11 +115,8 @@ export class AdminAnnouncements implements OnInit {
     try {
       const date = new Date(isoString);
       return date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
+        year: 'numeric', month: 'short', day: 'numeric',
+        hour: '2-digit', minute: '2-digit',
       });
     } catch {
       return isoString;
@@ -115,7 +132,72 @@ export class AdminAnnouncements implements OnInit {
     return this.programs.find(p => p.id === programId)?.name ?? '—';
   }
 
-  // ── add ───────────────────────────────────────────────────────────────────
+  // ── Audience targeting ────────────────────────────────────────────────────
+
+  onAudienceChange(): void {
+    this.selectedPrograms.clear();
+    this.selectedTeachers.clear();
+    this.selectedStudents.clear();
+    this.teacherSearchQuery = '';
+    this.studentSearchQuery = '';
+  }
+
+  toggleProgram(programId: string): void {
+    if (this.selectedPrograms.has(programId)) {
+      this.selectedPrograms.delete(programId);
+    } else {
+      this.selectedPrograms.add(programId);
+    }
+  }
+
+  toggleTeacher(teacherUid: string): void {
+    if (this.selectedTeachers.has(teacherUid)) {
+      this.selectedTeachers.delete(teacherUid);
+    } else {
+      this.selectedTeachers.add(teacherUid);
+    }
+  }
+
+  filterTeachers(): void {
+    if (!this.teacherSearchQuery.trim()) {
+      this.filteredTeachers = this.allTeachers;
+      return;
+    }
+    const q = this.teacherSearchQuery.toLowerCase();
+    this.filteredTeachers = this.allTeachers.filter(t =>
+      t.firstname.toLowerCase().includes(q) ||
+      t.lastname.toLowerCase().includes(q) ||
+      t.email.toLowerCase().includes(q)
+    );
+  }
+
+  filterStudents(): void {
+    if (!this.studentSearchQuery.trim()) {
+      this.filteredStudents = this.allStudents;
+      return;
+    }
+    const q = this.studentSearchQuery.toLowerCase();
+    this.filteredStudents = this.allStudents.filter(s =>
+      s.firstname.toLowerCase().includes(q) ||
+      s.lastname.toLowerCase().includes(q) ||
+      s.studentID.toLowerCase().includes(q) ||
+      s.email.toLowerCase().includes(q)
+    );
+  }
+
+  toggleStudent(uid: string): void {
+    if (this.selectedStudents.has(uid)) {
+      this.selectedStudents.delete(uid);
+    } else {
+      this.selectedStudents.add(uid);
+    }
+  }
+
+  isStudentSelected(uid: string): boolean {
+    return this.selectedStudents.has(uid);
+  }
+
+  // ── Create announcement ───────────────────────────────────────────────────
 
   createAnnouncement(): void {
     const f = this.addForm;
@@ -124,9 +206,51 @@ export class AdminAnnouncements implements OnInit {
       return;
     }
 
+    let recipients: string[] = [];
+
+    switch (this.targetAudience) {
+      case 'all':
+        recipients = [...this.allTeachers.map((t: any) => t.uid || t.UID), ...this.allStudents.map(s => s.UID)];
+        break;
+      case 'all-students':
+        recipients = this.allStudents.map(s => s.UID);
+        break;
+      case 'all-teachers':
+        recipients = this.allTeachers.map((t: any) => t.uid || t.UID);
+        break;
+      case 'program':
+        if (this.selectedPrograms.size === 0) {
+          this.toast('error', 'Select at least one program');
+          return;
+        }
+        const studentsInPrograms = this.allStudents.filter(s => this.selectedPrograms.has(s.program || ''));
+        recipients = studentsInPrograms.map(s => s.UID);
+        break;
+      case 'specific-teachers':
+        if (this.selectedTeachers.size === 0) {
+          this.toast('error', 'Select at least one teacher');
+          return;
+        }
+        recipients = Array.from(this.selectedTeachers);
+        break;
+      case 'specific-students':
+        if (this.selectedStudents.size === 0) {
+          this.toast('error', 'Select at least one student');
+          return;
+        }
+        recipients = Array.from(this.selectedStudents);
+        break;
+    }
+
     this.announcementService.create('ADMIN', f.title, f.message).then(
       () => {
         this.addForm = this.emptyAddForm();
+        this.targetAudience = 'all-students';
+        this.selectedPrograms.clear();
+        this.selectedTeachers.clear();
+        this.selectedStudents.clear();
+        this.teacherSearchQuery = '';
+        this.studentSearchQuery = '';
         this.toast('success', 'Announcement created successfully');
         void this.loadAll();
       },
@@ -136,7 +260,7 @@ export class AdminAnnouncements implements OnInit {
     );
   }
 
-  // ── delete ────────────────────────────────────────────────────────────────
+  // ── Delete ────────────────────────────────────────────────────────────────
 
   async deleteAnnouncement(id: string | number): Promise<void> {
     const res = await Swal.fire({

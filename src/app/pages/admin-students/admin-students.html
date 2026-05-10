@@ -147,7 +147,7 @@
                     title="Select all on this page"
                   />
                 </th>
-                <th class="sortable" (click)="sortBy('UID')">
+                <th class="col-uid sortable" (click)="sortBy('UID')">
                   UID
                   <span class="sort-icon">
                     <i *ngIf="sortField !== 'UID'" class="ti ti-arrows-sort"></i>
@@ -155,7 +155,7 @@
                     <i *ngIf="sortField === 'UID' && sortDir === 'desc'" class="ti ti-arrow-down"></i>
                   </span>
                 </th>
-                <th class="sortable" (click)="sortBy('studentID')">
+                <th class="col-id sortable" (click)="sortBy('studentID')">
                   Student ID
                   <span class="sort-icon">
                     <i *ngIf="sortField !== 'studentID'" class="ti ti-arrows-sort"></i>
@@ -163,7 +163,7 @@
                     <i *ngIf="sortField === 'studentID' && sortDir === 'desc'" class="ti ti-arrow-down"></i>
                   </span>
                 </th>
-                <th class="sortable" (click)="sortBy('lastname')">
+                <th class="col-name sortable" (click)="sortBy('lastname')">
                   Name
                   <span class="sort-icon">
                     <i *ngIf="sortField !== 'lastname'" class="ti ti-arrows-sort"></i>
@@ -171,7 +171,7 @@
                     <i *ngIf="sortField === 'lastname' && sortDir === 'desc'" class="ti ti-arrow-down"></i>
                   </span>
                 </th>
-                <th class="sortable" (click)="sortBy('program')">
+                <th class="col-program sortable" (click)="sortBy('program')">
                   Program
                   <span class="sort-icon">
                     <i *ngIf="sortField !== 'program'" class="ti ti-arrows-sort"></i>
@@ -179,7 +179,7 @@
                     <i *ngIf="sortField === 'program' && sortDir === 'desc'" class="ti ti-arrow-down"></i>
                   </span>
                 </th>
-                <th class="sortable" (click)="sortBy('email')">
+                <th class="col-email sortable" (click)="sortBy('email')">
                   Email
                   <span class="sort-icon">
                     <i *ngIf="sortField !== 'email'" class="ti ti-arrows-sort"></i>
@@ -187,7 +187,7 @@
                     <i *ngIf="sortField === 'email' && sortDir === 'desc'" class="ti ti-arrow-down"></i>
                   </span>
                 </th>
-                <th class="sortable" (click)="sortBy('status')">
+                <th class="col-status sortable" (click)="sortBy('status')">
                   Status
                   <span class="sort-icon">
                     <i *ngIf="sortField !== 'status'" class="ti ti-arrows-sort"></i>
@@ -195,7 +195,7 @@
                     <i *ngIf="sortField === 'status' && sortDir === 'desc'" class="ti ti-arrow-down"></i>
                   </span>
                 </th>
-                <th></th>
+                <th class="col-actions"></th>
               </tr>
             </thead>
             <tbody>
@@ -207,17 +207,17 @@
                     (change)="toggleSelectStudent(s.UID)"
                   />
                 </td>
-                <td>{{ s.UID }}</td>
-                <td>{{ s.studentID }}</td>
-                <td>{{ s.lastname }}, {{ s.firstname }} {{ s.middlename }}</td>
-                <td>{{ s.program || '—' }}</td>
-                <td>{{ s.email || '—' }}</td>
-                <td>
+                <td class="col-uid">{{ s.UID }}</td>
+                <td class="col-id">{{ s.studentID }}</td>
+                <td class="col-name">{{ s.lastname }}, {{ s.firstname }} {{ s.middlename }}</td>
+                <td class="col-program">{{ s.program || '—' }}</td>
+                <td class="col-email">{{ s.email || '—' }}</td>
+                <td class="col-status">
                   <span class="status-chip clickable" [class.inactive]="s.status === 'inactive'" (click)="toggleStudentStatus(s)">
                     {{ s.status }}
                   </span>
                 </td>
-                <td class="actions">
+                <td class="col-actions">
                   <button type="button" class="btn subtle" title="Reset password" (click)="resetStudentPassword(s)">
                     <i class="ti ti-key"></i>
                   </button>
