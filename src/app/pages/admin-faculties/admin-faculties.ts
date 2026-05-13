@@ -8,7 +8,7 @@ import {
   FacultyTeacher,
 } from '../../services/academic.service';
 import { TeacherAccount, TeacherAccountService } from '../../services/teacher-account.service';
-import Swal from 'sweetalert2';
+import { ToastService } from '../../services/toast.service';
 
 interface FacultyRow {
   faculty: Faculty;
@@ -49,6 +49,7 @@ export class AdminFaculties implements OnInit {
   constructor(
     private readonly academic: AcademicService,
     private readonly teacherService: TeacherAccountService,
+    private readonly toastService: ToastService,
     private readonly cdr: ChangeDetectorRef,
   ) {}
 
@@ -57,10 +58,8 @@ export class AdminFaculties implements OnInit {
   }
 
   private toast(icon: 'success' | 'error', title: string): void {
-    void Swal.fire({
-      toast: true, position: 'top-end', icon, title,
-      showConfirmButton: false, timer: 2000, timerProgressBar: true,
-    });
+    if (icon === 'success') this.toastService.success(title);
+    else this.toastService.error(title);
   }
 
   private async loadAll(): Promise<void> {
@@ -141,15 +140,10 @@ export class AdminFaculties implements OnInit {
   cancelEditProgram(): void { this.editingProgramId = null; }
 
   async deleteProgram(p: Program): Promise<void> {
-    const res = await Swal.fire({
-      icon: 'warning',
-      title: `Delete ${p.name}?`,
+    const ok = await this.toastService.confirmDestructive(`Delete ${p.name}?`, {
       text: 'This will also delete its faculty, sections, courses, and enrollments.',
-      showCancelButton: true,
-      confirmButtonText: 'Delete',
-      confirmButtonColor: '#ef4444',
     });
-    if (!res.isConfirmed) return;
+    if (!ok) return;
     try {
       await this.academic.deleteProgram(p.id);
       if (this.expandedProgramId === p.id) this.expandedProgramId = null;
@@ -190,15 +184,10 @@ export class AdminFaculties implements OnInit {
   cancelEditFaculty(): void { this.editingFacultyId = null; }
 
   async deleteFaculty(f: Faculty): Promise<void> {
-    const res = await Swal.fire({
-      icon: 'warning',
-      title: `Delete ${f.name}?`,
+    const ok = await this.toastService.confirmDestructive(`Delete ${f.name}?`, {
       text: 'All teacher assignments to this faculty will be removed.',
-      showCancelButton: true,
-      confirmButtonText: 'Delete',
-      confirmButtonColor: '#ef4444',
     });
-    if (!res.isConfirmed) return;
+    if (!ok) return;
     try {
       await this.academic.deleteFaculty(f.id);
       await this.loadAll();
@@ -227,14 +216,10 @@ export class AdminFaculties implements OnInit {
   }
 
   async removeTeacher(assignmentId: string, teacherName: string): Promise<void> {
-    const res = await Swal.fire({
-      icon: 'warning',
-      title: `Remove ${teacherName} from faculty?`,
-      showCancelButton: true,
-      confirmButtonText: 'Remove',
-      confirmButtonColor: '#ef4444',
+    const ok = await this.toastService.confirmDestructive(`Remove ${teacherName} from faculty?`, {
+      confirmText: 'Remove',
     });
-    if (!res.isConfirmed) return;
+    if (!ok) return;
     try {
       await this.academic.removeTeacherFromFaculty(assignmentId);
       await this.loadAll();

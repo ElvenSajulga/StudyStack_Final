@@ -2,7 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../services/auth.service';
-import Swal from 'sweetalert2';
+import { ToastService } from '../../services/toast.service';
 
 interface StudentPreferences {
   showDeadlinesInDashboard: boolean;
@@ -30,7 +30,10 @@ export class StudentSettings implements OnInit {
     emailOnGradeUpdate: false,
   };
 
-  constructor(private readonly auth: AuthService) {}
+  constructor(
+    private readonly auth: AuthService,
+    private readonly toast: ToastService,
+  ) {}
 
   ngOnInit(): void {
     this.loadPreferences();
@@ -62,29 +65,13 @@ export class StudentSettings implements OnInit {
     try {
       localStorage.setItem(this.prefStorageKey, JSON.stringify(this.preferences));
       this.originalPreferences = JSON.parse(JSON.stringify(this.preferences));
-      void Swal.fire({
-        icon: 'success',
-        title: 'Settings saved',
-        timer: 1500,
-        showConfirmButton: false,
-      });
+      this.toast.success('Settings saved');
     } catch {
-      void Swal.fire({
-        icon: 'error',
-        title: 'Failed to save settings',
-        timer: 1500,
-        showConfirmButton: false,
-      });
+      this.toast.error('Failed to save settings');
     }
   }
 
   sendPasswordReset(): void {
-    void Swal.fire({
-      icon: 'info',
-      title: 'Password reset email sent',
-      text: 'Check your inbox for further instructions.',
-      timer: 2500,
-      showConfirmButton: false,
-    });
+    this.toast.info('Password reset email sent', { text: 'Check your inbox for further instructions.' });
   }
 }

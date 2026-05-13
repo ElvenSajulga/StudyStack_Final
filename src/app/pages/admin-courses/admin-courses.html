@@ -44,10 +44,35 @@
         </select>
       </label>
 
-      <label class="field full-width">
+      <div class="field full-width">
         <span class="field-label">Schedule</span>
+        <p class="field-hint">
+          <i class="ti ti-info-circle" aria-hidden="true"></i>
+          Add one row per weekly meeting. Used to detect schedule conflicts.
+        </p>
+        <div class="meeting-list" *ngIf="courseForm.meetings && courseForm.meetings.length > 0">
+          <div class="meeting-row" *ngFor="let m of courseForm.meetings; let i = index; trackBy: trackMeeting">
+            <select [(ngModel)]="m.day" (ngModelChange)="onMeetingChange()" aria-label="Day">
+              <option *ngFor="let d of dayOptions" [value]="d">{{ dayLabels[d] }}</option>
+            </select>
+            <input type="time" [(ngModel)]="m.startTime" (ngModelChange)="onMeetingChange()" aria-label="Start time" />
+            <span class="meeting-sep">to</span>
+            <input type="time" [(ngModel)]="m.endTime" (ngModelChange)="onMeetingChange()" aria-label="End time" />
+            <button class="btn small danger" type="button" (click)="removeMeeting(i); onMeetingChange()">
+              Remove
+            </button>
+          </div>
+        </div>
+        <button class="btn small subtle" type="button" (click)="addMeeting(); onMeetingChange()">
+          + Add meeting
+        </button>
+      </div>
+
+      <label class="field full-width">
+        <span class="field-label">Schedule label</span>
         <input type="text" [(ngModel)]="courseForm.schedule"
-          placeholder="e.g. MWF 8:00–9:00 AM" />
+          placeholder="auto-filled from meetings above" />
+        <span class="field-hint">Displayed to students &amp; teachers. Auto-fills from the meetings; edit freely.</span>
       </label>
     </div>
     <div class="form-actions">

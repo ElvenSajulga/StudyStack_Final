@@ -51,7 +51,11 @@
       <header class="ann-header-content">
         <div>
           <h3>{{ a.title }}</h3>
-          <span class="meta">{{ a.createdAt | date: 'medium' }}</span>
+          <span class="meta">
+            <span class="course-tag" *ngIf="courseNameForAnnouncement(a)">{{ courseNameForAnnouncement(a) }}</span>
+            <span *ngIf="teacherNameForAnnouncement(a)">· {{ teacherNameForAnnouncement(a) }}</span>
+            · {{ a.createdAt | date: 'medium' }}
+          </span>
         </div>
       </header>
       <p>{{ a.message }}</p>

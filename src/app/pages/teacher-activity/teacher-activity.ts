@@ -1,4 +1,4 @@
-import { Component, OnInit, ChangeDetectorRef, HostListener } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Activity, ActivityService, ActivitySubmission, ActivityType } from '../../services/activity.service';
@@ -7,14 +7,26 @@ import { NotificationService } from '../../services/notification.service';
 import { AuthService } from '../../services/auth.service';
 import { StudentAccountService } from '../../services/student-account.service';
 import { AcademicService, Course, CourseSection } from '../../services/academic.service';
-import Swal from 'sweetalert2';
+import { StudentQuestion, StudentQuestionService } from '../../services/student-question.service';
+import { ToastService } from '../../services/toast.service';
+import { Subscription } from 'rxjs';
 
 interface CourseCard {
   courseSection: CourseSection;
   course: Course;
+  /** Section name (e.g. "BSIT 2A"), '' if unresolvable. */
+  sectionName: string;
+  /** Distinct students enrolled in this (course, section) for this teacher. */
+  enrollmentCount: number;
+  /** Activities the teacher has created for this course. */
+  activityCount: number;
+  /** Submitted-but-not-graded submissions across this teacher's activities for this course. */
+  pendingGradingCount: number;
+  /** ISO timestamp of the most recent submission received (any activity), undefined if none. */
+  lastSubmissionAt?: string;
 }
 
-type TeacherView = 'courses' | 'list' | 'create' | 'edit' | 'quiz-builder' | 'grade';
+type TeacherView = 'courses' | 'list' | 'create' | 'edit' | 'quiz-builder' | 'grade' | 'questions';
 
 @Component({
   selector: 'app-teacher-activity',
@@ -23,12 +35,22 @@ type TeacherView = 'courses' | 'list' | 'create' | 'edit' | 'quiz-builder' | 'gr
   templateUrl: './teacher-activity.html',
   styleUrl: './teacher-activity.scss',
 })
-export class TeacherActivity implements OnInit {
+export class TeacherActivity implements OnInit, OnDestroy {
   view: TeacherView = 'courses';
   courseCards: CourseCard[] = [];
   selectedCourseCard: CourseCard | null = null;
   activities: Activity[] = [];
   loading = false;
+
+  // Per-activity question counts shown on the activity list cards.
+  questionCounts: Record<string, { total: number; unanswered: number }> = {};
+
+  // Q&A view state.
+  questionsActivity: Activity | null = null;
+  activityQuestions: StudentQuestion[] = [];
+  replyDrafts: Record<string, string> = {};
+  sendingReplyFor: string | null = null;
+  private questionsSub?: Subscription;
 
   form: {
     title: string; description: string; type: ActivityType;
@@ -69,8 +91,14 @@ export class TeacherActivity implements OnInit {
     private readonly auth: AuthService,
     private readonly studentService: StudentAccountService,
     private readonly academic: AcademicService,
+    private readonly studentQuestionService: StudentQuestionService,
+    private readonly toast: ToastService,
     private readonly cdr: ChangeDetectorRef,
   ) {}
+
+  ngOnDestroy(): void {
+    this.questionsSub?.unsubscribe();
+  }
 
   ngOnInit(): void { void this.loadCourseCards(); }
 
@@ -84,19 +112,89 @@ export class TeacherActivity implements OnInit {
 
   async loadCourseCards(): Promise<void> {
     const uid = this.teacherUID;
+    const teacherID = this.teacherID;
     if (!uid) { this.courseCards = []; this.cdr.detectChanges(); return; }
 
     this.loading = true;
-    const [courseSections, courses] = await Promise.all([
+    const [courseSections, courses, sections, enrollments, activities] = await Promise.all([
       this.academic.getCourseSectionsByTeacher(uid),
       this.academic.getCourses(),
+      this.academic.getSections(),
+      this.academic.getEnrollmentsByTeacher(uid),
+      teacherID
+        ? this.activityService.getActivitiesForTeacher(teacherID)
+        : Promise.resolve([] as Activity[]),
     ]);
+
+    // Group enrollments by (courseId, sectionId) so distinct student counts
+    // are scoped to the right card even if a teacher has multiple sections.
+    const enrollmentKey = (courseId: string, sectionId: string) => `${courseId}::${sectionId}`;
+    const enrollmentsByKey = new Map<string, Set<string>>();
+    for (const e of enrollments) {
+      const k = enrollmentKey(e.courseId, e.sectionId);
+      const set = enrollmentsByKey.get(k) ?? new Set<string>();
+      set.add(e.studentUID);
+      enrollmentsByKey.set(k, set);
+    }
+
+    // Activities grouped by course id for fast lookup.
+    const activitiesByCourse = new Map<string, Activity[]>();
+    for (const a of activities) {
+      if (!a.courseId) continue;
+      const list = activitiesByCourse.get(a.courseId) ?? [];
+      list.push(a);
+      activitiesByCourse.set(a.courseId, list);
+    }
+
+    // Pre-fetch every submission for the teacher's activities once, then
+    // partition by activity id. Avoids N+1 reads per card.
+    const allActivityIds = activities.map(a => a.id);
+    const allSubmissions = allActivityIds.length === 0
+      ? []
+      : await this.activityService.getSubmissionsForActivities(allActivityIds);
+    const submissionsByActivity = new Map<string, ActivitySubmission[]>();
+    for (const sub of allSubmissions) {
+      const list = submissionsByActivity.get(sub.activityId) ?? [];
+      list.push(sub);
+      submissionsByActivity.set(sub.activityId, list);
+    }
 
     const cards: CourseCard[] = [];
     for (const cs of courseSections) {
       const course = courses.find(c => c.id === cs.courseId);
       if (!course) continue;
-      cards.push({ courseSection: cs, course });
+
+      const section = sections.find(s => s.id === cs.sectionId);
+      const sectionName = section?.name ?? '';
+
+      const studentSet = enrollmentsByKey.get(enrollmentKey(cs.courseId, cs.sectionId));
+      const enrollmentCount = studentSet?.size ?? 0;
+
+      const courseActivities = activitiesByCourse.get(course.id) ?? [];
+
+      let pendingGradingCount = 0;
+      let lastSubmissionAt: string | undefined;
+      for (const activity of courseActivities) {
+        const subs = submissionsByActivity.get(activity.id) ?? [];
+        for (const sub of subs) {
+          if (sub.submitted && !sub.graded) pendingGradingCount++;
+          if (sub.submitted) {
+            if (!lastSubmissionAt || new Date(sub.submittedAt) > new Date(lastSubmissionAt)) {
+              lastSubmissionAt = sub.submittedAt;
+            }
+          }
+        }
+      }
+
+      cards.push({
+        courseSection: cs,
+        course,
+        sectionName,
+        enrollmentCount,
+        activityCount: courseActivities.length,
+        pendingGradingCount,
+        lastSubmissionAt,
+      });
     }
 
     this.courseCards = cards;
@@ -169,6 +267,87 @@ export class TeacherActivity implements OnInit {
     this.activities = all.filter(a => a.courseId === this.selectedCourseCard!.course.id);
     this.loading = false;
     this.cdr.detectChanges();
+
+    void this.loadQuestionCounts();
+  }
+
+  /** Pre-fetches question counts for every activity in the list so cards can show a badge. */
+  private async loadQuestionCounts(): Promise<void> {
+    const teacherUID = this.teacherUID;
+    if (!teacherUID) return;
+    try {
+      const all = await this.studentQuestionService.getQuestionsForTeacher(teacherUID);
+      const counts: Record<string, { total: number; unanswered: number }> = {};
+      for (const q of all) {
+        const bucket = counts[q.activityId] ?? { total: 0, unanswered: 0 };
+        bucket.total += 1;
+        if (!q.answered) bucket.unanswered += 1;
+        counts[q.activityId] = bucket;
+      }
+      this.questionCounts = counts;
+      this.cdr.detectChanges();
+    } catch (e) {
+      console.warn('loadQuestionCounts failed:', e);
+    }
+  }
+
+  questionCountFor(activityId: string): { total: number; unanswered: number } {
+    return this.questionCounts[activityId] ?? { total: 0, unanswered: 0 };
+  }
+
+  async openQuestions(activity: Activity): Promise<void> {
+    this.questionsActivity = activity;
+    this.activityQuestions = [];
+    this.replyDrafts = {};
+    this.view = 'questions';
+    this.cdr.detectChanges();
+
+    this.questionsSub?.unsubscribe();
+    this.questionsSub = this.studentQuestionService
+      .watchQuestionsForActivity(activity.id)
+      .subscribe({
+        next: list => {
+          this.activityQuestions = list;
+          // Seed the draft for unanswered questions so users can keep typing
+          // without losing focus when the stream re-emits.
+          for (const q of list) {
+            if (!q.answered && !(q.id in this.replyDrafts)) {
+              this.replyDrafts[q.id] = '';
+            }
+          }
+          this.cdr.detectChanges();
+        },
+        error: err => console.warn('watchQuestionsForActivity error:', err),
+      });
+  }
+
+  async sendReply(question: StudentQuestion): Promise<void> {
+    const draft = (this.replyDrafts[question.id] ?? '').trim();
+    if (!draft) {
+      this.toast.warning('Type a reply before sending');
+      return;
+    }
+    this.sendingReplyFor = question.id;
+    try {
+      await this.studentQuestionService.answerQuestion(question, draft);
+      this.replyDrafts[question.id] = '';
+      this.toast.success('Reply sent');
+      // The stream subscription will refresh activityQuestions; also bump the
+      // count badge optimistically so the list-view chip updates on back-nav.
+      const counts = this.questionCountFor(question.activityId);
+      if (counts.unanswered > 0) {
+        this.questionCounts[question.activityId] = {
+          total: counts.total,
+          unanswered: counts.unanswered - 1,
+        };
+      }
+    } catch (e) {
+      console.error('sendReply failed:', e);
+      this.toast.error('Failed to send reply');
+    } finally {
+      this.sendingReplyFor = null;
+      this.cdr.detectChanges();
+    }
   }
 
   goBackToCourses(): void {
@@ -218,6 +397,11 @@ export class TeacherActivity implements OnInit {
     this.selectedSubmission = null;
     this.editingActivity = null;
     this.editingHasSubmissions = false;
+    this.questionsActivity = null;
+    this.activityQuestions = [];
+    this.replyDrafts = {};
+    this.questionsSub?.unsubscribe();
+    this.questionsSub = undefined;
     void this.loadActivities();
   }
 
@@ -265,19 +449,19 @@ export class TeacherActivity implements OnInit {
     const closeAt = this.form.closeAt.trim();
 
     if (!title) {
-      await Swal.fire({ icon: 'warning', title: 'Title required', text: 'Please enter an activity title.' });
+      this.toast.warning('Title required');
       return;
     }
     if (!deadline) {
-      await Swal.fire({ icon: 'warning', title: 'Deadline required', text: 'Please set a deadline.' });
+      this.toast.warning('Deadline required');
       return;
     }
     if (!closeAt) {
-      await Swal.fire({ icon: 'warning', title: 'Close time required', text: 'Please set a close time.' });
+      this.toast.warning('Close time required');
       return;
     }
     if (new Date(closeAt) <= new Date(deadline)) {
-      await Swal.fire({ icon: 'warning', title: 'Invalid close time', text: 'Close time must be after the deadline.' });
+      this.toast.warning('Close time must be after the deadline');
       return;
     }
 
@@ -285,15 +469,12 @@ export class TeacherActivity implements OnInit {
     const closeAtInPast = new Date(newCloseAtIso) < new Date();
 
     if (closeAtInPast && this.editingHasSubmissions) {
-      const res = await Swal.fire({
-        icon: 'warning',
-        title: 'Close time is in the past',
-        text: 'Setting close time to the past will prevent further submissions. Continue?',
-        showCancelButton: true,
-        confirmButtonText: 'Continue',
-        confirmButtonColor: '#d97706',
+      const ok = await this.toast.confirm('Close time is in the past', {
+        text: 'Setting close time to the past will prevent further submissions.',
+        confirmText: 'Continue',
+        confirmColor: '#d97706',
       });
-      if (!res.isConfirmed) return;
+      if (!ok) return;
     }
 
     const changes: Partial<Activity> = {
@@ -314,14 +495,7 @@ export class TeacherActivity implements OnInit {
     this.savingEdit = true;
     try {
       await this.activityService.updateActivity(this.editingActivity.id, changes);
-      Swal.fire({
-        icon: 'success',
-        title: 'Activity updated',
-        toast: true,
-        position: 'top-end',
-        timer: 2000,
-        showConfirmButton: false,
-      });
+      this.toast.success('Activity updated');
       this.editingActivity = null;
       this.editingHasSubmissions = false;
       this.view = 'list';
@@ -335,12 +509,12 @@ export class TeacherActivity implements OnInit {
   async createActivity(): Promise<void> {
     const teacherID = this.teacherID;
     const teacherUID = this.teacherUID;
-    if (!teacherID || !teacherUID || !this.selectedCourseCard) { alert('You must select a course first.'); return; }
+    if (!teacherID || !teacherUID || !this.selectedCourseCard) { this.toast.warning('Select a course first'); return; }
     const title = this.form.title.trim();
     const deadline = this.form.deadline.trim();
     const closeAt = this.form.closeAt.trim();
-    if (!title || !deadline || !closeAt) { alert('Please fill in title, deadline, and close time.'); return; }
-    if (new Date(closeAt) <= new Date(deadline)) { alert('Close time must be after the deadline.'); return; }
+    if (!title || !deadline || !closeAt) { this.toast.warning('Fill in title, deadline, and close time'); return; }
+    if (new Date(closeAt) <= new Date(deadline)) { this.toast.warning('Close time must be after the deadline'); return; }
 
     if (this.form.type === 'quiz') {
       // For quiz: store locally and go to builder — don't write to Firestore yet
@@ -352,29 +526,37 @@ export class TeacherActivity implements OnInit {
       this.view = 'quiz-builder';
       this.cdr.detectChanges();
     } else {
-      await this.activityService.createActivity({
-        title, description: this.form.description.trim(),
-        type: this.form.type,
-        deadline: new Date(deadline).toISOString(),
-        closeAt: new Date(closeAt).toISOString(),
-        teacherID, teacherUID, courseId: this.selectedCourseCard.course.id, maxPoints: this.form.maxPoints,
-        shuffleQuestions: undefined,
-      });
-      this.view = 'list';
-      await this.loadActivities();
+      try {
+        await this.activityService.createActivity({
+          title, description: this.form.description.trim(),
+          type: this.form.type,
+          deadline: new Date(deadline).toISOString(),
+          closeAt: new Date(closeAt).toISOString(),
+          teacherID, teacherUID, courseId: this.selectedCourseCard.course.id, maxPoints: this.form.maxPoints,
+          shuffleQuestions: undefined,
+        });
+        this.view = 'list';
+        await this.loadActivities();
+        this.toast.success('Activity created');
+      } catch {
+        this.toast.error('Failed to create activity');
+      }
     }
   }
 
   async deleteActivity(activity: Activity): Promise<void> {
-    const res = await Swal.fire({
-      icon: 'warning', title: 'Delete activity?',
+    const ok = await this.toast.confirmDestructive('Delete activity?', {
       text: 'This will also delete all student submissions.',
-      showCancelButton: true, confirmButtonText: 'Delete', confirmButtonColor: '#ef4444',
     });
-    if (!res.isConfirmed) return;
-    await this.activityService.deleteActivity(activity.id);
-    if (activity.type === 'quiz') await this.quizService.deleteAllQuestionsForActivity(activity.id);
-    await this.loadActivities();
+    if (!ok) return;
+    try {
+      await this.activityService.deleteActivity(activity.id);
+      if (activity.type === 'quiz') await this.quizService.deleteAllQuestionsForActivity(activity.id);
+      await this.loadActivities();
+      this.toast.success('Activity deleted');
+    } catch {
+      this.toast.error('Failed to delete activity');
+    }
   }
 
   // ── Quiz Builder ──────────────────────────────────────────────────────────
@@ -452,11 +634,11 @@ export class TeacherActivity implements OnInit {
 
   async saveQuiz(): Promise<void> {
     for (const q of this.questions) {
-      if (!q.question.trim()) { alert('All questions must have question text.'); return; }
+      if (!q.question.trim()) { this.toast.warning('All questions must have question text'); return; }
       if (q.type !== 'short-answer' && !q.correctAnswer) {
-        alert('All multiple choice and true/false questions need a correct answer selected.'); return;
+        this.toast.warning('Select a correct answer for every multiple-choice and true/false question'); return;
       }
-      if (!q.points || q.points <= 0) { alert('Points per question must be greater than 0.'); return; }
+      if (!q.points || q.points <= 0) { this.toast.warning('Points per question must be greater than 0'); return; }
     }
 
     if (this.isNewQuiz && this.newQuizForm) {
@@ -488,7 +670,7 @@ export class TeacherActivity implements OnInit {
       this.newQuizForm = null;
       this.selectedActivity = null;
       this.savingQuiz = false;
-      Swal.fire({ icon: 'success', title: 'Quiz created!', timer: 1500, showConfirmButton: false });
+      this.toast.success('Quiz created');
       this.view = 'list';
       await this.loadActivities();
       return;
@@ -497,12 +679,12 @@ export class TeacherActivity implements OnInit {
     // Editing existing quiz
     const subs = await this.activityService.getSubmissionsForActivity(this.selectedActivity!.id);
     if (subs.length > 0) {
-      const res = await Swal.fire({
-        icon: 'warning', title: 'Students have already submitted',
-        text: 'Saving changes will recalculate their scores based on the new questions. Continue?',
-        showCancelButton: true, confirmButtonText: 'Yes, save', confirmButtonColor: '#0a7a45',
+      const ok = await this.toast.confirm('Students have already submitted', {
+        text: 'Saving will recalculate their scores based on the new questions.',
+        confirmText: 'Yes, save',
+        confirmColor: '#0a7a45',
       });
-      if (!res.isConfirmed) return;
+      if (!ok) return;
     }
 
     this.savingQuiz = true;
@@ -520,7 +702,7 @@ export class TeacherActivity implements OnInit {
     }
 
     this.savingQuiz = false;
-    Swal.fire({ icon: 'success', title: 'Quiz saved!', timer: 1500, showConfirmButton: false });
+    this.toast.success('Quiz saved');
     this.view = 'list';
     await this.loadActivities();
   }
@@ -548,18 +730,18 @@ export class TeacherActivity implements OnInit {
     this.selectedSubmission.graded = true;
     const idx = this.submissions.findIndex(s => s.id === this.selectedSubmission!.id);
     if (idx !== -1) this.submissions[idx] = { ...this.selectedSubmission };
-    Swal.fire({ icon: 'success', title: 'Grade saved!', timer: 1200, showConfirmButton: false });
+    this.toast.success('Grade saved');
     this.cdr.detectChanges();
   }
 
   async releaseScores(): Promise<void> {
     if (!this.gradingActivity) return;
-    const res = await Swal.fire({
-      icon: 'question', title: 'Release scores?',
+    const ok = await this.toast.confirm('Release scores?', {
       text: 'All students will be notified and can see their scores.',
-      showCancelButton: true, confirmButtonText: 'Release', confirmButtonColor: '#0a7a45',
+      confirmText: 'Release',
+      confirmColor: '#0a7a45',
     });
-    if (!res.isConfirmed) return;
+    if (!ok) return;
 
     this.releasingScores = true;
     await this.activityService.releaseScores(this.gradingActivity.id);
@@ -574,7 +756,7 @@ export class TeacherActivity implements OnInit {
 
     this.gradingActivity.scoresReleased = true;
     this.releasingScores = false;
-    Swal.fire({ icon: 'success', title: 'Scores released!', timer: 1500, showConfirmButton: false });
+    this.toast.success('Scores released');
     this.cdr.detectChanges();
   }
 
@@ -703,12 +885,12 @@ export class TeacherActivity implements OnInit {
     const teacherID = this.teacherID;
     const teacherUID = this.teacherUID;
     if (!teacherID || !teacherUID) {
-      await Swal.fire({ icon: 'error', title: 'Not signed in', text: 'You must be signed in as a teacher.' });
+      this.toast.error('Not signed in', { text: 'You must be signed in as a teacher.' });
       return;
     }
 
     if (!this.duplicateTargetCourseId) {
-      await Swal.fire({ icon: 'warning', title: 'Select a course', text: 'Please choose a target course.' });
+      this.toast.warning('Choose a target course');
       return;
     }
 
@@ -743,22 +925,16 @@ export class TeacherActivity implements OnInit {
         }
       }
 
-      await Swal.fire({
-        icon: 'success',
-        title: 'Activity duplicated!',
+      await this.toast.alert('Activity duplicated', {
         text: 'Remember to set the deadline and close time before students can submit.',
-        confirmButtonColor: '#0a7a45',
-      });
+        confirmColor: '#0a7a45',
+      }, 'success');
 
       this.closeDuplicateModal();
       await this.loadActivities();
     } catch (e) {
       console.error('Duplicate activity failed:', e);
-      await Swal.fire({
-        icon: 'error',
-        title: 'Duplication failed',
-        text: 'Something went wrong while duplicating the activity. Please try again.',
-      });
+      this.toast.error('Duplication failed', { text: 'Please try again.' });
     } finally {
       this.duplicating = false;
       this.cdr.detectChanges();

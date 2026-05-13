@@ -16,6 +16,12 @@ export interface StudentAccount {
   lastname: string;
   firstname: string;
   middlename: string;
+  /**
+   * Profile picture as a base64 data URL (e.g. "data:image/jpeg;base64,...").
+   * Capped at ~750KB encoded by the upload helper to stay under Firestore's
+   * 1MB document limit. Empty/undefined → fall back to the initials avatar.
+   */
+  avatar?: string;
 }
 
 @Injectable({

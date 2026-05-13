@@ -1045,3 +1045,31 @@ th.col-actions, td.col-actions { text-align: right; }
   color: var(--color-text-secondary);
   font-size: 14px;
 }
+
+/* ==========================================================================
+   COURSE TAG — used to label activity references with their course name
+   ========================================================================== */
+.course-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--color-primary-pale);
+  color: var(--color-primary-dark);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.5;
+  border: 1px solid rgba(10,171,115,0.25);
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+[data-theme="dark"] .course-tag {
+  background: rgba(24,201,138,0.12);
+  color: var(--color-primary-light);
+  border-color: rgba(24,201,138,0.30);
+}

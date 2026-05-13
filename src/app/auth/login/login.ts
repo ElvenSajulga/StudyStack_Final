@@ -6,7 +6,7 @@ import { AuthService } from '../../services/auth.service';
 import { StudentAccountService } from '../../services/student-account.service';
 import { TeacherAccountService } from '../../services/teacher-account.service';
 import { FirestoreService } from '../../services/firestore.service';
-import Swal from 'sweetalert2';
+import { ToastService } from '../../services/toast.service';
 
 interface AdminAccount {
   id?: string;
@@ -35,6 +35,7 @@ export class Login {
     private readonly studentAccounts: StudentAccountService,
     private readonly teacherAccounts: TeacherAccountService,
     private readonly firestoreService: FirestoreService,
+    private readonly toast: ToastService,
   ) {}
 
   // NOTE: The previous ngOnInit redirect guard has been removed.
@@ -50,7 +51,7 @@ export class Login {
     const pwd = this.password.trim();
 
     if (!uid || !pwd) {
-      Swal.fire({ icon: 'error', title: 'Error', text: 'Please enter both UID and password.' });
+      this.toast.warning('Enter both UID and password');
       return;
     }
 
@@ -89,6 +90,7 @@ export class Login {
         name: `${student.firstname} ${student.lastname}`.trim(),
         studentID: student.studentID,
         UID: student.UID,
+        avatar: student.avatar,
       });
       this.showSuccess('Welcome, student!');
       void this.router.navigate(['/student-dashboard']);
@@ -103,22 +105,17 @@ export class Login {
         name: `${teacher.firstname} ${teacher.lastname}`.trim(),
         teacherID: teacher.teacherID,
         UID: teacher.UID,
+        avatar: teacher.avatar,
       });
       this.showSuccess('Welcome, teacher!');
       void this.router.navigate(['/teacher-dashboard']);
       return;
     }
 
-    Swal.fire({ icon: 'error', title: 'Error', text: 'Invalid UID or password.' });
+    this.toast.error('Invalid UID or password');
   }
 
   private showSuccess(text: string): void {
-    Swal.fire({
-      icon: 'success',
-      title: 'Login successful',
-      text,
-      timer: 2000,
-      showConfirmButton: false,
-    });
+    this.toast.success('Login successful', { text });
   }
 }

@@ -5,6 +5,7 @@ import { Activity, ActivityService, ActivitySubmission, AttendanceStatus } from 
 import { AuthService } from '../../services/auth.service';
 import { AcademicService } from '../../services/academic.service';
 import { TeacherAccountService } from '../../services/teacher-account.service';
+import { CourseLookupService } from '../../services/course-lookup.service';
 
 @Component({
   selector: 'app-student-attendance',
@@ -37,11 +38,13 @@ export class StudentAttendance implements OnInit, OnDestroy {
     private readonly auth: AuthService,
     private readonly academic: AcademicService,
     private readonly teacherAccountService: TeacherAccountService,
+    private readonly courseLookup: CourseLookupService,
     private readonly cdr: ChangeDetectorRef,
     private readonly zone: NgZone,
   ) {}
 
   ngOnInit(): void {
+    void this.courseLookup.ensureLoaded();
     void this.loadActivities();
 
     if (isPlatformBrowser(this.platformId)) {
@@ -160,6 +163,13 @@ export class StudentAttendance implements OnInit, OnDestroy {
 
   statusClass(activity: Activity): string {
     return this.attendanceStatus(activity);
+  }
+
+  courseName(activity: Activity): string {
+    const direct = activity.courseId ? this.courseLookup.name(activity.courseId, '') : '';
+    if (direct) return direct;
+    const mapped = this.activityToCourseId[activity.id];
+    return mapped ? this.courseLookup.name(mapped, 'Unassigned') : 'Unassigned';
   }
 
   getRateColorClass(): string {

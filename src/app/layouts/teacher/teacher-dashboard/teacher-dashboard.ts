@@ -6,6 +6,7 @@ import { Announcement, AnnouncementService } from '../../../services/announcemen
 import { StudentAccountService } from '../../../services/student-account.service';
 import { AuthService } from '../../../services/auth.service';
 import { AcademicService } from '../../../services/academic.service';
+import { CourseLookupService } from '../../../services/course-lookup.service';
 
 interface CourseStats {
   courseId: string;
@@ -45,6 +46,7 @@ export class TeacherDashboard implements OnInit {
     private readonly studentService: StudentAccountService,
     private readonly auth: AuthService,
     private readonly academic: AcademicService,
+    private readonly courseLookup: CourseLookupService,
     private readonly cdr: ChangeDetectorRef,
   ) {}
 
@@ -54,7 +56,12 @@ export class TeacherDashboard implements OnInit {
       const parsed = JSON.parse(user);
       this.userName = parsed.name || 'Teacher';
     }
+    void this.courseLookup.ensureLoaded();
     void this.computeStats();
+  }
+
+  courseNameFor(activity: Activity): string {
+    return this.courseLookup.name(activity.courseId, 'Unassigned');
   }
 
   getGreeting(): string {

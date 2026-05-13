@@ -4,6 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { Announcement, AnnouncementService } from '../../services/announcement.service';
 import { AuthService } from '../../services/auth.service';
 import { AcademicService, Course, CourseSection } from '../../services/academic.service';
+import { NotificationService } from '../../services/notification.service';
+import { ToastService } from '../../services/toast.service';
 
 interface CourseCard {
   courseSection: CourseSection;
@@ -32,6 +34,8 @@ export class TeacherAnnouncement implements OnInit {
     private readonly announcementService: AnnouncementService,
     private readonly auth: AuthService,
     private readonly academic: AcademicService,
+    private readonly notificationService: NotificationService,
+    private readonly toast: ToastService,
     private readonly cdr: ChangeDetectorRef,
   ) {}
 
@@ -98,26 +102,78 @@ export class TeacherAnnouncement implements OnInit {
   }
 
   async createAnnouncement(): Promise<void> {
-    const id = this.teacherID;
-    if (!id || !this.selectedCourseCard) {
-      alert('You must select a course first.');
+    const credential = this.teacherID;
+    const uid = this.teacherUID;
+    if (!credential || !uid || !this.selectedCourseCard) {
+      this.toast.warning('Select a course first');
       return;
     }
 
-    if (!this.title.trim() || !this.message.trim()) {
-      alert('Please enter a title and message.');
+    const title = this.title.trim();
+    const message = this.message.trim();
+    if (!title || !message) {
+      this.toast.warning('Title and message are required');
       return;
     }
 
-    await this.announcementService.create(id, this.title.trim(), this.message.trim(), this.selectedCourseCard.course.id);
-    this.title = '';
-    this.message = '';
-    await this.loadAnnouncements();
+    const course = this.selectedCourseCard.course;
+
+    try {
+      const announcement = await this.announcementService.create(
+        credential, title, message, course.id, uid,
+      );
+      this.title = '';
+      this.message = '';
+      await this.loadAnnouncements();
+      this.toast.success('Announcement posted');
+
+      // Notify every enrolled student for this course/teacher (best-effort).
+      void this.notifyEnrolledStudents(announcement, course);
+    } catch {
+      this.toast.error('Failed to post announcement');
+    }
+  }
+
+  private async notifyEnrolledStudents(
+    announcement: Announcement,
+    course: Course,
+  ): Promise<void> {
+    try {
+      const enrollments = await this.academic.getEnrollmentsByCourse(course.id);
+      const teacherUID = this.teacherUID;
+      const studentUIDs = [...new Set(
+        enrollments
+          .filter(e => !teacherUID || e.teacherUID === teacherUID)
+          .map(e => e.studentUID),
+      )];
+      const createdAt = new Date().toISOString();
+      await Promise.all(studentUIDs.map(studentUID =>
+        this.notificationService.createNotification({
+          recipientUID: studentUID,
+          type: 'announcement',
+          title: `New announcement: ${course.name}`,
+          message: announcement.title,
+          relatedId: String(announcement.id),
+          read: false,
+          createdAt,
+        }),
+      ));
+    } catch (e) {
+      console.warn('Announcement notification dispatch failed:', e);
+    }
   }
 
   async deleteAnnouncement(id: string | number): Promise<void> {
-    if (!confirm('Delete this announcement?')) return;
-    await this.announcementService.delete(id);
-    await this.loadAnnouncements();
+    const ok = await this.toast.confirmDestructive('Delete this announcement?', {
+      text: 'This cannot be undone.',
+    });
+    if (!ok) return;
+    try {
+      await this.announcementService.delete(id);
+      await this.loadAnnouncements();
+      this.toast.success('Announcement deleted');
+    } catch {
+      this.toast.error('Failed to delete announcement');
+    }
   }
 }

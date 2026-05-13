@@ -26,12 +26,16 @@ import { StudentActivity } from './pages/student-activity/student-activity';
 import { StudentAnnouncement } from './pages/student-announcement/student-announcement';
 import { StudentAttendance } from './pages/student-attendance/student-attendance';
 import { StudentGrade } from './pages/student-grade/student-grade';
+import { StudentMaterials } from './pages/student-materials/student-materials';
+import { StudentChat } from './pages/student-chat/student-chat';
 
 import { TeacherActivity } from './pages/teacher-activity/teacher-activity';
 import { TeacherAnnouncement } from './pages/teacher-announcement/teacher-announcement';
 import { TeacherAttendance } from './pages/teacher-attendance/teacher-attendance';
 import { TeacherClassRecord } from './pages/teacher-class-record/teacher-class-record';
 import { TeacherStudents } from './pages/teacher-students/teacher-students';
+import { TeacherMaterials } from './pages/teacher-materials/teacher-materials';
+import { TeacherChat } from './pages/teacher-chat/teacher-chat';
 
 import { HelpCenter } from './pages/help-center/help-center';
 
@@ -176,6 +180,18 @@ export const routes: Routes = [
     canActivate: [authGuard, roleGuard],
     data: { roles: ['student'] },
   },
+  {
+    path: 'student-materials',
+    component: StudentMaterials,
+    canActivate: [authGuard, roleGuard],
+    data: { roles: ['student'] },
+  },
+  {
+    path: 'student-chat',
+    component: StudentChat,
+    canActivate: [authGuard, roleGuard],
+    data: { roles: ['student'] },
+  },
 
   // ── Teacher routes ─────────────────────────────────────────────────────────
   {
@@ -223,6 +239,18 @@ export const routes: Routes = [
   {
     path: 'teacher-students',
     component: TeacherStudents,
+    canActivate: [authGuard, roleGuard],
+    data: { roles: ['teacher'] },
+  },
+  {
+    path: 'teacher-materials',
+    component: TeacherMaterials,
+    canActivate: [authGuard, roleGuard],
+    data: { roles: ['teacher'] },
+  },
+  {
+    path: 'teacher-chat',
+    component: TeacherChat,
     canActivate: [authGuard, roleGuard],
     data: { roles: ['teacher'] },
   },

@@ -2,7 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../services/auth.service';
-import Swal from 'sweetalert2';
+import { ToastService } from '../../services/toast.service';
 
 interface TeacherPreferences {
   showUpcomingActivities: boolean;
@@ -25,7 +25,10 @@ export class TeacherSettings implements OnInit {
   };
   originalPreferences: TeacherPreferences = { ...this.preferences };
 
-  constructor(private readonly auth: AuthService) {}
+  constructor(
+    private readonly auth: AuthService,
+    private readonly toast: ToastService,
+  ) {}
 
   ngOnInit(): void {
     this.loadPreferences();
@@ -67,26 +70,12 @@ export class TeacherSettings implements OnInit {
     const key = `ss_teacher_prefs_${uid}`;
     localStorage.setItem(key, JSON.stringify(this.preferences));
     this.originalPreferences = { ...this.preferences };
-
-    void Swal.fire({
-      icon: 'success',
-      title: 'Settings saved',
-      toast: true,
-      position: 'top-end',
-      showConfirmButton: false,
-      timer: 3000,
-    });
+    this.toast.success('Settings saved');
   }
 
   sendPasswordReset(): void {
-    void Swal.fire({
-      icon: 'info',
-      title: 'Password reset email sent',
+    this.toast.info('Password reset email sent', {
       text: 'Check your email for instructions on how to reset your password.',
-      toast: true,
-      position: 'top-end',
-      showConfirmButton: false,
-      timer: 4000,
     });
   }
 

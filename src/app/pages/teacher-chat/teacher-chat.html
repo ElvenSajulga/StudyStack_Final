@@ -1,0 +1,143 @@
+<div class="chat-page" [class.thread-open]="!!selectedUID">
+  <!-- ── INBOX (left pane) ── -->
+  <aside class="inbox" [class.hidden-on-mobile]="!!selectedUID">
+    <header class="inbox-header">
+      <h2 class="page-title">Messages</h2>
+      <button type="button" class="new-chat-btn" (click)="togglePicker()" [class.active]="showPicker">
+        <i class="ti ti-pencil-plus"></i>
+        <span>New</span>
+      </button>
+    </header>
+
+    <div class="picker" *ngIf="showPicker">
+      <input
+        type="text"
+        placeholder="Search a student…"
+        [(ngModel)]="pickerQuery" />
+      <div class="picker-list">
+        <button
+          type="button"
+          class="picker-row"
+          *ngFor="let c of filteredContacts()"
+          (click)="openConversation(c.uid)">
+          <span class="avatar" [class.has-image]="!!c.avatar">
+            <img *ngIf="c.avatar; else pInitials" [src]="c.avatar" alt="" />
+            <ng-template #pInitials>
+              <span class="avatar-ini">{{ contactInitials(c.uid) }}</span>
+            </ng-template>
+          </span>
+          <span class="picker-info">
+            <span class="picker-name">{{ c.name }}</span>
+            <span class="picker-sub" *ngIf="c.studentID">{{ c.studentID }}</span>
+          </span>
+        </button>
+        <p class="empty-text" *ngIf="filteredContacts().length === 0">No students found.</p>
+      </div>
+    </div>
+
+    <p class="muted" *ngIf="loading">Loading conversations…</p>
+
+    <ng-container *ngIf="!loading">
+      <ul class="inbox-list" *ngIf="summaries.length > 0; else inboxEmpty">
+        <li
+          class="inbox-row"
+          *ngFor="let s of summaries; trackBy: trackBySummary"
+          [class.active]="selectedUID === s.otherUID"
+          (click)="openConversation(s.otherUID)">
+          <span class="avatar" [class.has-image]="!!contactFor(s.otherUID)?.avatar">
+            <img *ngIf="contactFor(s.otherUID)?.avatar as av; else inboxInitials" [src]="av" alt="" />
+            <ng-template #inboxInitials>
+              <span class="avatar-ini">{{ contactInitials(s.otherUID) }}</span>
+            </ng-template>
+          </span>
+          <div class="row-body">
+            <div class="row-top">
+              <span class="row-name">{{ contactName(s.otherUID) }}</span>
+              <span class="row-time">{{ s.lastMessage.createdAt | date: 'shortTime' }}</span>
+            </div>
+            <div class="row-bottom">
+              <span class="row-preview">{{ s.lastMessage.text }}</span>
+              <span class="row-badge" *ngIf="s.unreadCount > 0">{{ s.unreadCount }}</span>
+            </div>
+          </div>
+        </li>
+      </ul>
+
+      <ng-template #inboxEmpty>
+        <div class="empty-inbox" *ngIf="!showPicker">
+          <i class="ti ti-message-circle"></i>
+          <p>No conversations yet.</p>
+          <button type="button" class="link-action" (click)="togglePicker()">
+            Start a new chat
+          </button>
+        </div>
+      </ng-template>
+    </ng-container>
+  </aside>
+
+  <!-- ── THREAD (right pane) ── -->
+  <section class="thread" *ngIf="selectedUID; else emptyThread">
+    <header class="thread-header">
+      <button type="button" class="back-btn" (click)="backToInbox()">
+        <i class="ti ti-arrow-left"></i>
+      </button>
+      <span class="avatar" [class.has-image]="!!contactFor(selectedUID)?.avatar">
+        <img *ngIf="contactFor(selectedUID)?.avatar as av; else hi" [src]="av" alt="" />
+        <ng-template #hi>
+          <span class="avatar-ini">{{ contactInitials(selectedUID) }}</span>
+        </ng-template>
+      </span>
+      <div class="thread-title">
+        <h3>{{ contactName(selectedUID) }}</h3>
+        <span class="muted" *ngIf="contactFor(selectedUID)?.studentID">
+          {{ contactFor(selectedUID)?.studentID }}
+        </span>
+      </div>
+    </header>
+
+    <div class="thread-body">
+      <p class="thread-empty" *ngIf="threadMessages.length === 0">
+        Say hello — this conversation is just getting started.
+      </p>
+
+      <div
+        class="message"
+        *ngFor="let m of threadMessages; trackBy: trackByMessage"
+        [class.mine]="isMine(m)">
+        <div class="bubble">
+          <p>{{ m.text }}</p>
+          <span class="bubble-time">{{ m.createdAt | date: 'shortTime' }}</span>
+        </div>
+      </div>
+
+      <div #threadEnd></div>
+    </div>
+
+    <footer class="composer">
+      <textarea
+        rows="1"
+        placeholder="Write a message…"
+        [(ngModel)]="composer"
+        (keydown)="onComposerKeydown($event)"
+        [disabled]="sending"></textarea>
+      <button
+        type="button"
+        class="send-btn"
+        (click)="sendMessage()"
+        [disabled]="!composer.trim() || sending"
+        aria-label="Send">
+        <i class="ti ti-send"></i>
+      </button>
+    </footer>
+  </section>
+
+  <ng-template #emptyThread>
+    <section class="thread thread-empty-state">
+      <div class="empty-thread">
+        <i class="ti ti-message-2"></i>
+        <h3>Select a conversation</h3>
+        <p>Pick a student from the left to view your messages, or start a new chat.</p>
+      </div>
+    </section>
+  </ng-template>
+</div>

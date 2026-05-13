@@ -5,16 +5,24 @@ import { Activity, ActivityService, ActivitySubmission, AttendanceStatus, } from
 import { AuthService } from '../../services/auth.service';
 import { AcademicService, Course, Enrollment } from '../../services/academic.service';
 import { QuizService, QuizQuestion } from '../../services/quiz.service';
-import { StudentQuestionService } from '../../services/student-question.service';
+import { StudentQuestion, StudentQuestionService } from '../../services/student-question.service';
 import { TeacherAccountService } from '../../services/teacher-account.service';
+import { ToastService } from '../../services/toast.service';
 import { Subscription } from 'rxjs';
-import Swal from 'sweetalert2';
 
 interface CourseCard {
   course: Course;
   enrollment: Enrollment;
   teacherUID: string;
   pendingCount: number;
+  /** Total activities the enrolled teacher has posted for this course. */
+  totalActivities: number;
+  /** Display-friendly teacher name; empty string if unresolvable. */
+  teacherName: string;
+  /** Teacher's avatar data URL, '' if none. */
+  teacherAvatar: string;
+  /** ISO date of the most recently posted activity, undefined if none. */
+  lastActivityAt?: string;
 }
 
 @Component({
@@ -51,6 +59,10 @@ export class StudentActivity implements OnInit, OnDestroy {
   questionDraft = '';
   sendingQuestion = false;
 
+  /** Every question this student has asked, kept fresh via real-time stream. */
+  myQuestions: StudentQuestion[] = [];
+  private questionsSub?: Subscription;
+
   isAnsweringQuiz = false;
   filterBy = '';
 
@@ -70,6 +82,7 @@ export class StudentActivity implements OnInit, OnDestroy {
     private readonly quizService: QuizService,
     private readonly studentQuestionService: StudentQuestionService,
     private readonly teacherAccountService: TeacherAccountService,
+    private readonly toast: ToastService,
     private readonly cdr: ChangeDetectorRef,
   ) {}
 
@@ -139,6 +152,20 @@ export class StudentActivity implements OnInit, OnDestroy {
               this.recomputeFromState();
             },
           });
+
+        // Real-time stream of this student's own questions (and teacher replies)
+        const studentUID = this.studentUID;
+        if (studentUID) {
+          this.questionsSub = this.studentQuestionService
+            .watchQuestionsForStudent(studentUID)
+            .subscribe({
+              next: list => {
+                this.myQuestions = list;
+                this.cdr.detectChanges();
+              },
+              error: err => console.warn('myQuestions stream error:', err),
+            });
+        }
 
         // Safety-net polling — re-pulls enrollments in case admin changes them
         this.zone.runOutsideAngular(() => {
@@ -224,11 +251,28 @@ export class StudentActivity implements OnInit, OnDestroy {
         a => !submittedIds.has(a.id) && new Date(a.closeAt) > now,
       ).length;
 
+      // Most recent activity by deadline (proxy for "posted recency").
+      const lastActivity = teacherActivities.length === 0
+        ? undefined
+        : teacherActivities.reduce((latest, a) =>
+            new Date(a.deadline).getTime() > new Date(latest.deadline).getTime() ? a : latest,
+          );
+
+      const teacher = this.teacherAccountService.getByUID(e.teacherUID);
+      const teacherName = teacher
+        ? `${teacher.firstname} ${teacher.lastname}`.trim()
+        : '';
+      const teacherAvatar = teacher?.avatar ?? '';
+
       cards.push({
         course,
         enrollment: e,
         teacherUID: e.teacherUID,
         pendingCount: pending,
+        totalActivities: teacherActivities.length,
+        teacherName,
+        teacherAvatar,
+        lastActivityAt: lastActivity?.deadline,
       });
     }
     this.courseCards = cards;
@@ -524,7 +568,7 @@ export class StudentActivity implements OnInit, OnDestroy {
     const label = (this.newLinkLabel[activity.id] ?? '').trim();
     const url = (this.newLinkUrl[activity.id] ?? '').trim();
     if (!label || !url) {
-      alert('Please enter both label and URL.');
+      this.toast.warning('Both label and URL are required');
       return;
     }
     if (!this.submissionLinks[activity.id]) {
@@ -556,12 +600,7 @@ export class StudentActivity implements OnInit, OnDestroy {
 
   async sendQuestion(): Promise<void> {
     if (!this.questionDraft.trim()) {
-      await Swal.fire({
-        icon: 'warning',
-        title: 'Empty question',
-        text: 'Please type your question before sending.',
-        confirmButtonText: 'OK',
-      });
+      this.toast.warning('Type your question before sending');
       return;
     }
 
@@ -571,12 +610,7 @@ export class StudentActivity implements OnInit, OnDestroy {
     const studentName = (user as any)?.displayName || 'Student';
 
     if (!studentUID || !studentID || !this.selectedActivity || !this.selectedCard) {
-      await Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: 'Unable to send question. Missing required information.',
-        confirmButtonText: 'OK',
-      });
+      this.toast.error('Unable to send question', { text: 'Missing required information.' });
       return;
     }
 
@@ -603,24 +637,11 @@ export class StudentActivity implements OnInit, OnDestroy {
       };
 
       await this.studentQuestionService.createQuestion(payload);
-
-      await Swal.fire({
-        icon: 'success',
-        title: 'Question sent!',
-        text: 'Your teacher will be notified and respond when they are available.',
-        timer: 1500,
-        showConfirmButton: false,
-      });
-
+      this.toast.success('Question sent', { text: 'Your teacher will be notified.' });
       this.closeQuestionModal();
     } catch (error) {
       console.error('Error sending question:', error);
-      await Swal.fire({
-        icon: 'error',
-        title: 'Failed to send question',
-        text: 'Please try again later.',
-        confirmButtonText: 'OK',
-      });
+      this.toast.error('Failed to send question', { text: 'Please try again later.' });
     } finally {
       this.sendingQuestion = false;
       this.cdr.detectChanges();
@@ -638,46 +659,60 @@ export class StudentActivity implements OnInit, OnDestroy {
     const content = this.draftContent[activity.id] ?? '';
 
     if (!this.isOpen(activity)) {
-      alert('This activity is already closed.');
+      this.toast.warning('This activity is already closed');
       return;
     }
 
-    if (activity.type === 'quiz') {
-      const questions = this.quizQuestions[activity.id] ?? [];
-      if (questions.length === 0) {
-        alert('No questions loaded.');
-        return;
+    try {
+      if (activity.type === 'quiz') {
+        const questions = this.quizQuestions[activity.id] ?? [];
+        if (questions.length === 0) {
+          this.toast.error('No questions loaded');
+          return;
+        }
+        const answers = this.quizAnswers[activity.id] ?? {};
+        const unanswered = questions.filter(q => !answers[q.id]);
+        if (unanswered.length > 0) {
+          this.toast.warning('Answer all questions before submitting');
+          return;
+        }
+        const sub = await this.activityService.submitOrUpdateSubmission(
+          activity.id, sid, sUID, content,
+          { quizAnswers: answers }
+        );
+        this.submissions[activity.id] = sub;
+        // Quiz is now locked — close the answering panel.
+        this.isAnsweringQuiz = false;
+      } else {
+        if (!content.trim() && (!this.submissionLinks[activity.id] || this.submissionLinks[activity.id].length === 0)) {
+          this.toast.warning('Enter an answer or add at least one link');
+          return;
+        }
+        const links = this.submissionLinks[activity.id] ?? [];
+        const sub = await this.activityService.submitOrUpdateSubmission(
+          activity.id, sid, sUID, content,
+          { links }
+        );
+        this.submissions[activity.id] = sub;
       }
-      const answers = this.quizAnswers[activity.id] ?? {};
-      const unanswered = questions.filter(q => !answers[q.id]);
-      if (unanswered.length > 0) {
-        alert('Please answer all questions before submitting.');
-        return;
-      }
-      const sub = await this.activityService.submitOrUpdateSubmission(
-        activity.id, sid, sUID, content,
-        { quizAnswers: answers }
-      );
-      this.submissions[activity.id] = sub;
-    } else {
-      if (!content.trim() && (!this.submissionLinks[activity.id] || this.submissionLinks[activity.id].length === 0)) {
-        alert('Please enter your answer or add at least one link before submitting.');
-        return;
-      }
-      const links = this.submissionLinks[activity.id] ?? [];
-      const sub = await this.activityService.submitOrUpdateSubmission(
-        activity.id, sid, sUID, content,
-        { links }
-      );
-      this.submissions[activity.id] = sub;
+      this.cdr.detectChanges();
+      this.toast.success('Submitted');
+    } catch (e) {
+      console.error('Submit failed:', e);
+      const message = e instanceof Error ? e.message : 'Please try again.';
+      this.toast.error('Submit failed', { text: message });
     }
-    this.cdr.detectChanges();
-    alert('Submitted successfully!');
   }
 
   ngOnDestroy(): void {
     if (this.refreshTimer != null) clearInterval(this.refreshTimer);
     this.activitiesSub?.unsubscribe();
     this.submissionsSub?.unsubscribe();
+    this.questionsSub?.unsubscribe();
+  }
+
+  /** Helper for the activity-detail template — questions by this student for the selected activity. */
+  myQuestionsForActivity(activityId: string): StudentQuestion[] {
+    return this.myQuestions.filter(q => q.activityId === activityId);
   }
 }

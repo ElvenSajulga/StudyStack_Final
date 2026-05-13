@@ -1,0 +1,152 @@
+<div class="teacher-materials">
+  <!-- ── COURSES VIEW ── -->
+  <ng-container *ngIf="view === 'courses'">
+    <header>
+      <h2 class="page-title">Learning Materials</h2>
+      <p class="page-subtitle">Select a course to share links and resources with your students.</p>
+    </header>
+
+    <p class="muted" *ngIf="loading">Loading…</p>
+
+    <section class="course-grid" *ngIf="!loading">
+      <div
+        class="course-card"
+        *ngFor="let card of courseCards"
+        (click)="openCourse(card)"
+      >
+        <div class="course-card-header">
+          <span class="course-card-name">{{ card.course.name }}</span>
+          <span class="course-card-sem">{{ card.course.semester }}</span>
+        </div>
+        <div class="course-card-body">
+          <span class="units-badge">{{ card.course.units }} units</span>
+        </div>
+      </div>
+
+      <div class="empty-card" *ngIf="courseCards.length === 0">
+        <p class="empty-text">You are not assigned to any courses yet.</p>
+      </div>
+    </section>
+  </ng-container>
+
+  <!-- ── LIST VIEW ── -->
+  <ng-container *ngIf="view === 'list' && selectedCourseCard">
+    <header>
+      <button class="back-btn" (click)="goBackToCourses()">← Back</button>
+      <h2 class="page-title">{{ selectedCourseCard.course.name }}</h2>
+      <p class="page-subtitle">
+        Share useful links and resource files with the students enrolled in this course.
+      </p>
+    </header>
+
+    <section class="form-section">
+      <h3>Add new material</h3>
+
+      <div class="kind-toggle">
+        <button
+          type="button"
+          [class.active]="kind === 'link'"
+          (click)="setKind('link')">
+          <i class="ti ti-link"></i> Link
+        </button>
+        <button
+          type="button"
+          [class.active]="kind === 'file'"
+          (click)="setKind('file')">
+          <i class="ti ti-file-upload"></i> File
+        </button>
+      </div>
+
+      <form (ngSubmit)="submit()" #f="ngForm">
+        <label>
+          <span>Title</span>
+          <input type="text" name="title" [(ngModel)]="title" required />
+        </label>
+
+        <label>
+          <span>Description <em>(optional)</em></span>
+          <textarea name="description" rows="2" [(ngModel)]="description"></textarea>
+        </label>
+
+        <label *ngIf="kind === 'link'">
+          <span>URL</span>
+          <input
+            type="url"
+            name="linkUrl"
+            placeholder="https://example.com/lecture-notes.pdf"
+            [(ngModel)]="linkUrl" />
+        </label>
+
+        <div class="file-block" *ngIf="kind === 'file'">
+          <p class="file-help">Files must be 525 KB or smaller (PDF, image, doc, etc.).</p>
+
+          <div class="file-preview" *ngIf="fileName">
+            <i class="ti ti-paperclip"></i>
+            <div class="file-meta">
+              <span class="file-name">{{ fileName }}</span>
+              <span class="file-size">{{ formatBytes(fileSize) }}</span>
+            </div>
+            <button type="button" class="link-btn" (click)="clearFile()">Remove</button>
+          </div>
+
+          <label class="file-picker">
+            <input type="file" (change)="onFilePicked($event)" [disabled]="uploading" />
+            <span class="file-picker-btn">
+              <i class="ti ti-upload"></i>
+              {{ fileName ? 'Replace file' : 'Choose file' }}
+            </span>
+          </label>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" [disabled]="uploading">
+            <i class="ti ti-send"></i> Post material
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <section class="list-section" *ngIf="materials.length > 0; else emptyState">
+      <h3>Posted materials</h3>
+
+      <article class="material-card" *ngFor="let m of materials">
+        <div class="material-icon">
+          <i class="ti" [ngClass]="iconForMaterial(m)"></i>
+        </div>
+
+        <div class="material-body">
+          <header>
+            <h4>{{ m.title }}</h4>
+            <span class="meta">{{ m.createdAt | date: 'short' }}</span>
+          </header>
+          <p *ngIf="m.description">{{ m.description }}</p>
+
+          <div class="material-target" *ngIf="m.kind === 'link'">
+            <a [href]="m.linkUrl" target="_blank" rel="noopener noreferrer">
+              <i class="ti ti-external-link"></i>
+              {{ m.linkUrl }}
+            </a>
+          </div>
+
+          <div class="material-target" *ngIf="m.kind === 'file'">
+            <a
+              [href]="m.fileDataUrl"
+              [download]="m.fileName"
+              [attr.title]="m.fileName">
+              <i class="ti ti-download"></i>
+              {{ m.fileName }} <span class="muted">({{ formatBytes(m.fileSize || 0) }})</span>
+            </a>
+          </div>
+        </div>
+
+        <button type="button" class="delete-btn" (click)="deleteMaterial(m)">Delete</button>
+      </article>
+    </section>
+
+    <ng-template #emptyState>
+      <section class="empty-card">
+        <p class="empty-text">No materials posted for this course yet.</p>
+      </section>
+    </ng-template>
+  </ng-container>
+</div>

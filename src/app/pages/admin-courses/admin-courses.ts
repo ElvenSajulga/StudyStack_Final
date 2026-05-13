@@ -9,8 +9,11 @@ import {
   CourseSection,
   YearLevel,
 } from '../../services/academic.service';
+import {
+  DAY_CODES, DayCode, Meeting, ScheduleConflictService,
+} from '../../services/schedule-conflict.service';
 import { TeacherAccount, TeacherAccountService } from '../../services/teacher-account.service';
-import Swal from 'sweetalert2';
+import { ToastService } from '../../services/toast.service';
 
 @Component({
   selector: 'app-admin-courses',
@@ -33,6 +36,11 @@ export class AdminCourses implements OnInit {
   showCourseForm = false;
   editingCourseId: string | null = null;
   courseForm: Omit<Course, 'id'> = this.emptyCourseForm();
+  readonly dayOptions: readonly DayCode[] = DAY_CODES;
+  readonly dayLabels: Record<DayCode, string> = {
+    mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu',
+    fri: 'Fri', sat: 'Sat', sun: 'Sun',
+  };
 
   // section-teacher assignment form
   assignForm: Record<string, { sectionId: string; teacherUID: string }> = {};
@@ -43,6 +51,8 @@ export class AdminCourses implements OnInit {
   constructor(
     private readonly academic: AcademicService,
     private readonly teacherService: TeacherAccountService,
+    private readonly scheduleConflict: ScheduleConflictService,
+    private readonly toast: ToastService,
     private readonly cdr: ChangeDetectorRef,
   ) {}
 
@@ -50,21 +60,50 @@ export class AdminCourses implements OnInit {
     void this.loadAll();
   }
 
-  private toast(icon: 'success' | 'error', title: string): void {
-    void Swal.fire({
-      toast: true, position: 'top-end', icon, title,
-      showConfirmButton: false, timer: 2000, timerProgressBar: true,
-    });
-  }
-
   private emptyCourseForm(): Omit<Course, 'id'> {
     return {
       name: '',
       units: 3,
       schedule: '',
+      meetings: [],
       semester: '',
       programId: '',
     };
+  }
+
+  // ── meetings editor ──────────────────────────────────────────────────────
+
+  addMeeting(): void {
+    if (!this.courseForm.meetings) this.courseForm.meetings = [];
+    this.courseForm.meetings.push({ day: 'mon', startTime: '08:00', endTime: '09:00' });
+  }
+
+  removeMeeting(index: number): void {
+    if (!this.courseForm.meetings) return;
+    this.courseForm.meetings.splice(index, 1);
+  }
+
+  trackMeeting(index: number): number {
+    return index;
+  }
+
+  /** Filled in from `schedule` text when the form opens; updates `schedule` back when meetings change. */
+  private regenerateScheduleString(): void {
+    const formatted = this.scheduleConflict.formatMeetings(this.courseForm.meetings);
+    // Only overwrite if the existing string is auto-formatted or empty;
+    // preserves any custom human prose an admin typed manually.
+    if (!this.courseForm.schedule.trim() || this.looksAutoFormatted(this.courseForm.schedule)) {
+      this.courseForm.schedule = formatted;
+    }
+  }
+
+  private looksAutoFormatted(s: string): boolean {
+    // Auto-formatted strings look like "Mon 08:00–09:00 · Wed 08:00–09:00"
+    return /·|^[A-Z][a-z]{2}\s+\d{2}:\d{2}/.test(s);
+  }
+
+  onMeetingChange(): void {
+    this.regenerateScheduleString();
   }
 
   private async loadAll(): Promise<void> {
@@ -163,10 +202,14 @@ export class AdminCourses implements OnInit {
 
   openEditCourse(c: Course): void {
     this.editingCourseId = c.id;
+    const meetings = (c.meetings && c.meetings.length > 0)
+      ? c.meetings.map(m => ({ ...m }))
+      : this.scheduleConflict.parseScheduleString(c.schedule);
     this.courseForm = {
       name: c.name,
       units: c.units,
       schedule: c.schedule,
+      meetings,
       semester: c.semester,
       programId: c.programId,
     };
@@ -180,46 +223,62 @@ export class AdminCourses implements OnInit {
   }
 
   async saveCourse(): Promise<void> {
-    const { name, units, schedule, semester, programId } = this.courseForm;
+    const { name, units, schedule, semester, programId, meetings } = this.courseForm;
     if (!name.trim() || !units || !semester.trim() || !programId) {
-      this.toast('error', 'Please fill in all required fields');
+      this.toast.warning('Fill in all required fields');
       return;
     }
+
+    // Validate each meeting row: end must be after start.
+    const cleanMeetings: Meeting[] = [];
+    for (const m of (meetings ?? [])) {
+      if (!m.startTime || !m.endTime) {
+        this.toast.warning('Each meeting needs a start and end time');
+        return;
+      }
+      if (m.endTime <= m.startTime) {
+        this.toast.warning('Meeting end time must be after its start time');
+        return;
+      }
+      cleanMeetings.push({ day: m.day, startTime: m.startTime, endTime: m.endTime });
+    }
+
+    const payload = {
+      name: name.trim(),
+      units: Number(units),
+      schedule: schedule.trim(),
+      meetings: cleanMeetings,
+      semester: semester.trim(),
+      programId,
+    };
+
     try {
       if (this.editingCourseId) {
-        await this.academic.updateCourse(this.editingCourseId, {
-          name: name.trim(), units: Number(units),
-          schedule: schedule.trim(), semester: semester.trim(), programId,
-        });
-        this.toast('success', 'Course updated');
+        await this.academic.updateCourse(this.editingCourseId, payload);
+        this.toast.success('Course updated');
       } else {
-        await this.academic.addCourse({
-          name: name.trim(), units: Number(units),
-          schedule: schedule.trim(), semester: semester.trim(), programId,
-        });
-        this.toast('success', 'Course created');
+        await this.academic.addCourse(payload);
+        this.toast.success('Course created');
       }
       this.cancelCourseForm();
       await this.loadAll();
-    } catch { this.toast('error', 'Failed to save course'); }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Failed to save course';
+      this.toast.error('Failed to save course', { text: message });
+    }
   }
 
   async deleteCourse(c: Course): Promise<void> {
-    const res = await Swal.fire({
-      icon: 'warning',
-      title: `Delete ${c.name}?`,
+    const ok = await this.toast.confirmDestructive(`Delete ${c.name}?`, {
       text: 'All section assignments and enrollments for this course will be removed.',
-      showCancelButton: true,
-      confirmButtonText: 'Delete',
-      confirmButtonColor: '#ef4444',
     });
-    if (!res.isConfirmed) return;
+    if (!ok) return;
     try {
       await this.academic.deleteCourse(c.id);
       if (this.expandedCourseId === c.id) this.expandedCourseId = null;
       await this.loadAll();
-      this.toast('success', 'Course deleted');
-    } catch { this.toast('error', 'Failed to delete course'); }
+      this.toast.success('Course deleted');
+    } catch { this.toast.error('Failed to delete course'); }
   }
 
   // ── section-teacher assignments ───────────────────────────────────────────────
@@ -227,7 +286,7 @@ export class AdminCourses implements OnInit {
   async assignSection(courseId: string, programId: string): Promise<void> {
     const form = this.assignForm[courseId];
     if (!form?.sectionId || !form?.teacherUID) {
-      this.toast('error', 'Please select both a section and a teacher');
+      this.toast.warning('Select both a section and a teacher');
       return;
     }
     try {
@@ -236,24 +295,23 @@ export class AdminCourses implements OnInit {
       );
       this.assignForm[courseId] = { sectionId: '', teacherUID: '' };
       await this.loadAll();
-      this.toast('success', 'Section assigned');
-    } catch { this.toast('error', 'Failed to assign section'); }
+      this.toast.success('Section assigned');
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Failed to assign section';
+      this.toast.error('Failed to assign section', { text: message });
+    }
   }
 
   async removeAssignment(cs: CourseSection): Promise<void> {
-    const res = await Swal.fire({
-      icon: 'warning',
-      title: 'Remove assignment?',
+    const ok = await this.toast.confirmDestructive('Remove assignment?', {
       text: `Remove ${this.sectionName(cs.sectionId)} from ${this.teacherName(cs.teacherUID)}?`,
-      showCancelButton: true,
-      confirmButtonText: 'Remove',
-      confirmButtonColor: '#ef4444',
+      confirmText: 'Remove',
     });
-    if (!res.isConfirmed) return;
+    if (!ok) return;
     try {
       await this.academic.removeCourseSection(cs.id);
       await this.loadAll();
-      this.toast('success', 'Assignment removed');
-    } catch { this.toast('error', 'Failed to remove assignment'); }
+      this.toast.success('Assignment removed');
+    } catch { this.toast.error('Failed to remove assignment'); }
   }
 }

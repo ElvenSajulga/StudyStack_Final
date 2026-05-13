@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { FirestoreService } from './firestore.service';
+import { Meeting, ScheduleConflictService } from './schedule-conflict.service';
 import { where } from '@angular/fire/firestore';
 
 // ─── Interfaces ──────────────────────────────────────────────────────────────
@@ -39,7 +40,14 @@ export interface Course {
   id: string;
   name: string;
   units: number;
+  /** Human-readable display string. Kept for back-compat; `meetings` is canonical. */
   schedule: string;
+  /**
+   * Structured weekly schedule. The canonical source for conflict detection.
+   * Older course records may not have this field; the conflict service treats
+   * a missing/empty array as "schedule unknown, cannot conflict".
+   */
+  meetings?: Meeting[];
   semester: string;
   programId: string;
 }
@@ -75,7 +83,55 @@ export class AcademicService {
   private readonly CSC = 'courseSections';
   private readonly ENR = 'enrollments';
 
-  constructor(private readonly fs: FirestoreService) {}
+  constructor(
+    private readonly fs: FirestoreService,
+    private readonly schedule: ScheduleConflictService,
+  ) {}
+
+  /**
+   * Resolve the structured meetings for a course, parsing the legacy
+   * schedule string on-the-fly if `meetings` isn't populated.
+   */
+  private meetingsFor(course: Course | undefined): Meeting[] {
+    if (!course) return [];
+    if (course.meetings && course.meetings.length > 0) return course.meetings;
+    return this.schedule.parseScheduleString(course.schedule);
+  }
+
+  /**
+   * For a (course, section) pair: every distinct course the teacher already
+   * teaches PLUS every distinct course already running for the section.
+   * Returns the meetings to check the candidate course against.
+   */
+  private async getMeetingsForTeacherAndSection(
+    candidateCourseId: string,
+    courseId: string,
+    sectionId: string,
+    teacherUID: string,
+  ): Promise<{ course: Course; reason: 'teacher' | 'section' }[]> {
+    const [allCourseSections, allCourses] = await Promise.all([
+      this.getCourseSections(),
+      this.getCourses(),
+    ]);
+    const coursesById = new Map(allCourses.map(c => [c.id, c]));
+    const conflicts: { course: Course; reason: 'teacher' | 'section' }[] = [];
+    const seen = new Set<string>();
+    for (const cs of allCourseSections) {
+      // Ignore self — re-assigning the same (course, section) pair is fine.
+      if (cs.courseId === candidateCourseId && cs.sectionId === sectionId) continue;
+      const c = coursesById.get(cs.courseId);
+      if (!c) continue;
+      const reason: 'teacher' | 'section' | null =
+        cs.teacherUID === teacherUID ? 'teacher' :
+        cs.sectionId  === sectionId  ? 'section' : null;
+      if (!reason) continue;
+      const key = `${cs.courseId}::${reason}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      conflicts.push({ course: c, reason });
+    }
+    return conflicts;
+  }
 
   private newId(): string {
     return crypto.randomUUID
@@ -277,6 +333,7 @@ export class AcademicService {
   }
 
   async addCourse(data: Omit<Course, 'id'>): Promise<Course> {
+    await this.assertNoDuplicateConflict(data, null);
     const id = this.newId();
     const course: Course = { id, ...data };
     await this.fs.set(this.CRS, id, { ...course });
@@ -284,7 +341,45 @@ export class AcademicService {
   }
 
   async updateCourse(id: string, changes: Partial<Course>): Promise<void> {
+    const existing = await this.fs.getById<Course>(this.CRS, id);
+    if (existing) {
+      const merged: Course = { ...existing, ...changes };
+      await this.assertNoDuplicateConflict(merged, id);
+    }
     await this.fs.update(this.CRS, id, changes);
+  }
+
+  /**
+   * Enforces the D5 rule: a duplicate course (same name + semester + program)
+   * is allowed only if its meetings don't overlap any existing duplicate.
+   */
+  private async assertNoDuplicateConflict(
+    candidate: Pick<Course, 'name' | 'semester' | 'programId'> & { meetings?: Meeting[]; schedule?: string },
+    selfId: string | null,
+  ): Promise<void> {
+    const candidateMeetings = candidate.meetings && candidate.meetings.length > 0
+      ? candidate.meetings
+      : this.schedule.parseScheduleString(candidate.schedule);
+    if (candidateMeetings.length === 0) return;
+
+    const all = await this.getCourses();
+    const sameKey = all.filter(c =>
+      c.id !== selfId &&
+      c.programId === candidate.programId &&
+      c.semester === candidate.semester &&
+      c.name.trim().toLowerCase() === candidate.name.trim().toLowerCase(),
+    );
+    if (sameKey.length === 0) return;
+
+    const hit = this.schedule.findFirstConflict(
+      candidateMeetings, sameKey, c => this.meetingsFor(c),
+    );
+    if (hit) {
+      throw new Error(
+        `Schedule conflict: a course named "${hit.other.name}" in ${candidate.semester} ` +
+        `already meets ${this.schedule.formatMeeting(hit.conflict.b)}.`,
+      );
+    }
   }
 
   async deleteCourse(id: string): Promise<void> {
@@ -335,6 +430,8 @@ export class AcademicService {
     sectionId: string,
     teacherUID: string,
   ): Promise<CourseSection> {
+    await this.assertNoSectionAssignmentConflict(courseId, sectionId, teacherUID);
+
     // one teacher per section per course — remove existing first
     const existing = await this.getCourseSectionsByCourse(courseId);
     const duplicate = existing.find(cs => cs.sectionId === sectionId);
@@ -345,6 +442,36 @@ export class AcademicService {
     const cs: CourseSection = { id, courseId, sectionId, teacherUID };
     await this.fs.set(this.CSC, id, { ...cs });
     return cs;
+  }
+
+  /**
+   * Throws if assigning `(courseId, sectionId)` to `teacherUID` would put
+   * the teacher in two places at once, or put two courses on the same
+   * section at overlapping times (D7).
+   */
+  private async assertNoSectionAssignmentConflict(
+    courseId: string,
+    sectionId: string,
+    teacherUID: string,
+  ): Promise<void> {
+    const candidate = await this.fs.getById<Course>(this.CRS, courseId);
+    const candidateMeetings = this.meetingsFor(candidate);
+    if (candidateMeetings.length === 0) return;
+
+    const others = await this.getMeetingsForTeacherAndSection(
+      courseId, courseId, sectionId, teacherUID,
+    );
+    const hit = this.schedule.findFirstConflict(
+      candidateMeetings, others, o => this.meetingsFor(o.course),
+    );
+    if (!hit) return;
+    const subject = hit.other.reason === 'teacher'
+      ? 'This teacher already teaches'
+      : 'This section already has';
+    throw new Error(
+      `Schedule conflict: ${subject} "${hit.other.course.name}" at ` +
+      `${this.schedule.formatMeeting(hit.conflict.b)}.`,
+    );
   }
 
   async removeCourseSection(id: string): Promise<void> {
@@ -412,6 +539,8 @@ export class AcademicService {
   async enrollStudent(
     data: Omit<Enrollment, 'id' | 'enrolledAt'>,
   ): Promise<Enrollment> {
+    await this.assertNoStudentScheduleConflict(data.studentUID, data.courseId);
+
     const id = this.newId();
     const enrollment: Enrollment = {
       id, ...data,
@@ -419,6 +548,36 @@ export class AcademicService {
     };
     await this.fs.set(this.ENR, id, { ...enrollment });
     return enrollment;
+  }
+
+  /** Throws if enrolling `studentUID` in `courseId` would overlap an existing enrollment (D7). */
+  private async assertNoStudentScheduleConflict(
+    studentUID: string,
+    courseId: string,
+  ): Promise<void> {
+    const candidate = await this.fs.getById<Course>(this.CRS, courseId);
+    const candidateMeetings = this.meetingsFor(candidate);
+    if (candidateMeetings.length === 0) return;
+
+    const [existingEnrollments, allCourses] = await Promise.all([
+      this.getEnrollmentsByStudent(studentUID),
+      this.getCourses(),
+    ]);
+    const coursesById = new Map(allCourses.map(c => [c.id, c]));
+    const otherCourses = existingEnrollments
+      .filter(e => e.courseId !== courseId)
+      .map(e => coursesById.get(e.courseId))
+      .filter((c): c is Course => !!c);
+
+    const hit = this.schedule.findFirstConflict(
+      candidateMeetings, otherCourses, c => this.meetingsFor(c),
+    );
+    if (hit) {
+      throw new Error(
+        `Schedule conflict: student is already enrolled in "${hit.other.name}" ` +
+        `which meets ${this.schedule.formatMeeting(hit.conflict.b)}.`,
+      );
+    }
   }
 
   async removeEnrollment(enrollmentId: string): Promise<void> {

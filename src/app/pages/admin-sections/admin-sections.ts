@@ -9,7 +9,7 @@ import {
   Enrollment,
 } from '../../services/academic.service';
 import { StudentAccount, StudentAccountService } from '../../services/student-account.service';
-import Swal from 'sweetalert2';
+import { ToastService } from '../../services/toast.service';
 
 interface SectionStudent {
   studentID: string;
@@ -53,6 +53,7 @@ export class AdminSections implements OnInit {
   constructor(
     private readonly academic: AcademicService,
     private readonly studentService: StudentAccountService,
+    private readonly toastService: ToastService,
     private readonly cdr: ChangeDetectorRef,
   ) {}
 
@@ -61,10 +62,8 @@ export class AdminSections implements OnInit {
   }
 
   private toast(icon: 'success' | 'error', title: string): void {
-    void Swal.fire({
-      toast: true, position: 'top-end', icon, title,
-      showConfirmButton: false, timer: 2000, timerProgressBar: true,
-    });
+    if (icon === 'success') this.toastService.success(title);
+    else this.toastService.error(title);
   }
 
   private async loadAll(): Promise<void> {
@@ -189,17 +188,12 @@ export class AdminSections implements OnInit {
 
   async deleteYearLevel(yl: YearLevel): Promise<void> {
     const count = this.sectionsForYearLevel(yl.id).length;
-    const res = await Swal.fire({
-      icon: 'warning',
-      title: `Delete ${yl.name}?`,
+    const ok = await this.toastService.confirmDestructive(`Delete ${yl.name}?`, {
       text: count
         ? `This will also delete ${count} section(s) under it.`
         : 'Delete this year level?',
-      showCancelButton: true,
-      confirmButtonText: 'Delete',
-      confirmButtonColor: '#ef4444',
     });
-    if (!res.isConfirmed) return;
+    if (!ok) return;
     try {
       await this.academic.deleteYearLevel(yl.id);
       this.expandedYearLevelIds.delete(yl.id);
@@ -284,15 +278,10 @@ export class AdminSections implements OnInit {
   }
 
   async deleteSection(s: Section): Promise<void> {
-    const res = await Swal.fire({
-      icon: 'warning',
-      title: `Delete ${s.name}?`,
+    const ok = await this.toastService.confirmDestructive(`Delete ${s.name}?`, {
       text: 'All enrollments for this section will also be removed.',
-      showCancelButton: true,
-      confirmButtonText: 'Delete',
-      confirmButtonColor: '#ef4444',
     });
-    if (!res.isConfirmed) return;
+    if (!ok) return;
     try {
       await this.academic.deleteSection(s.id);
       await this.loadAll();

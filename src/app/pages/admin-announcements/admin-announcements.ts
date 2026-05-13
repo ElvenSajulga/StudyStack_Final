@@ -5,7 +5,7 @@ import { Announcement, AnnouncementService } from '../../services/announcement.s
 import { AcademicService, Program } from '../../services/academic.service';
 import { StudentAccount, StudentAccountService } from '../../services/student-account.service';
 import { TeacherAccountService } from '../../services/teacher-account.service';
-import Swal from 'sweetalert2';
+import { ToastService } from '../../services/toast.service';
 
 interface AnnouncementRow {
   announcement: Announcement;
@@ -58,6 +58,7 @@ export class AdminAnnouncements implements OnInit {
     private readonly academic: AcademicService,
     private readonly teacherService: TeacherAccountService,
     private readonly studentService: StudentAccountService,
+    private readonly toastService: ToastService,
     private readonly cdr: ChangeDetectorRef,
   ) {}
 
@@ -75,15 +76,8 @@ export class AdminAnnouncements implements OnInit {
   }
 
   private toast(icon: 'success' | 'error', title: string): void {
-    void Swal.fire({
-      toast: true,
-      position: 'top-end',
-      icon,
-      title,
-      showConfirmButton: false,
-      timer: 2000,
-      timerProgressBar: true,
-    });
+    if (icon === 'success') this.toastService.success(title);
+    else this.toastService.error(title);
   }
 
   private async loadAll(): Promise<void> {
@@ -289,15 +283,10 @@ export class AdminAnnouncements implements OnInit {
   // ── Delete ────────────────────────────────────────────────────────────────
 
   async deleteAnnouncement(id: string | number): Promise<void> {
-    const res = await Swal.fire({
-      icon: 'warning',
-      title: 'Delete announcement?',
+    const ok = await this.toastService.confirmDestructive('Delete announcement?', {
       text: 'This action cannot be undone.',
-      showCancelButton: true,
-      confirmButtonText: 'Delete',
-      confirmButtonColor: '#ef4444',
     });
-    if (!res.isConfirmed) return;
+    if (!ok) return;
 
     try {
       await this.announcementService.delete(id);

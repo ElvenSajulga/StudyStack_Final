@@ -108,6 +108,7 @@
             <div>
               <p class="ng-title">{{ item.activity.title }}</p>
               <p class="ng-meta">
+                <span class="course-tag">{{ courseNameFor(item.activity) }}</span>
                 <span class="badge badge-warning">{{ item.ungraded }} ungraded</span>
                 <span class="ng-due">Due {{ item.activity.deadline | date:'MMM d, y' }}</span>
               </p>
@@ -130,6 +131,7 @@
             <thead>
               <tr>
                 <th class="col-text">Activity</th>
+                <th class="col-text">Course</th>
                 <th class="col-text">Due Date</th>
                 <th class="col-status">Status</th>
                 <th class="col-actions">Actions</th>
@@ -138,6 +140,7 @@
             <tbody>
               <tr *ngFor="let activity of recentActivities">
                 <td class="col-text">{{ activity.title }}</td>
+                <td class="col-text"><span class="course-tag">{{ courseNameFor(activity) }}</span></td>
                 <td class="col-text">{{ activity.deadline | date: 'short' }}</td>
                 <td class="col-status">
                   <span class="badge" [ngClass]="isActivityUpcoming(activity.deadline) ? 'badge-warning' : 'badge-info'">

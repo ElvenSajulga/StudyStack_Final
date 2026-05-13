@@ -1,0 +1,83 @@
+<div class="student-materials">
+  <header>
+    <h2 class="page-title">Learning Materials</h2>
+    <p class="page-subtitle">Resources shared by your teachers, grouped by course.</p>
+  </header>
+
+  <section class="filter-bar">
+    <div class="search-box">
+      <i class="ti ti-search"></i>
+      <input
+        type="text"
+        placeholder="Search by title, description, or file name…"
+        [(ngModel)]="search"
+        (input)="onFilterChange()" />
+    </div>
+
+    <select
+      class="course-select"
+      [(ngModel)]="selectedCourseId"
+      (change)="onFilterChange()">
+      <option value="all">All courses</option>
+      <option *ngFor="let opt of courseFilterOptions" [value]="opt.id">
+        {{ opt.name }}
+      </option>
+    </select>
+  </section>
+
+  <p class="muted" *ngIf="loading">Loading materials…</p>
+
+  <ng-container *ngIf="!loading">
+    <section class="empty-card" *ngIf="groups.length === 0">
+      <i class="ti ti-folder-open"></i>
+      <p class="empty-text">
+        {{ flatMaterials.length === 0
+            ? 'No materials have been shared with you yet.'
+            : 'No materials match your filters.' }}
+      </p>
+    </section>
+
+    <section class="group" *ngFor="let group of groups">
+      <h3 class="group-title">
+        <i class="ti ti-book-2"></i>
+        {{ group.courseName }}
+        <span class="group-count">{{ group.items.length }}</span>
+      </h3>
+
+      <article
+        class="material-card"
+        *ngFor="let m of group.items; trackBy: trackById">
+        <div class="material-icon">
+          <i class="ti" [ngClass]="iconForMaterial(m)"></i>
+        </div>
+
+        <div class="material-body">
+          <header>
+            <h4>{{ m.title }}</h4>
+            <span class="meta">{{ m.createdAt | date: 'short' }}</span>
+          </header>
+          <p *ngIf="m.description">{{ m.description }}</p>
+
+          <div class="material-target" *ngIf="m.kind === 'link'">
+            <a [href]="m.linkUrl" target="_blank" rel="noopener noreferrer">
+              <i class="ti ti-external-link"></i>
+              Open link
+            </a>
+            <span class="link-url">{{ m.linkUrl }}</span>
+          </div>
+
+          <div class="material-target" *ngIf="m.kind === 'file'">
+            <a
+              [href]="m.fileDataUrl"
+              [download]="m.fileName"
+              [attr.title]="m.fileName">
+              <i class="ti ti-download"></i>
+              Download {{ m.fileName }}
+            </a>
+            <span class="link-url">{{ formatBytes(m.fileSize || 0) }}</span>
+          </div>
+        </div>
+      </article>
+    </section>
+  </ng-container>
+</div>

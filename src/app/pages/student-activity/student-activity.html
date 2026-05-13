@@ -22,12 +22,20 @@
       <button class="course-card" *ngFor="let card of courseCards" (click)="openCourse(card)" type="button">
         <!-- Card Header -->
         <div class="course-card-header">
-          <div class="course-badge">
-            <span class="badge-letter">{{ card.course.name.charAt(0) }}</span>
+          <div class="course-badge" [class.has-avatar]="!!card.teacherAvatar">
+            <img *ngIf="card.teacherAvatar; else letterBadge"
+              [src]="card.teacherAvatar"
+              [alt]="'Avatar of ' + (card.teacherName || 'teacher')" />
+            <ng-template #letterBadge>
+              <span class="badge-letter">{{ card.course.name.charAt(0) }}</span>
+            </ng-template>
           </div>
           <div class="course-header-info">
             <h3 class="course-name">{{ card.course.name }}</h3>
-            <p class="course-code">{{ card.course.semester }}</p>
+            <p class="course-teacher" *ngIf="card.teacherName">
+              <i class="ti ti-user" aria-hidden="true"></i>
+              {{ card.teacherName }}
+            </p>
           </div>
           <div class="course-status-indicator" [class]="'status-' + getCourseStatus(card.course.id)">
             <i class="ti" [ngClass]="getCourseStatusIcon(card.course.id)"></i>
@@ -37,27 +45,27 @@
         <!-- Course Meta -->
         <div class="course-meta">
           <div class="meta-item">
-            <span class="meta-label">Year</span>
+            <span class="meta-label">Semester</span>
             <span class="meta-value">{{ card.course.semester || '—' }}</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">Schedule</span>
+            <span class="meta-value">{{ card.course.schedule || '—' }}</span>
           </div>
           <div class="meta-item">
             <span class="meta-label">Units</span>
             <span class="meta-value">{{ card.course.units }}</span>
-          </div>
-          <div class="meta-item">
-            <span class="meta-label">Status</span>
-            <span class="meta-value">Active</span>
           </div>
         </div>
 
         <!-- Activity Stats -->
         <div class="course-stats">
           <div class="stat">
-            <span class="stat-number">{{ getTotalActivities(card.course.id) }}</span>
+            <span class="stat-number">{{ card.totalActivities }}</span>
             <span class="stat-label">Activities</span>
           </div>
           <div class="stat">
-            <span class="stat-number">{{ getPendingActivities(card.course.id) }}</span>
+            <span class="stat-number">{{ card.pendingCount }}</span>
             <span class="stat-label">Pending</span>
           </div>
           <div class="stat">
@@ -71,13 +79,25 @@
           <div class="progress-bar">
             <div class="progress-fill" [style.width.%]="getCourseCompletionPercent(card.course.id)"></div>
           </div>
-          <span class="progress-label">{{ getCompletedActivities(card.course.id) }}/{{ getTotalActivities(card.course.id) }} completed</span>
+          <span class="progress-label">{{ getCompletedActivities(card.course.id) }}/{{ card.totalActivities }} completed</span>
         </div>
 
-        <!-- Actions -->
-        <div class="course-actions">
-          <span class="btn-text">View Activities</span>
-          <i class="ti ti-arrow-right"></i>
+        <!-- Footer: last activity + CTA -->
+        <div class="course-card-footer">
+          <span class="last-activity" *ngIf="card.lastActivityAt; else noActivity">
+            <i class="ti ti-clock" aria-hidden="true"></i>
+            Latest: {{ card.lastActivityAt | date: 'MMM d' }}
+          </span>
+          <ng-template #noActivity>
+            <span class="last-activity muted">
+              <i class="ti ti-clock" aria-hidden="true"></i>
+              No activities yet
+            </span>
+          </ng-template>
+          <span class="cta-link">
+            View activities
+            <i class="ti ti-arrow-right" aria-hidden="true"></i>
+          </span>
         </div>
       </button>
     </div>
@@ -407,6 +427,31 @@
             Ask a question
           </button>
         </div>
+
+        <!-- Q&A history (this student's questions + teacher replies) -->
+        <section class="qa-history" *ngIf="myQuestionsForActivity(selectedActivity.id).length > 0">
+          <h5 class="qa-history-title">Your questions</h5>
+          <article class="qa-thread" *ngFor="let q of myQuestionsForActivity(selectedActivity.id)">
+            <div class="qa-thread-msg">
+              <span class="qa-thread-meta">You · {{ q.createdAt | date: 'medium' }}</span>
+              <p class="qa-thread-text">{{ q.message }}</p>
+            </div>
+            <div class="qa-thread-reply" *ngIf="q.answered; else awaitingReply">
+              <span class="qa-thread-meta">
+                <i class="ti ti-corner-down-right" aria-hidden="true"></i>
+                Teacher reply
+                <span *ngIf="q.answeredAt"> · {{ q.answeredAt | date: 'medium' }}</span>
+              </span>
+              <p class="qa-thread-text">{{ q.answer }}</p>
+            </div>
+            <ng-template #awaitingReply>
+              <p class="qa-thread-pending">
+                <i class="ti ti-clock" aria-hidden="true"></i>
+                Awaiting reply
+              </p>
+            </ng-template>
+          </article>
+        </section>
 
         <div class="status-row">
           <span class="status-label">Status:</span>

@@ -11,6 +11,7 @@ import { Announcement, AnnouncementService } from '../../../services/announcemen
 import { AcademicService, Course, Enrollment } from '../../../services/academic.service';
 import { AuthService } from '../../../services/auth.service';
 import { TeacherAccountService } from '../../../services/teacher-account.service';
+import { CourseLookupService } from '../../../services/course-lookup.service';
 import { isPlatformBrowser } from '@angular/common';
 import { Subscription } from 'rxjs';
 
@@ -76,8 +77,26 @@ export class StudentDashboard implements OnInit, OnDestroy {
     private readonly academic: AcademicService,
     private readonly auth: AuthService,
     private readonly teacherAccountService: TeacherAccountService,
+    private readonly courseLookup: CourseLookupService,
     private readonly cdr: ChangeDetectorRef,
   ) {}
+
+  /** Resolves an activity's course name, preferring direct courseId, falling back via enrollments. */
+  courseNameFor(activity: Activity): string {
+    if (activity.courseId) {
+      const name = this.courseLookup.name(activity.courseId, '');
+      if (name) return name;
+    }
+    // Fallback: resolve via teacher → enrollment → courseId
+    const teacher = this.teacherAccountService.getAll().find(
+      t => t.teacherID === activity.teacherID || t.UID === activity.teacherUID,
+    );
+    if (teacher) {
+      const enr = this.currentEnrollments.find(e => e.teacherUID === teacher.UID);
+      if (enr) return this.courseLookup.name(enr.courseId, 'Unassigned');
+    }
+    return 'Unassigned';
+  }
 
   ngOnInit(): void {
     const user = localStorage.getItem('currentUser');
@@ -85,6 +104,7 @@ export class StudentDashboard implements OnInit, OnDestroy {
       const parsed = JSON.parse(user);
       this.userName = parsed.name || 'Student';
     }
+    void this.courseLookup.ensureLoaded();
     void this.initRealtime();
   }
 

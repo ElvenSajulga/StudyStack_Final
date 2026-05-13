@@ -1,64 +1,105 @@
-<div class="student-page">
+<div class="student-page profile-page">
   <header>
     <h2 class="page-title">My profile</h2>
     <p class="page-subtitle">
-      View your student details and make sure your information is up to date.
+      Update your display name, profile picture, and password.
     </p>
   </header>
 
   <ng-container *ngIf="user; else noProfile">
+    <!-- Identity / avatar card -->
+    <section class="card identity-card">
+      <div class="identity-avatar">
+        <div class="avatar-wrap">
+          <img *ngIf="avatar; else initialsBlock" [src]="avatar" alt="Profile picture" class="avatar-img" />
+          <ng-template #initialsBlock>
+            <div class="avatar avatar-initials">{{ initials }}</div>
+          </ng-template>
+        </div>
+        <div class="avatar-actions">
+          <label class="btn small subtle" [class.disabled]="uploadingAvatar">
+            <i class="ti ti-upload" aria-hidden="true"></i>
+            {{ uploadingAvatar ? 'Uploading…' : (avatar ? 'Replace' : 'Upload') }}
+            <input type="file" accept="image/jpeg,image/png,image/webp,image/gif"
+              (change)="onAvatarSelected($event)" hidden [disabled]="uploadingAvatar" />
+          </label>
+          <button class="btn small danger" type="button" *ngIf="avatar"
+            (click)="removeAvatar()" [disabled]="uploadingAvatar">
+            Remove
+          </button>
+        </div>
+        <p class="avatar-hint">JPEG, PNG, WEBP, or GIF. Up to 10 MB; we'll resize automatically.</p>
+      </div>
+
+      <dl class="profile-meta">
+        <dt>Name</dt>
+        <dd>{{ account?.name || user.name || 'Student' }}</dd>
+
+        <dt>Student ID</dt>
+        <dd>{{ studentID || 'Not set' }}</dd>
+
+        <dt>Email</dt>
+        <dd>{{ email || '—' }}</dd>
+
+        <dt>Program</dt>
+        <dd>{{ program || '—' }}</dd>
+
+        <dt>Role</dt>
+        <dd>Student</dd>
+      </dl>
+    </section>
+
+    <!-- Editable name -->
     <section class="card">
-      <div class="profile-grid">
-        <div>
-          <div class="avatar">{{ initials }}</div>
-          <dl class="profile-meta">
-            <dt>Name</dt>
-            <dd>{{ user.name || 'Student' }}</dd>
+      <h3>Display name</h3>
+      <p class="card-description">
+        Your name as shown across StudyStack. Email and Student ID can only be changed by an administrator.
+      </p>
+      <div class="form-grid">
+        <label class="field">
+          <span class="field-label">First name <span class="req">*</span></span>
+          <input type="text" [(ngModel)]="form.firstname" [disabled]="savingName" />
+        </label>
+        <label class="field">
+          <span class="field-label">Middle name</span>
+          <input type="text" [(ngModel)]="form.middlename" [disabled]="savingName" />
+        </label>
+        <label class="field">
+          <span class="field-label">Last name <span class="req">*</span></span>
+          <input type="text" [(ngModel)]="form.lastname" [disabled]="savingName" />
+        </label>
+      </div>
+      <div class="form-actions">
+        <button class="btn primary" (click)="saveName()" [disabled]="!nameDirty || savingName">
+          {{ savingName ? 'Saving…' : 'Save changes' }}
+        </button>
+      </div>
+    </section>
 
-            <dt>Student ID</dt>
-            <dd>{{ studentID || 'Not set' }}</dd>
-
-            <dt>Role</dt>
-            <dd>Student</dd>
-          </dl>
-        </div>
-
-        <div>
-          <h3>Account information</h3>
-          <p class="card-description">
-            These details are based on your logged-in account. For changes to your official records,
-            please contact your teacher or school administrator.
-          </p>
-
-          <form>
-            <div class="form-grid">
-              <label class="field">
-                <span class="field-label">Full name</span>
-                <input type="text" [value]="user.name || ''" disabled />
-              </label>
-
-              <label class="field">
-                <span class="field-label">Student ID</span>
-                <input type="text" [value]="studentID || 'Not set'" disabled />
-              </label>
-
-              <label class="field">
-                <span class="field-label">Email address</span>
-                <input type="email" placeholder="Provided by the school" disabled />
-              </label>
-
-              <label class="field">
-                <span class="field-label">Course / strand</span>
-                <input type="text" placeholder="Provided by the school" disabled />
-              </label>
-            </div>
-
-            <p class="info-note">
-              Profile fields are managed by the school. If something looks incorrect, ask your teacher
-              or administrator to update it.
-            </p>
-          </form>
-        </div>
+    <!-- Password change -->
+    <section class="card">
+      <h3>Change password</h3>
+      <p class="card-description">
+        Use at least 6 characters. After changing, your existing session keeps working.
+      </p>
+      <div class="form-grid">
+        <label class="field">
+          <span class="field-label">Current password</span>
+          <input type="password" autocomplete="current-password" [(ngModel)]="pwd.current" [disabled]="savingPwd" />
+        </label>
+        <label class="field">
+          <span class="field-label">New password</span>
+          <input type="password" autocomplete="new-password" [(ngModel)]="pwd.next" [disabled]="savingPwd" />
+        </label>
+        <label class="field">
+          <span class="field-label">Confirm new password</span>
+          <input type="password" autocomplete="new-password" [(ngModel)]="pwd.confirm" [disabled]="savingPwd" />
+        </label>
+      </div>
+      <div class="form-actions">
+        <button class="btn primary" (click)="savePassword()" [disabled]="savingPwd">
+          {{ savingPwd ? 'Saving…' : 'Update password' }}
+        </button>
       </div>
     </section>
   </ng-container>

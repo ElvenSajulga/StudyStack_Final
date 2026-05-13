@@ -18,11 +18,57 @@
         (click)="openCourse(card)"
       >
         <div class="course-card-header">
-          <span class="course-card-name">{{ card.course.name }}</span>
+          <div class="course-card-titles">
+            <span class="course-card-name">{{ card.course.name }}</span>
+            <span class="course-card-section" *ngIf="card.sectionName">
+              <i class="ti ti-users" aria-hidden="true"></i>
+              {{ card.sectionName }}
+            </span>
+          </div>
           <span class="course-card-sem">{{ card.course.semester }}</span>
         </div>
-        <div class="course-card-body">
-          <span class="units-badge">{{ card.course.units }} units</span>
+
+        <div class="course-card-meta">
+          <span class="meta-pill" *ngIf="card.course.schedule">
+            <i class="ti ti-calendar" aria-hidden="true"></i>
+            {{ card.course.schedule }}
+          </span>
+          <span class="meta-pill">
+            <i class="ti ti-book" aria-hidden="true"></i>
+            {{ card.course.units }} units
+          </span>
+        </div>
+
+        <div class="course-card-stats">
+          <div class="cc-stat">
+            <span class="cc-stat-value">{{ card.enrollmentCount }}</span>
+            <span class="cc-stat-label">Students</span>
+          </div>
+          <div class="cc-stat">
+            <span class="cc-stat-value">{{ card.activityCount }}</span>
+            <span class="cc-stat-label">Activities</span>
+          </div>
+          <div class="cc-stat" [class.has-pending]="card.pendingGradingCount > 0">
+            <span class="cc-stat-value">{{ card.pendingGradingCount }}</span>
+            <span class="cc-stat-label">Pending grading</span>
+          </div>
+        </div>
+
+        <div class="course-card-footer">
+          <span class="last-submission" *ngIf="card.lastSubmissionAt; else noSubs">
+            <i class="ti ti-clock" aria-hidden="true"></i>
+            Last submission: {{ card.lastSubmissionAt | date: 'MMM d' }}
+          </span>
+          <ng-template #noSubs>
+            <span class="last-submission muted">
+              <i class="ti ti-clock" aria-hidden="true"></i>
+              No submissions yet
+            </span>
+          </ng-template>
+          <span class="cta-link">
+            Manage activities
+            <i class="ti ti-arrow-right" aria-hidden="true"></i>
+          </span>
         </div>
       </div>
 
@@ -85,6 +131,17 @@
           </button>
           <button class="btn outline" (click)="openGrading(a)">
             <i class="ti ti-eye" aria-hidden="true"></i> View submissions
+          </button>
+          <button class="btn outline" (click)="openQuestions(a)">
+            <i class="ti ti-message-circle-question" aria-hidden="true"></i>
+            Questions
+            <span class="qa-count-pill"
+              *ngIf="questionCountFor(a.id).total > 0"
+              [class.has-unanswered]="questionCountFor(a.id).unanswered > 0">
+              {{ questionCountFor(a.id).unanswered > 0
+                ? questionCountFor(a.id).unanswered + ' new'
+                : questionCountFor(a.id).total }}
+            </span>
           </button>
           <button class="btn outline" *ngIf="a.type==='quiz'" (click)="openQuizBuilder(a)">
             <i class="ti ti-edit" aria-hidden="true"></i> Edit quiz
@@ -511,6 +568,85 @@
         </main>
       </ng-template>
     </div>
+  </ng-container>
+
+  <!-- ══ QUESTIONS VIEW ═════════════════════════════════════════════════ -->
+  <ng-container *ngIf="view === 'questions' && selectedCourseCard && questionsActivity">
+    <div class="breadcrumb">
+      <button class="breadcrumb-link" (click)="goBackToCourses()">Activities</button>
+      <i class="ti ti-chevron-right" aria-hidden="true"></i>
+      <button class="breadcrumb-link" (click)="backToList()">{{ selectedCourseCard.course.name }}</button>
+      <i class="ti ti-chevron-right" aria-hidden="true"></i>
+      <button class="breadcrumb-link" (click)="backToList()">{{ questionsActivity.title }}</button>
+      <i class="ti ti-chevron-right" aria-hidden="true"></i>
+      <span class="breadcrumb-current">Questions</span>
+    </div>
+    <header class="page-header">
+      <div>
+        <button class="back-btn" (click)="backToList()">
+          <i class="ti ti-arrow-left" aria-hidden="true"></i> Back
+        </button>
+        <h2 class="page-title">Questions — {{ questionsActivity.title }}</h2>
+        <p class="page-subtitle">
+          {{ activityQuestions.length }} total
+          <span *ngIf="questionCountFor(questionsActivity.id).unanswered > 0">
+            · {{ questionCountFor(questionsActivity.id).unanswered }} awaiting reply
+          </span>
+        </p>
+      </div>
+    </header>
+
+    <section class="qa-list" *ngIf="activityQuestions.length > 0; else noQuestions">
+      <article class="qa-card" *ngFor="let q of activityQuestions" [class.answered]="q.answered">
+        <header class="qa-header">
+          <div class="qa-student">
+            <span class="qa-student-name">{{ q.studentName }}</span>
+            <span class="qa-student-id muted">{{ q.studentID }}</span>
+          </div>
+          <span class="qa-date muted">{{ q.createdAt | date: 'medium' }}</span>
+        </header>
+        <p class="qa-message">{{ q.message }}</p>
+
+        <div class="qa-reply" *ngIf="q.answered; else replyForm">
+          <p class="qa-reply-label">
+            <i class="ti ti-corner-down-right" aria-hidden="true"></i>
+            Your reply <span class="muted" *ngIf="q.answeredAt">· {{ q.answeredAt | date: 'medium' }}</span>
+          </p>
+          <p class="qa-reply-text">{{ q.answer }}</p>
+        </div>
+
+        <ng-template #replyForm>
+          <div class="qa-reply-form">
+            <textarea
+              rows="3"
+              [(ngModel)]="replyDrafts[q.id]"
+              placeholder="Write a reply to this student…"
+              [disabled]="sendingReplyFor === q.id"
+            ></textarea>
+            <button
+              class="btn primary"
+              (click)="sendReply(q)"
+              [disabled]="sendingReplyFor === q.id || !(replyDrafts[q.id] || '').trim()"
+            >
+              <i class="ti ti-send" aria-hidden="true"></i>
+              {{ sendingReplyFor === q.id ? 'Sending…' : 'Send reply' }}
+            </button>
+          </div>
+        </ng-template>
+      </article>
+    </section>
+
+    <ng-template #noQuestions>
+      <div class="empty-card" style="text-align:center; padding:48px 24px">
+        <div style="width:48px;height:48px;border-radius:12px;background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);display:flex;align-items:center;justify-content:center;margin:0 auto 14px">
+          <i class="ti ti-message-circle" style="font-size:22px;color:var(--color-text-secondary)" aria-hidden="true"></i>
+        </div>
+        <p style="font-size:0.95rem;font-weight:500;margin-bottom:6px">No questions yet</p>
+        <p style="font-size:0.875rem;color:var(--color-text-secondary);margin-bottom:0">
+          Students can ask questions from the activity detail page.
+        </p>
+      </div>
+    </ng-template>
   </ng-container>
 
   <!-- ══ DUPLICATE MODAL ════════════════════════════════════════════════ -->

@@ -8,6 +8,7 @@ export interface User {
   studentID?: string;
   teacherID?: string;
   UID?: string;
+  avatar?: string;
 }
 
 @Injectable({

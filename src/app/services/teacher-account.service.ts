@@ -15,6 +15,12 @@ export interface TeacherAccount {
   firstname: string;
   middlename: string;
   facultyId: string;
+  /**
+   * Profile picture as a base64 data URL (e.g. "data:image/jpeg;base64,...").
+   * Capped at ~750KB encoded by the upload helper to stay under Firestore's
+   * 1MB document limit.
+   */
+  avatar?: string;
 }
 
 @Injectable({

@@ -1,106 +1,166 @@
-.teacher-page {
+.teacher-page,
+.profile-page {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 20px;
 }
 
 .page-title {
   margin: 0;
   font-size: 1.4rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--color-text-primary);
 }
 
 .page-subtitle {
   margin: 4px 0 0;
   font-size: 0.9rem;
-  color: #6b7280;
+  color: var(--color-text-secondary);
 }
 
 .card {
-  background: var(--color-background-primary);
-  border-radius: 12px;
+  background: var(--color-bg-surface);
+  border-radius: var(--radius-lg);
   padding: 20px;
-  box-shadow: none;
-  border: 0.5px solid var(--color-border-tertiary);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-1);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
 }
 
 .card h3 {
   margin: 0;
   font-size: 1rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--color-text-primary);
 }
 
 .card-description {
-  margin: 4px 0 0;
+  margin: 0;
   font-size: 0.85rem;
-  color: #6b7280;
+  color: var(--color-text-secondary);
+  line-height: 1.55;
 }
 
-.profile-grid {
+.identity-card {
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr);
   gap: 24px;
   align-items: flex-start;
 }
 
-.avatar {
-  width: 80px;             // reduce from 120px
-  height: 80px;
-  border-radius: 12px;     // square-ish instead of circle
-  background: #1D9E75;     // consistent teal
+.identity-avatar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.avatar-wrap {
+  width: 120px;
+  height: 120px;
+}
+
+.avatar-img {
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-lg);
+  object-fit: cover;
+  display: block;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+}
+
+.avatar,
+.avatar-initials {
+  width: 120px;
+  height: 120px;
+  border-radius: var(--radius-lg);
+  background: var(--color-primary);
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
-  font-size: 1.75rem;
-  font-weight: 500;
+  font-family: var(--font-display);
+  font-size: 2.5rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.avatar-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.avatar-actions label.btn {
+  cursor: pointer;
+  &.disabled { opacity: 0.55; cursor: not-allowed; pointer-events: none; }
+}
+
+.avatar-hint {
+  margin: 0;
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  max-width: 200px;
+  line-height: 1.45;
 }
 
 .profile-meta {
+  margin: 0;
+  display: grid;
+  grid-template-columns: minmax(120px, auto) 1fr;
+  gap: 8px 16px;
   font-size: 0.9rem;
-  color: #4b5563;
+  color: var(--color-text-primary);
 }
 
 .profile-meta dt {
-  font-weight: 500;
-  margin-top: 8px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  align-self: center;
 }
 
 .profile-meta dd {
   margin: 0;
+  align-self: center;
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   font-size: 0.85rem;
 }
 
 .field-label {
-  font-weight: 500;
-  color: #374151;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  font-size: 13px;
 }
 
+.req { color: var(--red-500); margin-left: 2px; }
+
 .field input {
-  border-radius: 8px;
-  border: 0.5px solid var(--color-border-tertiary);
-  padding: 8px 10px;
-  font-size: 0.85rem;
-  background: var(--color-background-secondary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  padding: 9px 12px;
+  font-size: 14px;
+  background: var(--color-bg-surface);
   color: var(--color-text-primary);
+  transition: border-color var(--t-base), box-shadow var(--t-base);
 }
 
 .field input:focus {
   outline: none;
-  border-color: #1D9E75;
-  box-shadow: 0 0 0 2px #1D9E7520;
-  background: var(--color-background-primary);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(10, 171, 115, 0.15);
 }
 
 .field input:disabled {
@@ -110,25 +170,25 @@
 
 .form-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px 16px;
 }
 
-.info-note {
-  margin-top: 10px;
-  font-size: 0.8rem;
-  color: #6b7280;
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
 }
 
 @media (max-width: 900px) {
-  .profile-grid {
+  .identity-card {
     grid-template-columns: minmax(0, 1fr);
   }
+  .profile-meta { grid-template-columns: 1fr; gap: 4px; }
+  .profile-meta dt { margin-top: 8px; }
 }
 
 @media (max-width: 640px) {
-  .form-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
+  .form-grid { grid-template-columns: 1fr; }
 }
-

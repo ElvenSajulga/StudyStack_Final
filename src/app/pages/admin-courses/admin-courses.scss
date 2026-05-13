@@ -383,6 +383,27 @@
 
 .center { text-align: center; }
 
+.meeting-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 6px 0 8px;
+}
+
+.meeting-row {
+  display: grid;
+  grid-template-columns: minmax(90px, 0.6fr) minmax(100px, 1fr) auto minmax(100px, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+
+  select, input { height: 34px; }
+  .meeting-sep { color: var(--color-text-secondary); font-size: 12px; }
+}
+
 @media (max-width: 640px) {
   .form-grid { grid-template-columns: 1fr; }
+  .meeting-row {
+    grid-template-columns: 1fr 1fr;
+    .meeting-sep { display: none; }
+  }
 }

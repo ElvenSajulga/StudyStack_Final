@@ -7,7 +7,7 @@ import { AuditLogService } from '../../services/audit-log.service';
 import { AuthService } from '../../services/auth.service';
 import { AdminNotificationService } from '../../services/admin-notification.service';
 import { CSVImportModal, CSVImportRow, CSVImportConfig } from '../../components/csv-import-modal/csv-import-modal';
-import Swal from 'sweetalert2';
+import { ToastService } from '../../services/toast.service';
 
 @Component({
   selector: 'app-admin-students',
@@ -57,6 +57,7 @@ export class AdminStudents implements OnInit {
     private readonly auditLog: AuditLogService,
     private readonly auth: AuthService,
     private readonly adminNotification: AdminNotificationService,
+    private readonly toastService: ToastService,
     private readonly cdr: ChangeDetectorRef,
   ) {}
 
@@ -82,10 +83,8 @@ export class AdminStudents implements OnInit {
   }
 
   private toast(icon: 'success' | 'error', title: string): void {
-    void Swal.fire({
-      toast: true, position: 'top-end', icon, title,
-      showConfirmButton: false, timer: 2000, timerProgressBar: true,
-    });
+    if (icon === 'success') this.toastService.success(title);
+    else this.toastService.error(title);
   }
 
   private async loadAll(): Promise<void> {
@@ -319,14 +318,8 @@ export class AdminStudents implements OnInit {
   }
 
   removeStudent(uid: string): void {
-    void Swal.fire({
-      icon: 'warning',
-      title: 'Remove student?',
-      showCancelButton: true,
-      confirmButtonText: 'Remove',
-      confirmButtonColor: '#ef4444',
-    }).then(res => {
-      if (!res.isConfirmed) return;
+    void this.toastService.confirmDestructive('Remove student?', { confirmText: 'Remove' }).then(ok => {
+      if (!ok) return;
       const student = this.students.find(s => s.UID === uid);
       this.studentService.remove(uid).subscribe({
         next: () => {
@@ -408,12 +401,9 @@ export class AdminStudents implements OnInit {
     }
 
     await this.loadAll();
-    void Swal.fire({
-      icon: 'success',
-      title: 'Import Complete',
+    void this.toastService.alert('Import complete', {
       html: `<p><strong>${imported}</strong> students imported</p>${skipped > 0 ? `<p><strong>${skipped}</strong> students skipped</p>` : ''}`,
-      showConfirmButton: true,
-    });
+    }, 'success');
   }
 
   // ── Bulk Status Management ─────────────────────────────────────────────────
@@ -441,15 +431,12 @@ export class AdminStudents implements OnInit {
   async bulkSetStatus(status: 'active' | 'inactive'): Promise<void> {
     if (this.selectedStudentUIDs.size === 0) return;
 
-    const res = await Swal.fire({
-      icon: 'warning',
-      title: `Set ${this.selectedStudentUIDs.size} student(s) to ${status}?`,
-      showCancelButton: true,
-      confirmButtonText: 'Confirm',
-      confirmButtonColor: status === 'inactive' ? '#ef4444' : '#22c55e',
-    });
+    const ok = await this.toastService.confirm(
+      `Set ${this.selectedStudentUIDs.size} student(s) to ${status}?`,
+      { confirmColor: status === 'inactive' ? '#ef4444' : '#22c55e' },
+    );
 
-    if (!res.isConfirmed) return;
+    if (!ok) return;
 
     try {
       const count = this.selectedStudentUIDs.size;
@@ -468,15 +455,12 @@ export class AdminStudents implements OnInit {
 
   async toggleStudentStatus(student: StudentAccount): Promise<void> {
     const newStatus = student.status === 'active' ? 'inactive' : 'active';
-    const res = await Swal.fire({
-      icon: 'warning',
-      title: `Set ${student.firstname} ${student.lastname} to ${newStatus}?`,
-      showCancelButton: true,
-      confirmButtonText: 'Confirm',
-      confirmButtonColor: newStatus === 'inactive' ? '#ef4444' : '#22c55e',
-    });
+    const ok = await this.toastService.confirm(
+      `Set ${student.firstname} ${student.lastname} to ${newStatus}?`,
+      { confirmColor: newStatus === 'inactive' ? '#ef4444' : '#22c55e' },
+    );
 
-    if (!res.isConfirmed) return;
+    if (!ok) return;
 
     try {
       this.studentService.update(student.UID, { status: newStatus });
@@ -488,21 +472,18 @@ export class AdminStudents implements OnInit {
   }
 
   async resetStudentPassword(student: StudentAccount): Promise<void> {
-    const result = await Swal.fire({
-      icon: 'info',
-      title: 'Reset password',
+    const newPassword = await this.toastService.prompt('Reset password', {
       html: `<p>Enter a temporary password for <strong>${student.firstname} ${student.lastname}</strong></p>`,
-      input: 'password',
-      inputPlaceholder: 'Minimum 6 characters',
+      inputType: 'password',
+      placeholder: 'Minimum 6 characters',
       inputAttributes: { minlength: '6' },
-      showCancelButton: true,
-      confirmButtonText: 'Reset',
+      confirmText: 'Reset',
     });
 
-    if (!result.isConfirmed || !result.value) return;
+    if (!newPassword) return;
 
     try {
-      this.studentService.update(student.UID, { password: result.value });
+      this.studentService.update(student.UID, { password: newPassword });
       this.toast('success', 'Password reset successfully');
     } catch {
       this.toast('error', 'Failed to reset password');

@@ -2,7 +2,7 @@ import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AcademicService, Course, Program } from '../../services/academic.service';
-import Swal from 'sweetalert2';
+import { ToastService } from '../../services/toast.service';
 
 @Component({
   selector: 'app-admin-subjects',
@@ -31,6 +31,7 @@ export class AdminSubjects implements OnInit {
 
   constructor(
     private readonly academic: AcademicService,
+    private readonly toastService: ToastService,
     private readonly cdr: ChangeDetectorRef,
   ) {}
 
@@ -49,10 +50,8 @@ export class AdminSubjects implements OnInit {
   }
 
   private toast(icon: 'success' | 'error', title: string): void {
-    void Swal.fire({
-      toast: true, position: 'top-end', icon, title,
-      showConfirmButton: false, timer: 2000, timerProgressBar: true,
-    });
+    if (icon === 'success') this.toastService.success(title);
+    else this.toastService.error(title);
   }
 
   private async loadAll(): Promise<void> {
@@ -123,21 +122,17 @@ export class AdminSubjects implements OnInit {
       }
       this.cancelForm();
       await this.loadAll();
-    } catch {
-      this.toast('error', 'Failed to save course');
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Failed to save course';
+      this.toastService.error('Failed to save course', { text: message });
     }
   }
 
   async deleteCourse(id: string): Promise<void> {
-    const res = await Swal.fire({
-      icon: 'warning',
-      title: 'Delete course?',
+    const ok = await this.toastService.confirmDestructive('Delete course?', {
       text: 'All section assignments and enrollments will also be removed.',
-      showCancelButton: true,
-      confirmButtonText: 'Delete',
-      confirmButtonColor: '#ef4444',
     });
-    if (!res.isConfirmed) return;
+    if (!ok) return;
     try {
       await this.academic.deleteCourse(id);
       await this.loadAll();

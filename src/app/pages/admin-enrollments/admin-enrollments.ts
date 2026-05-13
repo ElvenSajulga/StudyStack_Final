@@ -16,7 +16,7 @@ import { AuditLogService } from '../../services/audit-log.service';
 import { AuthService } from '../../services/auth.service';
 import { AcademicCalendarService } from '../../services/academic-calendar.service';
 import { FirestoreService } from '../../services/firestore.service';
-import Swal from 'sweetalert2';
+import { ToastService } from '../../services/toast.service';
 
 interface EnrollmentRow {
   enrollment: Enrollment;
@@ -74,6 +74,7 @@ export class AdminEnrollments implements OnInit {
     private readonly auth: AuthService,
     private readonly academicCalendar: AcademicCalendarService,
     private readonly firestore: FirestoreService,
+    private readonly toastService: ToastService,
     private readonly cdr: ChangeDetectorRef,
   ) {}
 
@@ -82,10 +83,8 @@ export class AdminEnrollments implements OnInit {
   }
 
   private toast(icon: 'success' | 'error', title: string): void {
-    void Swal.fire({
-      toast: true, position: 'top-end', icon, title,
-      showConfirmButton: false, timer: 2000, timerProgressBar: true,
-    });
+    if (icon === 'success') this.toastService.success(title);
+    else this.toastService.error(title);
   }
 
   private async loadAll(): Promise<void> {
@@ -259,26 +258,22 @@ export class AdminEnrollments implements OnInit {
       if (calendar && !this.academicCalendar.isEnrollmentOpen(calendar)) {
         const enrollOpen = new Date(calendar.enrollmentOpen).toLocaleDateString();
         const enrollClose = new Date(calendar.enrollmentClose).toLocaleDateString();
-        void Swal.fire({
-          icon: 'info',
-          title: 'Enrollment window closed',
+        void this.toastService.alert('Enrollment window closed', {
           html: `<p>Enrollment is currently outside the scheduled window.</p><p style="margin-top: 8px;"><strong>Enrollment period:</strong> ${enrollOpen} to ${enrollClose}</p>`,
-          showConfirmButton: true,
-        });
+        }, 'info');
       }
-    } catch { this.toast('error', 'Failed to enroll student'); }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Failed to enroll student';
+      this.toastService.error('Failed to enroll student', { text: message });
+    }
   }
 
   async removeEnrollment(r: EnrollmentRow): Promise<void> {
-    const res = await Swal.fire({
-      icon: 'warning',
-      title: 'Remove enrollment?',
+    const ok = await this.toastService.confirmDestructive('Remove enrollment?', {
       text: `Remove ${r.studentName} from ${r.courseName} (${r.sectionName})?`,
-      showCancelButton: true,
-      confirmButtonText: 'Remove',
-      confirmButtonColor: '#ef4444',
+      confirmText: 'Remove',
     });
-    if (!res.isConfirmed) return;
+    if (!ok) return;
     try {
       await this.academic.removeEnrollment(r.enrollment.id);
       const actor = this.auth.getCurrentUser();

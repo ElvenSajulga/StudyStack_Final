@@ -99,7 +99,7 @@
             (click)="selectDay(day)">
             <span class="day-num">{{ day.dateNum }}</span>
             <span class="day-dots" *ngIf="day.activities.length > 0">
-              <span class="dot" *ngFor="let a of day.activities.slice(0, 3)" [title]="a.title"></span>
+              <span class="dot" *ngFor="let a of day.activities.slice(0, 3)" [title]="courseNameFor(a) + ' — ' + a.title"></span>
               <span class="dot-more" *ngIf="day.activities.length > 3">+{{ day.activities.length - 3 }}</span>
             </span>
           </button>
@@ -118,6 +118,7 @@
             <i class="ti" [class.ti-help-circle]="a.type === 'quiz'" [class.ti-pencil]="a.type === 'output'"></i>
             <div class="day-activity-text">
               <p class="day-activity-title">{{ a.title }}</p>
+              <p class="day-activity-course">{{ courseNameFor(a) }}</p>
               <p class="day-activity-time">Due {{ a.closeAt | date: 'shortTime' }}</p>
             </div>
           </div>
@@ -194,6 +195,7 @@
             <thead>
               <tr>
                 <th class="col-text">Activity</th>
+                <th class="col-text">Course</th>
                 <th class="col-text">Due Date</th>
                 <th class="col-status">Status</th>
               </tr>
@@ -201,6 +203,7 @@
             <tbody>
               <tr *ngFor="let activity of upcomingActivities">
                 <td class="col-text">{{ activity.title }}</td>
+                <td class="col-text"><span class="course-tag">{{ courseNameFor(activity) }}</span></td>
                 <td class="col-text">{{ activity.closeAt | date: 'short' }}</td>
                 <td class="col-status">
                   <span class="badge" [ngClass]="isUrgent(activity.closeAt) ? 'badge-danger' : 'badge-info'">

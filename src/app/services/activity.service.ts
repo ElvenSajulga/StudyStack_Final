@@ -347,7 +347,24 @@ export class ActivityService {
     }
   }
 
+  /**
+   * Returns an error message if the pair is mis-ordered, or null if valid.
+   * Empty strings are allowed (the duplicate-activity flow intentionally
+   * creates an activity with blank deadlines for the teacher to fill in later).
+   */
+  private validateDeadlinePair(deadline?: string, closeAt?: string): string | null {
+    if (!deadline || !closeAt) return null;
+    const d = new Date(deadline).getTime();
+    const c = new Date(closeAt).getTime();
+    if (isNaN(d) || isNaN(c)) return null;
+    if (c <= d) return 'Close time must be after the deadline.';
+    return null;
+  }
+
   async createActivity(activity: Omit<Activity, 'id'>): Promise<Activity> {
+    const validationError = this.validateDeadlinePair(activity.deadline, activity.closeAt);
+    if (validationError) throw new Error(validationError);
+
     const id = crypto.randomUUID
       ? crypto.randomUUID()
       : `${Date.now()}-${Math.random()}`;
@@ -370,6 +387,16 @@ export class ActivityService {
   }
 
   async updateActivity(id: string, changes: Partial<Activity>): Promise<void> {
+    if (changes.deadline !== undefined || changes.closeAt !== undefined) {
+      // Validate against the merged final state, not just the patch payload,
+      // so callers that only update one side still get a correct check.
+      const existing = await this.getActivityById(id);
+      const finalDeadline = changes.deadline ?? existing?.deadline;
+      const finalCloseAt  = changes.closeAt  ?? existing?.closeAt;
+      const validationError = this.validateDeadlinePair(finalDeadline, finalCloseAt);
+      if (validationError) throw new Error(validationError);
+    }
+
     try {
       await this.firestoreService.update(this.ACT_COLLECTION, id, changes);
       return;
@@ -518,6 +545,17 @@ export class ActivityService {
     const nowIso    = new Date().toISOString();
     const existing  = await this.getSubmission(activityId, studentID);
 
+    // Quiz lock: once a student has submitted a quiz, the answers are sealed.
+    // This is the data-layer enforcement of the spec rule "Quiz resubmission
+    // is disabled; answers cannot be edited." UI surfaces should also hide
+    // the edit affordance, but this guard is the source of truth.
+    if (existing?.submitted) {
+      const activity = await this.getActivityById(activityId);
+      if (activity?.type === 'quiz') {
+        throw new Error('Quiz answers are locked after submission and cannot be edited.');
+      }
+    }
+
     if (!existing) {
       const id = crypto.randomUUID
         ? crypto.randomUUID()
@@ -632,24 +670,48 @@ export class ActivityService {
 
   // ─── Attendance ───────────────────────────────────────────────────────────
 
+  /**
+   * Attendance status derived from a student's submission.
+   *
+   * Output activities (assignments / general posts):
+   *   submittedAt ≤ deadline                              → PRESENT
+   *   submittedAt > deadline ∧ submittedAt ≤ closeAt      → LATE
+   *   submittedAt > closeAt OR no submission              → ABSENT
+   *   A *resubmission* after the deadline but before
+   *   closeAt downgrades PRESENT → LATE (uses lastEditedAt).
+   *
+   * Quiz activities:
+   *   Same time-window rule, but lastEditedAt is ignored —
+   *   quiz answers are locked on first submit (see
+   *   submitOrUpdateSubmission) so any later edits would
+   *   indicate manual data tampering, not a student action.
+   */
   getAttendanceStatus(
     activity: Activity,
     submission?: ActivitySubmission
   ): AttendanceStatus {
     if (!submission || !submission.submitted) return 'absent';
-    const deadline        = new Date(activity.deadline);
-    const closeAt         = new Date(activity.closeAt);
-    const submittedAt     = new Date(submission.submittedAt);
-    const lastEditedAt    = new Date(submission.lastEditedAt);
-    const submittedOnTime = submittedAt.getTime() <= deadline.getTime();
-    const editedAfterDeadline =
-      lastEditedAt.getTime() > deadline.getTime() &&
-      lastEditedAt.getTime() <= closeAt.getTime();
-    const submittedLate =
-      submittedAt.getTime() > deadline.getTime() &&
-      submittedAt.getTime() <= closeAt.getTime();
-    if (submittedOnTime && !editedAfterDeadline) return 'present';
-    if (submittedLate || editedAfterDeadline)    return 'late';
+
+    const deadlineMs = new Date(activity.deadline).getTime();
+    const closeAtMs  = new Date(activity.closeAt).getTime();
+    const submittedAtMs = new Date(submission.submittedAt).getTime();
+
+    const onTime = submittedAtMs <= deadlineMs;
+    const inLateWindow = submittedAtMs > deadlineMs && submittedAtMs <= closeAtMs;
+
+    if (activity.type === 'quiz') {
+      if (onTime) return 'present';
+      if (inLateWindow) return 'late';
+      return 'absent';
+    }
+
+    // Output activities: a late resubmission downgrades PRESENT → LATE.
+    const lastEditedAtMs = new Date(submission.lastEditedAt).getTime();
+    const editedInLateWindow =
+      lastEditedAtMs > deadlineMs && lastEditedAtMs <= closeAtMs;
+
+    if (onTime && !editedInLateWindow) return 'present';
+    if (inLateWindow || editedInLateWindow) return 'late';
     return 'absent';
   }
 

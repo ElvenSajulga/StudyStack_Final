@@ -38,8 +38,12 @@
 
         <!-- User Profile Card -->
         <button type="button" class="sidebar-profile" (click)="navigateToProfile(user.role); closeSidebar()">
-          <div class="profile-avatar">
-            <i class="ti ti-user"></i>
+          <div class="profile-avatar" [class.has-image]="!!user.avatar">
+            <img *ngIf="user.avatar; else avatarFallback" [src]="user.avatar" alt="Profile picture" />
+            <ng-template #avatarFallback>
+              <span class="profile-avatar-initials" *ngIf="getInitials(user.name) as ini">{{ ini }}</span>
+              <i class="ti ti-user" *ngIf="!getInitials(user.name)"></i>
+            </ng-template>
           </div>
           <div class="profile-info">
             <p class="profile-name">{{ user.name || 'User' }}</p>
@@ -142,6 +146,16 @@
               <i class="ti ti-speakerphone"></i>
               <span>Announcements</span>
             </a>
+
+            <a routerLink="/teacher-materials" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
+              <i class="ti ti-folder"></i>
+              <span>Materials</span>
+            </a>
+
+            <a routerLink="/teacher-chat" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
+              <i class="ti ti-message-circle"></i>
+              <span>Messages</span>
+            </a>
           </ng-container>
 
           <!-- Student Main Menu -->
@@ -174,6 +188,16 @@
               <i class="ti ti-speakerphone"></i>
               <span>Announcements</span>
               <span class="badge" *ngIf="studentBadges.announcements > 0">{{ studentBadges.announcements }}</span>
+            </a>
+
+            <a routerLink="/student-materials" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
+              <i class="ti ti-folder"></i>
+              <span>Materials</span>
+            </a>
+
+            <a routerLink="/student-chat" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
+              <i class="ti ti-message-circle"></i>
+              <span>Messages</span>
             </a>
           </ng-container>
         </div>

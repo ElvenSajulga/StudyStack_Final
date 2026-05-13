@@ -1,0 +1,228 @@
+.student-materials {
+  max-width: 960px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.page-subtitle {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+
+.filter-bar {
+  display: grid;
+  grid-template-columns: 1fr 220px;
+  gap: 12px;
+
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+
+  i {
+    position: absolute;
+    left: 12px;
+    color: var(--color-text-tertiary);
+    font-size: 18px;
+    pointer-events: none;
+  }
+
+  input {
+    width: 100%;
+    padding: 9px 12px 9px 36px;
+    border-radius: 8px;
+    border: 0.5px solid var(--color-border-tertiary);
+    background: var(--color-background-primary);
+    color: var(--color-text-primary);
+    font-size: 0.88rem;
+
+    &:focus {
+      outline: none;
+      border-color: #1D9E75;
+      box-shadow: 0 0 0 2px #1D9E7520;
+    }
+  }
+}
+
+.course-select {
+  border-radius: 8px;
+  border: 0.5px solid var(--color-border-tertiary);
+  background: var(--color-background-primary);
+  color: var(--color-text-primary);
+  font-size: 0.88rem;
+  padding: 9px 10px;
+
+  &:focus {
+    outline: none;
+    border-color: #1D9E75;
+    box-shadow: 0 0 0 2px #1D9E7520;
+  }
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.group-title {
+  margin: 0 0 4px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  i {
+    color: #1D9E75;
+    font-size: 18px;
+  }
+}
+
+.group-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: rgba(29,158,117,0.15);
+  color: #1D9E75;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-left: auto;
+}
+
+.material-card {
+  background: var(--color-background-primary);
+  border-radius: 10px;
+  padding: 14px;
+  border: 0.5px solid var(--color-border-tertiary);
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.material-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: rgba(29,158,117,0.1);
+  color: #1D9E75;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  i { font-size: 20px; }
+}
+
+.material-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  h4 {
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--color-text-primary);
+  }
+
+  p {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--color-text-secondary);
+    line-height: 1.4;
+  }
+}
+
+.meta {
+  font-size: 0.75rem;
+  color: var(--color-text-tertiary);
+  flex-shrink: 0;
+}
+
+.material-target {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  word-break: break-all;
+
+  a {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #1D9E75;
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 0.88rem;
+    align-self: flex-start;
+    &:hover { text-decoration: underline; }
+    i { font-size: 16px; }
+  }
+
+  .link-url {
+    font-size: 0.78rem;
+    color: var(--color-text-tertiary);
+  }
+}
+
+.empty-card {
+  text-align: center;
+  padding: 48px 24px;
+  background: var(--color-background-primary);
+  border-radius: 12px;
+  border: 0.5px solid var(--color-border-tertiary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+
+  i {
+    font-size: 36px;
+    color: var(--color-text-tertiary);
+  }
+}
+
+.empty-text {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+}
+
+.muted {
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+}

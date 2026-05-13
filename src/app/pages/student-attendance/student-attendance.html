@@ -46,6 +46,7 @@
         <thead>
           <tr>
             <th>Activity</th>
+            <th>Course</th>
             <th>Type</th>
             <th>Deadline</th>
             <th>Status</th>
@@ -54,6 +55,7 @@
         <tbody>
           <tr *ngFor="let a of activities">
             <td data-label="Activity">{{ a.title }}</td>
+            <td data-label="Course"><span class="course-tag">{{ courseName(a) }}</span></td>
             <td data-label="Type">{{ a.type }}</td>
             <td data-label="Deadline">{{ a.deadline | date: 'short' }}</td>
             <td data-label="Status">

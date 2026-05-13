@@ -61,7 +61,10 @@
       <article class="card" *ngFor="let a of activities">
         <header class="card-header">
           <h3>{{ a.title }}</h3>
-          <span class="meta">Deadline: {{ a.deadline | date: 'short' }}</span>
+          <span class="meta">
+            <span class="course-tag">{{ courseNameFor(a) }}</span>
+            · Deadline: {{ a.deadline | date: 'short' }}
+          </span>
         </header>
 
         <div class="table-wrapper">

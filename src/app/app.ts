@@ -8,7 +8,7 @@ import { NotificationPanel } from './components/notification-panel/notification-
 import { AdminNotificationPanel } from './components/admin-notification-panel/admin-notification-panel';
 import { TeacherNotificationPanel } from './components/teacher-notification-panel/teacher-notification-panel';
 import { AdminGlobalSearch } from './components/admin-global-search/admin-global-search';
-import Swal from 'sweetalert2';
+import { ToastService } from './services/toast.service';
 
 @Component({
   selector: 'app-root',
@@ -29,6 +29,7 @@ export class App implements OnInit, OnDestroy {
     private readonly router: Router,
     private readonly badgeService: BadgeService,
     public readonly themeService: ThemeService,
+    private readonly toast: ToastService,
   ) {
     this.loadUserEmail();
   }
@@ -113,29 +114,17 @@ export class App implements OnInit, OnDestroy {
   }
 
   async logout(): Promise<void> {
-    const res = await Swal.fire({
-      icon: 'question',
-      title: 'Logout?',
+    const ok = await this.toast.confirm('Logout?', {
       text: 'Are you sure you want to logout?',
-      showCancelButton: true,
-      confirmButtonText: 'Logout',
-      cancelButtonText: 'Cancel',
-      confirmButtonColor: '#ef4444',
+      confirmText: 'Logout',
+      confirmColor: '#ef4444',
     });
 
-    if (!res.isConfirmed) return;
+    if (!ok) return;
 
     this.auth.clear();
     await this.router.navigate(['/login']);
 
-    void Swal.fire({
-      icon: 'success',
-      title: 'Logged out',
-      toast: true,
-      position: 'top-end',
-      timer: 1400,
-      showConfirmButton: false,
-      timerProgressBar: true,
-    });
+    this.toast.success('Logged out');
   }
 }

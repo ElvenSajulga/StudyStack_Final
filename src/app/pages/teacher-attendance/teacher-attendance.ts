@@ -5,6 +5,7 @@ import { Activity, ActivityService, ActivitySubmission, AttendanceStatus } from 
 import { AuthService } from '../../services/auth.service';
 import { StudentAccount, StudentAccountService } from '../../services/student-account.service';
 import { AcademicService, CourseSection, Enrollment } from '../../services/academic.service';
+import { CourseLookupService } from '../../services/course-lookup.service';
 
 interface CourseFilterOption {
   courseId: string;
@@ -47,11 +48,17 @@ export class TeacherAttendance implements OnInit {
     private readonly auth: AuthService,
     private readonly studentService: StudentAccountService,
     private readonly academicService: AcademicService,
+    private readonly courseLookup: CourseLookupService,
     private readonly cdr: ChangeDetectorRef,
   ) {}
 
   ngOnInit(): void {
+    void this.courseLookup.ensureLoaded();
     void this.loadData();
+  }
+
+  courseNameFor(activity: Activity): string {
+    return this.courseLookup.name(activity.courseId, 'Unassigned');
   }
 
   private submissionKey(activityId: string, studentID: string): string {
