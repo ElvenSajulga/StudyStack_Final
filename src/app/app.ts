@@ -8,12 +8,13 @@ import { NotificationPanel } from './components/notification-panel/notification-
 import { AdminNotificationPanel } from './components/admin-notification-panel/admin-notification-panel';
 import { TeacherNotificationPanel } from './components/teacher-notification-panel/teacher-notification-panel';
 import { AdminGlobalSearch } from './components/admin-global-search/admin-global-search';
+import { FloatingChat } from './components/floating-chat/floating-chat';
 import { ToastService } from './services/toast.service';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive, NotificationPanel, AdminNotificationPanel, TeacherNotificationPanel, AdminGlobalSearch],
+  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive, NotificationPanel, AdminNotificationPanel, TeacherNotificationPanel, AdminGlobalSearch, FloatingChat],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })

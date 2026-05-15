@@ -66,6 +66,7 @@ export class StudentDashboard implements OnInit, OnDestroy {
   private refreshTimer?: ReturnType<typeof setInterval>;
   private activitiesSub?: Subscription;
   private submissionsSub?: Subscription;
+  private announcementsSub?: Subscription;
   private currentEnrollments: Enrollment[] = [];
   private currentTeacherUIDs: string[] = [];
   private allEnrolledActivities: Activity[] = [];
@@ -112,6 +113,7 @@ export class StudentDashboard implements OnInit, OnDestroy {
     if (this.refreshTimer != null) clearInterval(this.refreshTimer);
     this.activitiesSub?.unsubscribe();
     this.submissionsSub?.unsubscribe();
+    this.announcementsSub?.unsubscribe();
   }
 
   /**
@@ -127,10 +129,8 @@ export class StudentDashboard implements OnInit, OnDestroy {
       this.currentEnrollments = await this.academic.getEnrollmentsByStudentID(sid);
       this.currentTeacherUIDs = [...new Set(this.currentEnrollments.map(e => e.teacherUID))];
 
-      // Load announcements once (refreshed on the periodic safety-net interval)
-      await this.refreshAnnouncements();
-
       if (isPlatformBrowser(this.platformId)) {
+        this.subscribeToAnnouncements();
         this.activitiesSub = this.activityService
           .watchActivitiesForEnrolledTeacherUIDs(this.currentTeacherUIDs)
           .subscribe({
@@ -170,6 +170,7 @@ export class StudentDashboard implements OnInit, OnDestroy {
         this.allEnrolledActivities = await this.activityService
           .getActivitiesForEnrolledTeacherUIDsBulk(this.currentTeacherUIDs);
         this.allSubmissions = await this.activityService.getSubmissionsForStudent(sid);
+        await this.refreshAnnouncements();
         this.recomputeFromState();
       }
     } catch (e) {
@@ -198,30 +199,53 @@ export class StudentDashboard implements OnInit, OnDestroy {
             this.allEnrolledActivities = activities;
             this.recomputeFromState();
           });
+        this.subscribeToAnnouncements();
       }
 
-      await this.refreshAnnouncements();
       this.recomputeFromState();
     } catch (e) {
       console.warn('[StudentDashboard] safetyNetRefresh failed:', e);
     }
   }
 
+  /**
+   * Real-time announcement stream for the dashboard's "Recent Announcements"
+   * card. Uses the resilient bulk matcher in AnnouncementService that handles
+   * both `teacherUID` and `teacherID` (credential) shapes — calling
+   * `getForTeacher(uid)` here historically returned nothing because that
+   * method queries by credential, not UID.
+   */
+  private subscribeToAnnouncements(): void {
+    this.announcementsSub?.unsubscribe();
+    if (this.currentTeacherUIDs.length === 0) {
+      this.latestAnnouncements = [];
+      this.cdr.detectChanges();
+      return;
+    }
+    this.announcementsSub = this.announcementService
+      .watchForEnrolledTeacherUIDs(this.currentTeacherUIDs)
+      .subscribe({
+        next: list => {
+          this.latestAnnouncements = list.slice(0, 3);
+          this.cdr.detectChanges();
+        },
+        error: err => {
+          console.warn('[StudentDashboard] announcement stream error:', err);
+          void this.refreshAnnouncements();
+        },
+      });
+  }
+
+  /** SSR / stream-failure fallback: one-shot bulk fetch via the resilient matcher. */
   private async refreshAnnouncements(): Promise<void> {
     if (this.currentTeacherUIDs.length === 0) {
       this.latestAnnouncements = [];
       return;
     }
     try {
-      const perTeacher = await Promise.all(
-        this.currentTeacherUIDs.map(uid => this.announcementService.getForTeacher(uid))
-      );
-      const seen = new Set<string | number>();
-      const all = perTeacher
-        .flat()
-        .filter(a => { if (seen.has(a.id)) return false; seen.add(a.id); return true; })
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      this.latestAnnouncements = all.slice(0, 3);
+      const list = await this.announcementService
+        .getForEnrolledTeacherUIDsBulk(this.currentTeacherUIDs);
+      this.latestAnnouncements = list.slice(0, 3);
     } catch (e) {
       console.warn('refreshAnnouncements failed:', e);
     }

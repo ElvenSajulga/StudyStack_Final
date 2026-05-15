@@ -64,6 +64,27 @@ export class AdminEnrollments implements OnInit {
     teacherUID: '',
   };
 
+  // ── bulk enroll ─────────────────────────────────────────────────────────────
+  showBulkForm = false;
+  bulkForm = {
+    programId: '',
+    courseId: '',
+    sectionId: '',
+    teacherUID: '',
+  };
+  bulkSelectedUIDs = new Set<string>();
+  bulkSearch = '';
+  bulkProgramFilter = '';
+  bulkProcessing = false;
+  bulkResults: Array<{
+    studentName: string;
+    studentID: string;
+    status: 'enrolled' | 'skipped' | 'failed';
+    reason?: string;
+  }> = [];
+  bulkProgressDone = 0;
+  bulkProgressTotal = 0;
+
   loading = false;
 
   constructor(
@@ -347,5 +368,211 @@ export class AdminEnrollments implements OnInit {
       await this.loadAll();
       this.toast('success', `Student transferred to ${newSection.name}`);
     } catch { this.toast('error', 'Failed to transfer enrollment'); }
+  }
+
+  // ── bulk enroll ─────────────────────────────────────────────────────────────
+
+  openBulkForm(): void {
+    this.bulkForm = {
+      programId: '', courseId: '', sectionId: '', teacherUID: '',
+    };
+    this.bulkSelectedUIDs = new Set<string>();
+    this.bulkSearch = '';
+    this.bulkProgramFilter = '';
+    this.bulkResults = [];
+    this.bulkProgressDone = 0;
+    this.bulkProgressTotal = 0;
+    this.showBulkForm = true;
+  }
+
+  cancelBulkForm(): void {
+    if (this.bulkProcessing) return;
+    this.showBulkForm = false;
+    this.bulkResults = [];
+  }
+
+  onBulkProgramChange(): void {
+    this.bulkForm.courseId = '';
+    this.bulkForm.sectionId = '';
+    this.bulkForm.teacherUID = '';
+  }
+
+  onBulkCourseChange(): void {
+    this.bulkForm.sectionId = '';
+    this.bulkForm.teacherUID = '';
+  }
+
+  onBulkSectionChange(): void {
+    const cs = this.courseSections.find(
+      cs => cs.courseId === this.bulkForm.courseId
+        && cs.sectionId === this.bulkForm.sectionId,
+    );
+    this.bulkForm.teacherUID = cs?.teacherUID ?? '';
+  }
+
+  /** Distinct program names found across student records — used for the filter dropdown. */
+  get bulkStudentPrograms(): string[] {
+    const set = new Set<string>();
+    for (const s of this.students) {
+      if (s.program) set.add(s.program);
+    }
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }
+
+  get filteredBulkStudents(): StudentAccount[] {
+    const q = this.bulkSearch.trim().toLowerCase();
+    const programFilter = this.bulkProgramFilter.trim().toLowerCase();
+    return this.students.filter(s => {
+      if (programFilter && (s.program ?? '').toLowerCase() !== programFilter) return false;
+      if (!q) return true;
+      const haystack = [
+        s.firstname, s.lastname, s.studentID, s.email, s.program, s.UID,
+      ].map(v => (v ?? '').toLowerCase()).join(' ');
+      return haystack.includes(q);
+    });
+  }
+
+  isBulkSelected(uid: string): boolean {
+    return this.bulkSelectedUIDs.has(uid);
+  }
+
+  toggleBulkSelect(uid: string): void {
+    if (this.bulkSelectedUIDs.has(uid)) this.bulkSelectedUIDs.delete(uid);
+    else this.bulkSelectedUIDs.add(uid);
+  }
+
+  /** True iff every currently-visible student is in the selection set. */
+  get allVisibleSelected(): boolean {
+    const visible = this.filteredBulkStudents;
+    if (visible.length === 0) return false;
+    return visible.every(s => this.bulkSelectedUIDs.has(s.UID));
+  }
+
+  toggleSelectAllVisible(): void {
+    const visible = this.filteredBulkStudents;
+    if (this.allVisibleSelected) {
+      for (const s of visible) this.bulkSelectedUIDs.delete(s.UID);
+    } else {
+      for (const s of visible) this.bulkSelectedUIDs.add(s.UID);
+    }
+  }
+
+  clearBulkSelection(): void {
+    this.bulkSelectedUIDs.clear();
+  }
+
+  get bulkSelectedCount(): number {
+    return this.bulkSelectedUIDs.size;
+  }
+
+  get bulkSuccessCount(): number {
+    return this.bulkResults.filter(r => r.status === 'enrolled').length;
+  }
+
+  get bulkSkippedCount(): number {
+    return this.bulkResults.filter(r => r.status === 'skipped').length;
+  }
+
+  get bulkFailedCount(): number {
+    return this.bulkResults.filter(r => r.status === 'failed').length;
+  }
+
+  /**
+   * Enroll every selected student into the target (course, section).
+   * Each call re-uses `enrollStudent`, so the per-student validations
+   * already in place (schedule conflict, missing course) still apply.
+   * Results are collected per student so the admin can see exactly who
+   * succeeded and why anyone failed.
+   */
+  async bulkEnroll(): Promise<void> {
+    const { courseId, sectionId, teacherUID } = this.bulkForm;
+    if (!courseId || !sectionId) {
+      this.toast('error', 'Select a course and section first');
+      return;
+    }
+    if (!teacherUID) {
+      this.toast('error', 'No teacher assigned to this section for this course');
+      return;
+    }
+    const selected = this.students.filter(s => this.bulkSelectedUIDs.has(s.UID));
+    if (selected.length === 0) {
+      this.toast('error', 'Pick at least one student to enroll');
+      return;
+    }
+
+    const course = this.courses.find(c => c.id === courseId);
+    const section = this.sections.find(s => s.id === sectionId);
+
+    this.bulkProcessing = true;
+    this.bulkResults = [];
+    this.bulkProgressDone = 0;
+    this.bulkProgressTotal = selected.length;
+
+    for (const student of selected) {
+      const displayName = `${student.lastname}, ${student.firstname}`.trim();
+      try {
+        if (this.alreadyEnrolled(student.UID, courseId, sectionId)) {
+          this.bulkResults.push({
+            studentName: displayName,
+            studentID: student.studentID,
+            status: 'skipped',
+            reason: 'Already enrolled in this section',
+          });
+        } else {
+          await this.academic.enrollStudent({
+            studentUID: student.UID,
+            studentID: student.studentID,
+            courseId,
+            sectionId,
+            teacherUID,
+          });
+          this.bulkResults.push({
+            studentName: displayName,
+            studentID: student.studentID,
+            status: 'enrolled',
+          });
+        }
+      } catch (e) {
+        const reason = e instanceof Error ? e.message : 'Unknown error';
+        this.bulkResults.push({
+          studentName: displayName,
+          studentID: student.studentID,
+          status: 'failed',
+          reason,
+        });
+      }
+      this.bulkProgressDone++;
+      this.cdr.detectChanges();
+    }
+
+    const actor = this.auth.getCurrentUser();
+    void this.auditLog.log({
+      actorUID: actor?.UID ?? 'unknown',
+      actorName: actor?.name ?? 'Unknown Admin',
+      action: 'create',
+      entityType: 'enrollment',
+      entityId: `bulk-${courseId}-${sectionId}`,
+      description:
+        `Bulk-enrolled ${this.bulkSuccessCount} of ${selected.length} students into ` +
+        `${course?.name ?? courseId} (${section?.name ?? sectionId}). ` +
+        `${this.bulkSkippedCount} skipped, ${this.bulkFailedCount} failed.`,
+      timestamp: new Date().toISOString(),
+    });
+
+    this.bulkProcessing = false;
+    this.bulkSelectedUIDs.clear();
+    await this.loadAll();
+
+    if (this.bulkSuccessCount > 0) {
+      const detail = this.bulkSkippedCount + this.bulkFailedCount > 0
+        ? { text: `${this.bulkSkippedCount} skipped, ${this.bulkFailedCount} failed — see details below.` }
+        : {};
+      this.toastService.success(`${this.bulkSuccessCount} student(s) enrolled`, detail);
+    } else {
+      this.toastService.error(
+        'No students were enrolled',
+        { text: 'See per-student details below.' },
+      );
+    }
   }
 }

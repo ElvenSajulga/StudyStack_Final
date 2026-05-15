@@ -48,17 +48,135 @@
   align-items: flex-start;
 }
 
-.avatar {
-  width: 80px;             // reduce from 120px
-  height: 80px;
-  border-radius: 12px;     // square-ish instead of circle
-  background: #1D9E75;     // consistent teal
+.identity-card {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.identity-avatar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.avatar-wrap {
+  width: 120px;
+  height: 120px;
+}
+
+.avatar-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+  object-fit: cover;
+  display: block;
+  border: 1px solid var(--color-border-tertiary, #e5e7eb);
+  background: var(--color-background-secondary, #f9fafb);
+}
+
+.avatar,
+.avatar-initials {
+  width: 120px;
+  height: 120px;
+  border-radius: 12px;
+  background: #1D9E75;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
-  font-size: 1.75rem;
-  font-weight: 500;
+  font-size: 2.5rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.avatar-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.avatar-actions label.btn {
+  cursor: pointer;
+}
+
+.avatar-actions label.btn.disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.avatar-hint {
+  margin: 0;
+  font-size: 11px;
+  color: #6b7280;
+  max-width: 200px;
+  line-height: 1.45;
+}
+
+.btn.small {
+  padding: 6px 12px;
+  font-size: 0.8rem;
+}
+
+.btn.subtle {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.btn.subtle:hover { background: #e5e7eb; }
+
+.btn.danger {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.btn.danger:hover { background: #fecaca; }
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.req {
+  color: #ef4444;
+  margin-left: 2px;
+}
+
+.profile-meta {
+  display: grid;
+  grid-template-columns: minmax(120px, auto) 1fr;
+  gap: 8px 16px;
+  font-size: 0.9rem;
+  color: #374151;
+  align-self: center;
+}
+
+.profile-meta dt {
+  font-weight: 600;
+  color: #6b7280;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-top: 0;
+  align-self: center;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.muted.center {
+  color: #6b7280;
+  text-align: center;
+  margin: 16px 0;
 }
 
 .profile-meta {

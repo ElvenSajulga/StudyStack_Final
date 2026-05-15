@@ -151,10 +151,6 @@
             <span>Materials</span>
           </a>
 
-          <a routerLink="/teacher-chat" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
-            <i class="ti ti-message-circle"></i>
-            <span>Messages</span>
-          </a>
         </ng-container>
 
         <!-- Student Main Menu -->
@@ -194,10 +190,6 @@
             <span>Materials</span>
           </a>
 
-          <a routerLink="/student-chat" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
-            <i class="ti ti-message-circle"></i>
-            <span>Messages</span>
-          </a>
         </ng-container>
       </div>
 
@@ -237,4 +229,6 @@
       <router-outlet></router-outlet>
     </main>
   </div>
+
+  <app-floating-chat></app-floating-chat>
 </div>

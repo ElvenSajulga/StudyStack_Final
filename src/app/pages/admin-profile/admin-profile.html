@@ -1,56 +1,133 @@
-<div class="admin-page">
+<div class="admin-page profile-page">
   <header>
     <h2 class="page-title">My profile</h2>
-    <p class="page-subtitle">View your administrator details and update your account information.</p>
+    <p class="page-subtitle">
+      Update your display name, profile picture, and password.
+    </p>
   </header>
 
-  <section class="card">
-    <div class="profile-grid">
-      <div>
-        <div class="avatar">A</div>
-        <dl class="profile-meta">
-          <dt>Role</dt>
-          <dd>System administrator</dd>
-          <dt>Username</dt>
-          <dd>admin</dd>
-        </dl>
+  <p class="muted center" *ngIf="loading">Loading…</p>
+
+  <ng-container *ngIf="!loading && user; else noProfile">
+    <section class="card identity-card">
+      <div class="identity-avatar">
+        <div class="avatar-wrap">
+          <img *ngIf="avatar; else initialsBlock" [src]="avatar" alt="Profile picture" class="avatar-img" />
+          <ng-template #initialsBlock>
+            <div class="avatar avatar-initials">{{ initials }}</div>
+          </ng-template>
+        </div>
+        <div class="avatar-actions">
+          <label class="btn small subtle" [class.disabled]="uploadingAvatar">
+            <i class="ti ti-upload" aria-hidden="true"></i>
+            {{ uploadingAvatar ? 'Uploading…' : (avatar ? 'Replace' : 'Upload') }}
+            <input type="file" accept="image/jpeg,image/png,image/webp,image/gif"
+              (change)="onAvatarSelected($event)" hidden [disabled]="uploadingAvatar" />
+          </label>
+          <button class="btn small danger" type="button" *ngIf="avatar"
+            (click)="removeAvatar()" [disabled]="uploadingAvatar">
+            Remove
+          </button>
+        </div>
+        <p class="avatar-hint">JPEG, PNG, WEBP, or GIF. Up to 10 MB; we'll resize automatically.</p>
       </div>
 
-      <div>
-        <h3>Account information</h3>
-        <p class="card-description">
-          These details are used for admin communication and login. In a real deployment this would be
-          connected to your backend.
-        </p>
+      <dl class="profile-meta">
+        <dt>Name</dt>
+        <dd>{{ account?.name || user.name || 'Administrator' }}</dd>
 
-        <form>
-          <div class="form-grid">
-            <label class="field">
-              <span class="field-label">Full name</span>
-              <input type="text" value="Admin User" />
-            </label>
+        <dt>Username</dt>
+        <dd>{{ username }}</dd>
 
-            <label class="field">
-              <span class="field-label">Email address</span>
-              <input type="email" value="admin@example.com" />
-            </label>
+        <dt>Email</dt>
+        <dd>{{ account?.email || '—' }}</dd>
 
-            <label class="field">
-              <span class="field-label">Contact number</span>
-              <input type="tel" placeholder="+63 9XX XXX XXXX" />
-            </label>
+        <dt>Role</dt>
+        <dd>System administrator</dd>
+      </dl>
+    </section>
 
-            <label class="field">
-              <span class="field-label">Department</span>
-              <input type="text" value="IT Department" />
-            </label>
-          </div>
+    <section class="card" *ngIf="account">
+      <h3>Account information</h3>
+      <p class="card-description">
+        Your display name and contact email. Your username is permanent.
+      </p>
+      <form (ngSubmit)="saveProfile()">
+        <div class="form-grid">
+          <label class="field">
+            <span class="field-label">Full name <span class="req">*</span></span>
+            <input type="text"
+              [(ngModel)]="form.name"
+              name="name"
+              [disabled]="savingProfile"
+              placeholder="Admin User" />
+          </label>
+          <label class="field">
+            <span class="field-label">Email address</span>
+            <input type="email"
+              [(ngModel)]="form.email"
+              name="email"
+              [disabled]="savingProfile"
+              placeholder="admin@example.com"
+              autocomplete="email" />
+          </label>
+        </div>
+        <div class="form-actions">
+          <button class="btn primary" type="submit"
+            [disabled]="!profileDirty || savingProfile">
+            {{ savingProfile ? 'Saving…' : 'Save changes' }}
+          </button>
+        </div>
+      </form>
+    </section>
 
-          <div class="btn-row">
-            <button class="btn primary" type="button">Save profile</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  </section>
+    <section class="card" *ngIf="account">
+      <h3>Change password</h3>
+      <p class="card-description">
+        Use at least 6 characters. After changing, your existing session keeps working.
+      </p>
+      <form (ngSubmit)="savePassword()">
+        <div class="form-grid">
+          <label class="field">
+            <span class="field-label">Current password</span>
+            <input type="password"
+              autocomplete="current-password"
+              [(ngModel)]="pwd.current"
+              name="currentPassword"
+              [disabled]="savingPwd" />
+          </label>
+          <label class="field">
+            <span class="field-label">New password</span>
+            <input type="password"
+              autocomplete="new-password"
+              [(ngModel)]="pwd.next"
+              name="newPassword"
+              [disabled]="savingPwd" />
+          </label>
+          <label class="field">
+            <span class="field-label">Confirm new password</span>
+            <input type="password"
+              autocomplete="new-password"
+              [(ngModel)]="pwd.confirm"
+              name="confirmPassword"
+              [disabled]="savingPwd" />
+          </label>
+        </div>
+        <div class="form-actions">
+          <button class="btn primary" type="submit" [disabled]="savingPwd">
+            {{ savingPwd ? 'Saving…' : 'Update password' }}
+          </button>
+        </div>
+      </form>
+    </section>
+  </ng-container>
+
+  <ng-template #noProfile>
+    <section class="card" *ngIf="!loading">
+      <p class="card-description">
+        No profile information is available for this session. Try logging in again or contact a fellow administrator
+        if the problem continues.
+      </p>
+    </section>
+  </ng-template>
 </div>

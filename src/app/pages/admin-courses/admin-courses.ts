@@ -185,6 +185,33 @@ export class AdminCourses implements OnInit {
     );
   }
 
+  /**
+   * Existing courses that share (name, programId, semester) with what the
+   * admin is currently entering — i.e. the set the conflict check will scan.
+   * Shown inline so the admin can plan meetings around them before submitting.
+   */
+  get siblingCourses(): Array<{ course: Course; meetingsLabel: string }> {
+    const name = this.courseForm.name.trim().toLowerCase();
+    const { programId, semester } = this.courseForm;
+    if (!name || !programId || !semester) return [];
+    return this.courses
+      .filter(c =>
+        c.id !== this.editingCourseId &&
+        c.programId === programId &&
+        c.semester === semester &&
+        c.name.trim().toLowerCase() === name,
+      )
+      .map(course => {
+        const meetings = course.meetings && course.meetings.length > 0
+          ? course.meetings
+          : this.scheduleConflict.parseScheduleString(course.schedule);
+        return {
+          course,
+          meetingsLabel: this.scheduleConflict.formatMeetings(meetings) || '(no schedule)',
+        };
+      });
+  }
+
   toggleCourse(id: string): void {
     this.expandedCourseId = this.expandedCourseId === id ? null : id;
     if (!this.assignForm[id]) {

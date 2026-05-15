@@ -1,6 +1,15 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FirestoreService } from '../services/firestore.service';
+import { ScheduleConflictService } from '../services/schedule-conflict.service';
+
+interface CourseRow {
+  id: string;
+  name?: string;
+  schedule?: string;
+  meetings?: unknown;
+  [key: string]: unknown;
+}
 
 const dbData = {
   admins: [
@@ -160,6 +169,22 @@ const dbData = {
         {{ isRunning ? 'Migrating...' : isDone ? 'Done ✓' : 'Start Migration' }}
       </button>
 
+      <hr style="margin: 18px 0;" />
+
+      <h3 style="margin-top: 0;">Backfill course meetings</h3>
+      <p>
+        Parses the legacy free-text <code>schedule</code> on every course and
+        writes the result into a structured <code>meetings[]</code> field.
+        Safe to re-run: courses that already have meetings are skipped.
+      </p>
+      <button
+        (click)="backfillCourseMeetings()"
+        [disabled]="isBackfillRunning"
+        style="padding: 10px 20px; font-size: 16px; cursor: pointer; margin-bottom: 16px;"
+      >
+        {{ isBackfillRunning ? 'Backfilling...' : 'Backfill course meetings' }}
+      </button>
+
       <pre style="background: #f3f4f6; padding: 12px; border-radius: 8px; font-size: 13px; white-space: pre-wrap;">{{ log }}</pre>
     </div>
   `,
@@ -167,9 +192,13 @@ const dbData = {
 export class MigrateComponent implements OnInit {
   isRunning = false;
   isDone = false;
+  isBackfillRunning = false;
   log = 'Ready. Press "Start Migration" to begin.\n';
 
-  constructor(private readonly firestoreService: FirestoreService) {}
+  constructor(
+    private readonly firestoreService: FirestoreService,
+    private readonly scheduleConflict: ScheduleConflictService,
+  ) {}
 
   ngOnInit(): void {}
 
@@ -215,6 +244,53 @@ export class MigrateComponent implements OnInit {
       } catch (err) {
         this.addLog(`  ✗ ${collectionName}/${id} → ${String(err)}`);
       }
+    }
+  }
+
+  /**
+   * One-shot backfill: parse every course's legacy `schedule` string into the
+   * structured `meetings` field used by ScheduleConflictService. Idempotent —
+   * courses that already have a non-empty `meetings` array are skipped.
+   */
+  async backfillCourseMeetings(): Promise<void> {
+    this.isBackfillRunning = true;
+    this.addLog('\nBackfilling course meetings...');
+
+    try {
+      const courses = await this.firestoreService.getAll<CourseRow>('courses');
+      let updated = 0;
+      let skipped = 0;
+      let unparsed = 0;
+
+      for (const c of courses) {
+        const existing = Array.isArray(c.meetings) ? c.meetings : [];
+        if (existing.length > 0) {
+          skipped++;
+          continue;
+        }
+        const meetings = this.scheduleConflict.parseScheduleString(c.schedule);
+        if (meetings.length === 0) {
+          unparsed++;
+          this.addLog(`  · courses/${c.id} (${c.name ?? 'unnamed'}): could not parse "${c.schedule ?? ''}"`);
+          continue;
+        }
+        try {
+          await this.firestoreService.update('courses', c.id, { meetings });
+          updated++;
+          this.addLog(`  ✓ courses/${c.id}: ${meetings.length} meeting(s) backfilled`);
+        } catch (err) {
+          this.addLog(`  ✗ courses/${c.id}: ${String(err)}`);
+        }
+      }
+
+      this.addLog(
+        `\nBackfill complete: ${updated} updated, ${skipped} already had meetings, ` +
+        `${unparsed} unparseable (re-enter manually via Admin → Courses).`,
+      );
+    } catch (err) {
+      this.addLog('\n❌ Backfill failed: ' + String(err));
+    } finally {
+      this.isBackfillRunning = false;
     }
   }
 

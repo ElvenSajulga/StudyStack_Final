@@ -44,6 +44,23 @@
         </select>
       </label>
 
+      <div class="field full-width sibling-courses" *ngIf="siblingCourses.length > 0">
+        <span class="field-label">
+          Existing section(s) under this name
+          <span class="sibling-count">({{ siblingCourses.length }})</span>
+        </span>
+        <p class="field-hint">
+          <i class="ti ti-info-circle" aria-hidden="true"></i>
+          A course with the same name, program, and semester already exists.
+          Set meetings that don't overlap any of these to allow this duplicate.
+        </p>
+        <ul class="sibling-list">
+          <li *ngFor="let s of siblingCourses">
+            <span class="sibling-label">{{ s.meetingsLabel }}</span>
+          </li>
+        </ul>
+      </div>
+
       <div class="field full-width">
         <span class="field-label">Schedule</span>
         <p class="field-hint">

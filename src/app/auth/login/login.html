@@ -24,14 +24,16 @@
       <h2>Welcome Back to StudyStack!</h2>
       <p class="subtitle">Track your class records with StudyStack</p>
 
-      <form (ngSubmit)="login()">
+      <form (ngSubmit)="login()" [class.shake]="shake" novalidate>
         <input
           id="UID"
           name="UID"
           class="form-control"
           [(ngModel)]="UID"
+          [disabled]="loading"
           required
           placeholder="UID"
+          autocomplete="username"
         />
 
         <div class="password-input-wrapper">
@@ -41,25 +43,40 @@
             name="password"
             class="form-control"
             [(ngModel)]="password"
+            [disabled]="loading"
             required
             placeholder="Password"
+            autocomplete="current-password"
           />
           <button
             type="button"
             class="password-toggle"
             (click)="togglePasswordVisibility()"
+            [disabled]="loading"
             [attr.aria-label]="showPassword ? 'Hide password' : 'Show password'"
           >
             <i class="ti" [class.ti-eye]="showPassword" [class.ti-eye-off]="!showPassword"></i>
           </button>
         </div>
 
-        <button type="submit" class="login-button">Login</button>
+        <button
+          type="submit"
+          class="login-button"
+          [class.is-loading]="loading"
+          [disabled]="loading"
+          [attr.aria-busy]="loading ? 'true' : 'false'"
+        >
+          <span class="btn-label" aria-hidden="true">{{ loading ? 'Signing in' : 'Login' }}</span>
+          @if (loading) {
+            <span class="btn-spinner" aria-hidden="true"></span>
+            <span class="visually-hidden">Signing in, please wait</span>
+          }
+        </button>
 
         <div class="form-footer">
           <a class="forgot">Forgot Password?</a>
           <label class="remember">
-            <input type="checkbox" /> Remember sign in details
+            <input type="checkbox" [disabled]="loading" /> Remember sign in details
           </label>
         </div>
       </form>

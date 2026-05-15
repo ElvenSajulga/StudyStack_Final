@@ -1,0 +1,180 @@
+@if (visible) {
+  <!-- Minimized FAB -->
+  @if (!expanded) {
+    <button
+      type="button"
+      class="chat-fab"
+      (click)="toggleExpanded()"
+      [attr.aria-label]="unreadCount > 0
+        ? 'Open chat (' + unreadCount + ' unread)'
+        : 'Open chat'"
+    >
+      <i class="ti ti-message-circle" aria-hidden="true"></i>
+      @if (unreadCount > 0) {
+        <span class="chat-fab-badge">{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
+      }
+    </button>
+  }
+
+  <!-- Expanded panel -->
+  @if (expanded) {
+    <section class="chat-panel" role="dialog" aria-label="Chat">
+      <header class="chat-header">
+        @if (selectedUID) {
+          <button
+            type="button"
+            class="chat-icon-btn"
+            (click)="backToInbox()"
+            aria-label="Back to inbox"
+          >
+            <i class="ti ti-chevron-left" aria-hidden="true"></i>
+          </button>
+          <div class="chat-header-title">
+            <span class="chat-avatar small">{{ contactInitials(selectedUID) }}</span>
+            <span class="chat-header-name">{{ contactName(selectedUID) }}</span>
+          </div>
+        } @else {
+          <span class="chat-header-title">
+            <i class="ti ti-message-circle" aria-hidden="true"></i>
+            Chat
+            @if (unreadCount > 0) {
+              <span class="header-badge">{{ unreadCount }}</span>
+            }
+          </span>
+        }
+        <button
+          type="button"
+          class="chat-icon-btn"
+          (click)="minimize()"
+          aria-label="Minimize chat"
+          title="Minimize"
+        >
+          <i class="ti ti-minus" aria-hidden="true"></i>
+        </button>
+      </header>
+
+      <!-- Inbox view -->
+      @if (!selectedUID) {
+        <div class="chat-inbox">
+          @if (loading) {
+            <p class="chat-empty">Loading…</p>
+          } @else if (summaries.length === 0 && !showPicker) {
+            <p class="chat-empty">
+              No conversations yet.
+              @if (contacts.length > 0) {
+                Pick someone to start chatting.
+              } @else {
+                You don't have anyone to chat with yet.
+              }
+            </p>
+          } @else if (!showPicker) {
+            <ul class="chat-list">
+              @for (s of summaries; track trackBySummary($index, s)) {
+                <li>
+                  <button
+                    type="button"
+                    class="chat-list-item"
+                    [class.has-unread]="s.unreadCount > 0"
+                    (click)="openConversation(s.otherUID)"
+                  >
+                    <span class="chat-avatar">{{ contactInitials(s.otherUID) }}</span>
+                    <span class="chat-list-content">
+                      <span class="chat-list-name">{{ contactName(s.otherUID) }}</span>
+                      <span class="chat-list-preview">{{ s.lastMessage.text }}</span>
+                    </span>
+                    @if (s.unreadCount > 0) {
+                      <span class="chat-list-unread">{{ s.unreadCount }}</span>
+                    }
+                  </button>
+                </li>
+              }
+            </ul>
+          }
+
+          <!-- Contact picker (new conversation) -->
+          @if (showPicker) {
+            <div class="chat-picker">
+              <input
+                type="text"
+                class="chat-search"
+                placeholder="Search…"
+                [(ngModel)]="pickerQuery"
+                autocomplete="off"
+              />
+              @if (filteredContacts().length === 0) {
+                <p class="chat-empty small">No matches.</p>
+              } @else {
+                <ul class="chat-list">
+                  @for (c of filteredContacts(); track trackByContact($index, c)) {
+                    <li>
+                      <button
+                        type="button"
+                        class="chat-list-item"
+                        (click)="openConversation(c.uid)"
+                      >
+                        <span class="chat-avatar">{{ contactInitials(c.uid) }}</span>
+                        <span class="chat-list-content">
+                          <span class="chat-list-name">{{ c.name }}</span>
+                          @if (c.credential) {
+                            <span class="chat-list-preview">{{ c.credential }}</span>
+                          }
+                        </span>
+                      </button>
+                    </li>
+                  }
+                </ul>
+              }
+            </div>
+          }
+
+          @if (contacts.length > 0) {
+            <button
+              type="button"
+              class="chat-new-btn"
+              (click)="togglePicker()"
+            >
+              {{ showPicker ? 'Cancel' : '+ New chat' }}
+            </button>
+          }
+        </div>
+      }
+
+      <!-- Thread view -->
+      @if (selectedUID) {
+        <div class="chat-thread">
+          @if (threadMessages.length === 0) {
+            <p class="chat-empty">No messages yet — say hi.</p>
+          }
+          @for (m of threadMessages; track trackByMessage($index, m)) {
+            <div class="chat-bubble" [class.mine]="isMine(m)">
+              <span class="chat-bubble-text">{{ m.text }}</span>
+              <span class="chat-bubble-time">{{ m.createdAt | date: 'shortTime' }}</span>
+            </div>
+          }
+          <div #threadEnd></div>
+        </div>
+
+        <form class="chat-composer" (ngSubmit)="sendMessage()">
+          <textarea
+            rows="1"
+            placeholder="Type a message…"
+            [(ngModel)]="composer"
+            name="composer"
+            (keydown)="onComposerKeydown($event)"
+            [disabled]="sending"
+            maxlength="2000"
+            aria-label="Message"
+          ></textarea>
+          <button
+            type="submit"
+            class="chat-send"
+            [disabled]="sending || !composer.trim()"
+            aria-label="Send"
+          >
+            <i class="ti ti-send" aria-hidden="true"></i>
+          </button>
+        </form>
+      }
+    </section>
+  }
+}
