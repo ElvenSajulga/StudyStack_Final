@@ -28,7 +28,7 @@
         type="button"
         class="btn btn-subtle"
         (click)="exportAttendanceCsv()"
-        [disabled]="activities.length === 0 || students.length === 0"
+        [disabled]="activities.length === 0 || studentRows.length === 0"
         aria-label="Export CSV"
       >
         <i class="ti ti-download" aria-hidden="true"></i>
@@ -37,25 +37,51 @@
     </div>
   </header>
 
-  <div class="filter-bar" *ngIf="courseFilters.length > 0">
-    <label for="course-filter">Filter by course</label>
-    <select
-      id="course-filter"
-      [(ngModel)]="selectedCourseId"
-      (ngModelChange)="onCourseFilterChange()"
+  <!-- Independent course + section filters. Section options cascade off the
+       picked course so the dropdown only shows valid pairs. -->
+  <div class="filter-bar" *ngIf="courseOptions.length > 0">
+    <div class="filter-group">
+      <label for="course-filter">Course</label>
+      <select
+        id="course-filter"
+        [(ngModel)]="selectedCourseId"
+        (ngModelChange)="onCourseFilterChange()"
+      >
+        <option value="">All courses</option>
+        <option *ngFor="let c of courseOptions" [value]="c.id">{{ c.name }}</option>
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <label for="section-filter">Section</label>
+      <select
+        id="section-filter"
+        [(ngModel)]="selectedSectionId"
+        (ngModelChange)="onSectionFilterChange()"
+        [disabled]="sectionOptions.length === 0"
+      >
+        <option value="">All sections</option>
+        <option *ngFor="let s of sectionOptions" [value]="s.id">{{ s.name }}</option>
+      </select>
+    </div>
+
+    <button
+      type="button"
+      class="btn btn-subtle clear-filters-btn"
+      *ngIf="hasFilters()"
+      (click)="clearFilters()"
     >
-      <option value="">All courses</option>
-      <option *ngFor="let filter of courseFilters" [value]="filter.courseId">
-        {{ filter.courseName }} – {{ filter.sectionName }}
-      </option>
-    </select>
-    <span class="muted" *ngIf="activities.length > 0">
-      Showing {{ activities.length }} {{ activities.length === 1 ? 'activity' : 'activities' }},
-      {{ students.length }} {{ students.length === 1 ? 'student' : 'students' }}
+      <i class="ti ti-x" aria-hidden="true"></i>
+      <span>Clear filters</span>
+    </button>
+
+    <span class="muted filter-counts" *ngIf="activities.length > 0 || studentRows.length > 0">
+      {{ activities.length }} {{ activities.length === 1 ? 'activity' : 'activities' }},
+      {{ studentRows.length }} {{ studentRows.length === 1 ? 'student' : 'students' }}
     </span>
   </div>
 
-  <ng-container *ngIf="activities.length > 0 && students.length > 0; else emptyState">
+  <ng-container *ngIf="activities.length > 0 && studentRows.length > 0; else emptyState">
     <!-- BY ACTIVITY VIEW -->
     <section *ngIf="attendanceView === 'by-activity'">
       <article class="card" *ngFor="let a of activities">
@@ -73,27 +99,36 @@
               <tr>
                 <th>Student ID</th>
                 <th>Name</th>
+                <th>Course</th>
+                <th>Section</th>
                 <th>Status</th>
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let s of students">
-                <td>{{ s.studentID }}</td>
-                <td>{{ s.lastname }}, {{ s.firstname }} {{ s.middlename }}</td>
+              <tr *ngFor="let r of rowsForActivity(a)">
+                <td>{{ r.student.studentID }}</td>
+                <td>{{ r.student.lastname }}, {{ r.student.firstname }} {{ r.student.middlename }}</td>
+                <td>{{ r.courseName }}</td>
+                <td>{{ r.sectionName }}</td>
                 <td>
                   <span
                     class="status-pill"
                     [ngClass]="{
-                      present: attendanceStatus(a, s) === 'present',
-                      late: attendanceStatus(a, s) === 'late',
-                      absent: attendanceStatus(a, s) === 'absent'
+                      present: attendanceStatus(a, r.student) === 'present',
+                      late: attendanceStatus(a, r.student) === 'late',
+                      absent: attendanceStatus(a, r.student) === 'absent'
                     }"
                   >
-                    <i class="ti ti-check"  *ngIf="attendanceStatus(a,s)==='present'" aria-hidden="true"></i>
-                    <i class="ti ti-clock"  *ngIf="attendanceStatus(a,s)==='late'"    aria-hidden="true"></i>
-                    <i class="ti ti-x"      *ngIf="attendanceStatus(a,s)==='absent'"  aria-hidden="true"></i>
-                    {{ attendanceStatus(a, s) | titlecase }}
+                    <i class="ti ti-check" *ngIf="attendanceStatus(a, r.student)==='present'" aria-hidden="true"></i>
+                    <i class="ti ti-clock" *ngIf="attendanceStatus(a, r.student)==='late'" aria-hidden="true"></i>
+                    <i class="ti ti-x" *ngIf="attendanceStatus(a, r.student)==='absent'" aria-hidden="true"></i>
+                    {{ attendanceStatus(a, r.student) | titlecase }}
                   </span>
+                </td>
+              </tr>
+              <tr *ngIf="rowsForActivity(a).length === 0">
+                <td colspan="5" class="no-results">
+                  No students in this course / section for this activity.
                 </td>
               </tr>
             </tbody>
@@ -115,36 +150,53 @@
             <thead>
               <tr>
                 <th>Student ID</th>
-                <th>Name</th>
+                <th
+                  class="sortable"
+                  [class.sorted]="isSortedBy('name')"
+                  (click)="toggleSort('name')"
+                >
+                  Name
+                  <i class="ti sort-icon" [ngClass]="sortIconFor('name')" aria-hidden="true"></i>
+                </th>
+                <th
+                  class="sortable"
+                  [class.sorted]="isSortedBy('course')"
+                  (click)="toggleSort('course')"
+                >
+                  Course
+                  <i class="ti sort-icon" [ngClass]="sortIconFor('course')" aria-hidden="true"></i>
+                </th>
+                <th
+                  class="sortable"
+                  [class.sorted]="isSortedBy('section')"
+                  (click)="toggleSort('section')"
+                >
+                  Section
+                  <i class="ti sort-icon" [ngClass]="sortIconFor('section')" aria-hidden="true"></i>
+                </th>
                 <th class="num-col">Present</th>
                 <th class="num-col">Late</th>
                 <th class="num-col">Absent</th>
                 <th class="num-col">Total</th>
                 <th
                   class="num-col sortable"
-                  [class.sorted]="rateSortDir !== null"
-                  (click)="toggleRateSort()"
+                  [class.sorted]="isSortedBy('rate')"
+                  (click)="toggleSort('rate')"
                 >
                   Rate
-                  <i
-                    class="ti sort-icon"
-                    [ngClass]="{
-                      'ti-arrows-sort': rateSortDir === null,
-                      'ti-sort-ascending': rateSortDir === 'asc',
-                      'ti-sort-descending': rateSortDir === 'desc'
-                    }"
-                    aria-hidden="true"
-                  ></i>
+                  <i class="ti sort-icon" [ngClass]="sortIconFor('rate')" aria-hidden="true"></i>
                 </th>
               </tr>
             </thead>
             <tbody>
               <tr *ngFor="let summary of studentSummaries">
-                <td>{{ summary.student.studentID }}</td>
+                <td>{{ summary.row.student.studentID }}</td>
                 <td>
-                  {{ summary.student.lastname }}, {{ summary.student.firstname }}
-                  {{ summary.student.middlename }}
+                  {{ summary.row.student.lastname }}, {{ summary.row.student.firstname }}
+                  {{ summary.row.student.middlename }}
                 </td>
+                <td>{{ summary.row.courseName }}</td>
+                <td>{{ summary.row.sectionName }}</td>
                 <td class="num-col">{{ summary.present }}</td>
                 <td class="num-col">{{ summary.late }}</td>
                 <td class="num-col">{{ summary.absent }}</td>
@@ -156,7 +208,7 @@
             </tbody>
             <tfoot>
               <tr class="summary-row">
-                <td colspan="2">Class totals</td>
+                <td colspan="4">Class totals</td>
                 <td class="num-col">{{ totalsRow.present }}</td>
                 <td class="num-col">{{ totalsRow.late }}</td>
                 <td class="num-col">{{ totalsRow.absent }}</td>
@@ -174,10 +226,24 @@
 
   <ng-template #emptyState>
     <article class="card empty-state">
-      <p>No activities or students to show yet.</p>
-      <p class="meta">
-        Create activities first and make sure there are student accounts in the system to track attendance.
+      <p *ngIf="hasFilters(); else noData">
+        No activities or students match these filters.
       </p>
+      <ng-template #noData>
+        <p>No activities or students to show yet.</p>
+        <p class="meta">
+          Create activities first and make sure students are enrolled in your course / section to track attendance.
+        </p>
+      </ng-template>
+      <button
+        *ngIf="hasFilters()"
+        type="button"
+        class="btn btn-subtle"
+        (click)="clearFilters()"
+      >
+        <i class="ti ti-x" aria-hidden="true"></i>
+        Clear filters
+      </button>
     </article>
   </ng-template>
 </div>

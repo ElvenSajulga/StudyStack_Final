@@ -4,24 +4,46 @@ import { FormsModule } from '@angular/forms';
 import { Activity, ActivityService, ActivitySubmission, AttendanceStatus } from '../../services/activity.service';
 import { AuthService } from '../../services/auth.service';
 import { StudentAccount, StudentAccountService } from '../../services/student-account.service';
-import { AcademicService, CourseSection, Enrollment } from '../../services/academic.service';
+import { AcademicService, Course, Enrollment, Section } from '../../services/academic.service';
 import { CourseLookupService } from '../../services/course-lookup.service';
 
-interface CourseFilterOption {
+interface CourseOption {
+  id: string;
+  name: string;
+}
+
+interface SectionOption {
+  id: string;
+  name: string;
+  /** Course this section is paired with for the current teacher. Used to keep
+   *  the section dropdown in sync when the user picks a specific course. */
+  courseId: string;
+}
+
+interface StudentRow {
+  /** Stable id across renders — `studentUID::sectionId` so a student enrolled
+   *  in two of this teacher's sections shows up once per section. */
+  rowId: string;
+  student: StudentAccount;
+  sectionId: string;
+  sectionName: string;
+  /** Course id of the row's enrollment — only used when no global course
+   *  filter is applied, to scope the per-row attendance to that course. */
   courseId: string;
   courseName: string;
-  sectionName: string;
-  sectionId: string;
 }
 
 interface StudentAttendanceSummary {
-  student: StudentAccount;
+  row: StudentRow;
   present: number;
   late: number;
   absent: number;
   total: number;
   rate: number;
 }
+
+type SortKey = 'name' | 'section' | 'course' | 'rate';
+type SortDir = 'asc' | 'desc';
 
 @Component({
   selector: 'app-teacher-attendance',
@@ -31,16 +53,29 @@ interface StudentAttendanceSummary {
   styleUrl: './teacher-attendance.scss',
 })
 export class TeacherAttendance implements OnInit {
+  /** Activities & student rows after the course + section filters are applied. */
   activities: Activity[] = [];
-  students: StudentAccount[] = [];
-  courseFilters: CourseFilterOption[] = [];
-  selectedCourseId: string = '';
-  attendanceView: 'by-activity' | 'by-student' = 'by-activity';
-  rateSortDir: 'asc' | 'desc' | null = null;
+  studentRows: StudentRow[] = [];
 
+  /** Filter dropdown contents. Section options cascade off the course pick. */
+  courseOptions: CourseOption[] = [];
+  sectionOptions: SectionOption[] = [];
+
+  selectedCourseId = '';
+  selectedSectionId = '';
+
+  attendanceView: 'by-activity' | 'by-student' = 'by-activity';
+  sortKey: SortKey = 'name';
+  sortDir: SortDir = 'asc';
+
+  // ── internal caches ────────────────────────────────────────────────────
   private allActivities: Activity[] = [];
-  private allStudents: StudentAccount[] = [];
-  private enrollmentsBySection: Map<string, Enrollment[]> = new Map();
+  /** Every (student, section) pair this teacher teaches — pre-built so the
+   *  filter step is just an array filter, no joins. */
+  private allStudentRows: StudentRow[] = [];
+  /** All sections the teacher teaches, paired with their course. The section
+   *  dropdown is derived from this. */
+  private allSectionOptions: SectionOption[] = [];
   private submissionsByKey: Record<string, ActivitySubmission | undefined> = {};
 
   constructor(
@@ -66,15 +101,11 @@ export class TeacherAttendance implements OnInit {
   }
 
   private async loadData(): Promise<void> {
-    const teacherUID = (this.auth.getCurrentUser() as any)?.UID;
+    const currentUser = this.auth.getCurrentUser();
+    const teacherUID = (currentUser as { UID?: string } | null)?.UID;
+    const teacherID = currentUser?.teacherID;
     if (!teacherUID) {
-      this.activities = [];
-      this.students = [];
-      this.courseFilters = [];
-      this.selectedCourseId = '';
-      this.allActivities = [];
-      this.allStudents = [];
-      this.submissionsByKey = {};
+      this.resetState();
       this.cdr.detectChanges();
       return;
     }
@@ -88,76 +119,137 @@ export class TeacherAttendance implements OnInit {
       this.academicService.getEnrollments(),
     ]);
 
-    // Build course filter options
-    this.courseFilters = courseSections.map(cs => {
-      const course = courses.find(c => c.id === cs.courseId);
-      const section = sections.find(s => s.id === cs.sectionId);
-      return {
-        courseId: cs.courseId,
-        courseName: course?.name || 'Unknown',
-        sectionName: section?.name || 'Unknown',
-        sectionId: cs.sectionId,
-      };
-    });
+    // ── Build dropdown options from the teacher's course/section assignments
+    const courseById = new Map<string, Course>(courses.map(c => [c.id, c]));
+    const sectionById = new Map<string, Section>(sections.map(s => [s.id, s]));
 
-    // Filter enrollments to only those for this teacher
-    const teacherEnrollments = enrollments.filter(e => e.teacherUID === teacherUID);
-
-    // Build map of enrollments by section
-    this.enrollmentsBySection.clear();
-    for (const enrollment of teacherEnrollments) {
-      const key = enrollment.sectionId;
-      if (!this.enrollmentsBySection.has(key)) {
-        this.enrollmentsBySection.set(key, []);
+    const courseOptionMap = new Map<string, CourseOption>();
+    this.allSectionOptions = [];
+    for (const cs of courseSections) {
+      const course = courseById.get(cs.courseId);
+      const section = sectionById.get(cs.sectionId);
+      if (course && !courseOptionMap.has(course.id)) {
+        courseOptionMap.set(course.id, { id: course.id, name: course.name });
       }
-      this.enrollmentsBySection.get(key)!.push(enrollment);
+      // Same section can pair with multiple courses for one teacher — dedupe
+      // by (courseId, sectionId) so the dropdown stays unique per pair.
+      const exists = this.allSectionOptions.some(
+        s => s.id === cs.sectionId && s.courseId === cs.courseId,
+      );
+      if (!exists) {
+        this.allSectionOptions.push({
+          id: cs.sectionId,
+          name: section?.name ?? 'Unknown',
+          courseId: cs.courseId,
+        });
+      }
+    }
+    this.courseOptions = [...courseOptionMap.values()]
+      .sort((a, b) => a.name.localeCompare(b.name));
+    this.allSectionOptions.sort((a, b) => a.name.localeCompare(b.name));
+
+    // ── Build the full (student × section) row list once. Filters work on
+    // this cache; we never re-join enrollments per render.
+    const teacherEnrollments = enrollments.filter(e => e.teacherUID === teacherUID);
+    const studentsById = new Map(this.studentService.getAll().map(s => [s.UID, s]));
+
+    this.allStudentRows = [];
+    const seenRows = new Set<string>();
+    for (const e of teacherEnrollments) {
+      const student = studentsById.get(e.studentUID);
+      if (!student) continue;
+      const rowId = `${e.studentUID}::${e.sectionId}::${e.courseId}`;
+      if (seenRows.has(rowId)) continue;
+      seenRows.add(rowId);
+      this.allStudentRows.push({
+        rowId,
+        student,
+        sectionId: e.sectionId,
+        sectionName: sectionById.get(e.sectionId)?.name ?? 'Unknown',
+        courseId: e.courseId,
+        courseName: courseById.get(e.courseId)?.name ?? 'Unknown',
+      });
     }
 
-    // Get enrolled student UIDs
-    const enrolledStudentUIDs = new Set(teacherEnrollments.map(e => e.studentUID));
-    const allStudents = this.studentService.getAll();
-    this.allStudents = allStudents.filter(s => enrolledStudentUIDs.has(s.UID));
+    // ── Load activities (use teacherID; see Issue #4 fix history) and pre-cache submissions
+    this.allActivities = teacherID
+      ? await this.activityService.getActivitiesForTeacher(teacherID)
+      : await this.activityService.getActivitiesForTeacherUID(teacherUID);
 
-    // Load activities
-    this.allActivities = await this.activityService.getActivitiesForTeacher(teacherUID);
-
-    // Load submissions
     const activityIds = this.allActivities.map(a => a.id);
-    const subs = await this.activityService.getSubmissionsForActivities(activityIds);
+    const subs = activityIds.length === 0
+      ? []
+      : await this.activityService.getSubmissionsForActivities(activityIds);
     this.submissionsByKey = {};
     for (const sub of subs) {
       this.submissionsByKey[this.submissionKey(sub.activityId, sub.studentID)] = sub;
     }
 
+    // Re-derive cascading section options and apply current filter
+    this.refreshSectionOptions();
+    this.applyFilter();
+    this.cdr.detectChanges();
+  }
+
+  // ── Filter handlers ────────────────────────────────────────────────────
+
+  /**
+   * When a course is picked the section dropdown narrows to that course's
+   * sections only. Picking "All courses" restores every section the teacher
+   * teaches.
+   */
+  private refreshSectionOptions(): void {
+    if (this.selectedCourseId === '') {
+      // Dedupe by sectionId for the global view — a section paired with two
+      // courses shouldn't appear twice.
+      const seen = new Set<string>();
+      this.sectionOptions = this.allSectionOptions
+        .filter(s => (seen.has(s.id) ? false : (seen.add(s.id), true)))
+        .sort((a, b) => a.name.localeCompare(b.name));
+    } else {
+      this.sectionOptions = this.allSectionOptions
+        .filter(s => s.courseId === this.selectedCourseId)
+        .sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    // If the active section is no longer valid under the new course, clear it.
+    if (
+      this.selectedSectionId &&
+      !this.sectionOptions.some(s => s.id === this.selectedSectionId)
+    ) {
+      this.selectedSectionId = '';
+    }
+  }
+
+  onCourseFilterChange(): void {
+    this.refreshSectionOptions();
+    this.applyFilter();
+    this.cdr.detectChanges();
+  }
+
+  onSectionFilterChange(): void {
     this.applyFilter();
     this.cdr.detectChanges();
   }
 
   private applyFilter(): void {
-    if (this.selectedCourseId === '') {
-      this.activities = [...this.allActivities];
-      this.students = [...this.allStudents];
-    } else {
-      const courseFilter = this.courseFilters.find(cf => cf.courseId === this.selectedCourseId);
-      if (!courseFilter) {
-        this.activities = [];
-        this.students = [];
-        return;
-      }
+    const courseId = this.selectedCourseId;
+    const sectionId = this.selectedSectionId;
 
-      // Filter activities by courseId
-      this.activities = this.allActivities.filter(a => a.courseId === this.selectedCourseId);
+    // Activities: filter by courseId and sectionId when set. Legacy activities
+    // (no sectionId field at all) fall through so historic data remains visible
+    // — only freshly-section-scoped activities are excluded from other sections.
+    this.activities = this.allActivities.filter(a => {
+      if (courseId && a.courseId !== courseId) return false;
+      if (sectionId && a.sectionId && a.sectionId !== sectionId) return false;
+      return true;
+    });
 
-      // Filter students to those enrolled in this section
-      const sectionEnrollments = this.enrollmentsBySection.get(courseFilter.sectionId) || [];
-      const sectionStudentUIDs = new Set(sectionEnrollments.map(e => e.studentUID));
-      this.students = this.allStudents.filter(s => sectionStudentUIDs.has(s.UID));
-    }
-  }
-
-  onCourseFilterChange(): void {
-    this.applyFilter();
-    this.cdr.detectChanges();
+    this.studentRows = this.allStudentRows.filter(r => {
+      if (courseId && r.courseId !== courseId) return false;
+      if (sectionId && r.sectionId !== sectionId) return false;
+      return true;
+    });
   }
 
   attendanceStatus(activity: Activity, student: StudentAccount): AttendanceStatus {
@@ -170,45 +262,82 @@ export class TeacherAttendance implements OnInit {
     this.cdr.detectChanges();
   }
 
-  toggleRateSort(): void {
-    if (this.rateSortDir === null) {
-      this.rateSortDir = 'desc';
-    } else if (this.rateSortDir === 'desc') {
-      this.rateSortDir = 'asc';
+  // ── Sorting ────────────────────────────────────────────────────────────
+
+  /**
+   * Toggle sort: clicking the same column flips direction, clicking another
+   * column resets direction to its natural default (asc for text, desc for
+   * the attendance rate so the best-performers float to the top first).
+   */
+  toggleSort(key: SortKey): void {
+    if (this.sortKey === key) {
+      this.sortDir = this.sortDir === 'asc' ? 'desc' : 'asc';
     } else {
-      this.rateSortDir = null;
+      this.sortKey = key;
+      this.sortDir = key === 'rate' ? 'desc' : 'asc';
     }
   }
 
+  isSortedBy(key: SortKey): boolean {
+    return this.sortKey === key;
+  }
+
+  sortIconFor(key: SortKey): string {
+    if (!this.isSortedBy(key)) return 'ti-arrows-sort';
+    return this.sortDir === 'asc' ? 'ti-sort-ascending' : 'ti-sort-descending';
+  }
+
+  // ── Summary table (by-student view) ─────────────────────────────────────
+
   get studentSummaries(): StudentAttendanceSummary[] {
-    const summaries: StudentAttendanceSummary[] = this.students.map(student => {
+    // For each (student, section) row, count statuses across the visible
+    // activities. When a course filter is active, activities are already
+    // narrowed to that course — when no course filter is active we additionally
+    // scope each row to its own course so cross-course numbers don't mix.
+    const summaries: StudentAttendanceSummary[] = this.studentRows.map(row => {
+      const scopedActivities = this.selectedCourseId
+        ? this.activities
+        : this.activities.filter(a => !a.courseId || a.courseId === row.courseId);
+
       let present = 0;
       let late = 0;
       let absent = 0;
 
-      for (const activity of this.activities) {
-        const status = this.attendanceStatus(activity, student);
+      for (const activity of scopedActivities) {
+        const status = this.attendanceStatus(activity, row.student);
         if (status === 'present') present++;
         else if (status === 'late') late++;
         else if (status === 'absent') absent++;
       }
 
-      const total = this.activities.length;
+      const total = scopedActivities.length;
       const rate = total > 0
         ? Math.round(((present + late) / total) * 1000) / 10
         : 0;
 
-      return { student, present, late, absent, total, rate };
+      return { row, present, late, absent, total, rate };
     });
 
-    if (this.rateSortDir !== null) {
-      const dir = this.rateSortDir;
-      summaries.sort((a, b) => dir === 'asc' ? a.rate - b.rate : b.rate - a.rate);
-    } else {
-      summaries.sort((a, b) =>
-        (a.student.lastname ?? '').localeCompare(b.student.lastname ?? '')
-      );
-    }
+    const dir = this.sortDir === 'asc' ? 1 : -1;
+    summaries.sort((a, b) => {
+      switch (this.sortKey) {
+        case 'rate':
+          return (a.rate - b.rate) * dir;
+        case 'section': {
+          const cmp = a.row.sectionName.localeCompare(b.row.sectionName);
+          if (cmp !== 0) return cmp * dir;
+          return (a.row.student.lastname ?? '').localeCompare(b.row.student.lastname ?? '');
+        }
+        case 'course': {
+          const cmp = a.row.courseName.localeCompare(b.row.courseName);
+          if (cmp !== 0) return cmp * dir;
+          return (a.row.student.lastname ?? '').localeCompare(b.row.student.lastname ?? '');
+        }
+        case 'name':
+        default:
+          return (a.row.student.lastname ?? '').localeCompare(b.row.student.lastname ?? '') * dir;
+      }
+    });
 
     return summaries;
   }
@@ -231,6 +360,52 @@ export class TeacherAttendance implements OnInit {
     return { present, late, absent, total, rate };
   }
 
+  // ── By-activity view helpers ────────────────────────────────────────────
+
+  /**
+   * Rows visible under one activity card. When no course/section filter is
+   * set we still want each activity to list only the students it could
+   * apply to — i.e. students enrolled in the activity's course (and section,
+   * if the activity is section-scoped). Legacy activities (no courseId/
+   * sectionId) keep showing every visible row.
+   */
+  rowsForActivity(activity: Activity): StudentRow[] {
+    return this.studentRows.filter(r => {
+      if (activity.courseId && r.courseId !== activity.courseId) return false;
+      if (activity.sectionId && r.sectionId !== activity.sectionId) return false;
+      return true;
+    });
+  }
+
+  // ── Reset / utility ─────────────────────────────────────────────────────
+
+  private resetState(): void {
+    this.activities = [];
+    this.studentRows = [];
+    this.courseOptions = [];
+    this.sectionOptions = [];
+    this.allSectionOptions = [];
+    this.selectedCourseId = '';
+    this.selectedSectionId = '';
+    this.allActivities = [];
+    this.allStudentRows = [];
+    this.submissionsByKey = {};
+  }
+
+  hasFilters(): boolean {
+    return !!this.selectedCourseId || !!this.selectedSectionId;
+  }
+
+  clearFilters(): void {
+    this.selectedCourseId = '';
+    this.selectedSectionId = '';
+    this.refreshSectionOptions();
+    this.applyFilter();
+    this.cdr.detectChanges();
+  }
+
+  // ── Export ──────────────────────────────────────────────────────────────
+
   exportAttendanceCsv(): void {
     let rows: (string | number)[][] = [];
 
@@ -239,6 +414,8 @@ export class TeacherAttendance implements OnInit {
         'Student ID',
         'Last Name',
         'First Name',
+        'Course',
+        'Section',
         'Present',
         'Late',
         'Absent',
@@ -248,11 +425,13 @@ export class TeacherAttendance implements OnInit {
       rows.push(headers);
 
       for (const summary of this.studentSummaries) {
-        const s = summary.student;
+        const s = summary.row.student;
         rows.push([
           s.studentID ?? '',
           s.lastname ?? '',
           s.firstname ?? '',
+          summary.row.courseName,
+          summary.row.sectionName,
           summary.present,
           summary.late,
           summary.absent,
@@ -265,16 +444,20 @@ export class TeacherAttendance implements OnInit {
         'Student ID',
         'Last Name',
         'First Name',
+        'Course',
+        'Section',
         ...this.activities.map(a => a.title),
       ];
       rows.push(headers);
 
-      for (const s of this.students) {
+      for (const r of this.studentRows) {
         rows.push([
-          s.studentID ?? '',
-          s.lastname ?? '',
-          s.firstname ?? '',
-          ...this.activities.map(a => this.attendanceStatus(a, s)),
+          r.student.studentID ?? '',
+          r.student.lastname ?? '',
+          r.student.firstname ?? '',
+          r.courseName,
+          r.sectionName,
+          ...this.activities.map(a => this.attendanceStatus(a, r.student)),
         ]);
       }
     }
