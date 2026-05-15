@@ -34,22 +34,10 @@
             <small class="helper-text">{{ addForm.message.length }} characters</small>
           </label>
 
-          <label class="field">
+          <label class="field field-full">
             <span class="field-label">Quick template</span>
             <select name="template" [(ngModel)]="selectedTemplate" (ngModelChange)="applyTemplate($event)">
               <option *ngFor="let t of messageTemplates" [value]="t.id">{{ t.label }}</option>
-            </select>
-          </label>
-
-          <label class="field">
-            <span class="field-label">Audience</span>
-            <select name="audienceType" [(ngModel)]="targetAudience" (ngModelChange)="onAudienceChange()">
-              <option value="all">All Users</option>
-              <option value="all-students">All Students</option>
-              <option value="all-teachers">All Teachers</option>
-              <option value="program">By Program</option>
-              <option value="specific-teachers">Specific Teachers</option>
-              <option value="specific-students">Specific Students</option>
             </select>
           </label>
 
