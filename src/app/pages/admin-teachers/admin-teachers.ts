@@ -6,13 +6,12 @@ import { AcademicService, Faculty } from '../../services/academic.service';
 import { AuditLogService } from '../../services/audit-log.service';
 import { AuthService } from '../../services/auth.service';
 import { AdminNotificationService } from '../../services/admin-notification.service';
-import { CSVImportModal, CSVImportRow, CSVImportConfig } from '../../components/csv-import-modal/csv-import-modal';
 import { ToastService } from '../../services/toast.service';
 
 @Component({
   selector: 'app-admin-teachers',
   standalone: true,
-  imports: [CommonModule, FormsModule, CSVImportModal],
+  imports: [CommonModule, FormsModule],
   templateUrl: './admin-teachers.html',
   styleUrl: './admin-teachers.scss',
 })
@@ -37,15 +36,6 @@ export class AdminTeachers implements OnInit {
   pageSizeOptions = [10, 15, 25, 50];
   pageSize = 15;
   currentPage = 1;
-
-  // CSV Import
-  showImportModal = false;
-  csvImportConfig: CSVImportConfig = {
-    templateFileName: 'teachers-template.csv',
-    templateHeaders: ['firstname', 'lastname', 'middlename', 'teacherID', 'email', 'status', 'facultyId'],
-    requiredFields: ['firstname', 'lastname', 'teacherID', 'status'],
-    entityType: 'teacher',
-  };
 
   // Bulk status management
   selectedTeacherUIDs = new Set<string>();
@@ -327,60 +317,6 @@ export class AdminTeachers implements OnInit {
         this.toast('error', (e as { message?: string })?.message ?? 'Failed to remove teacher');
       },
     });
-  }
-
-  // ── CSV Import ────────────────────────────────────────────────────────────
-
-  async onCSVImport(rows: CSVImportRow[]): Promise<void> {
-    let imported = 0;
-    let skipped = 0;
-
-    for (const row of rows) {
-      try {
-        const form: Partial<TeacherAccount> & { facultyId?: string } = {
-          UID: `TCH-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-          name: `${row.data['firstname']} ${row.data['lastname']}`.trim(),
-          firstname: row.data['firstname'],
-          lastname: row.data['lastname'],
-          middlename: row.data['middlename'] || '',
-          teacherID: row.data['teacherid'],
-          email: row.data['email'] || '',
-          status: (row.data['status'] || 'active') as 'active' | 'inactive',
-          password: `${row.data['teacherid']}@initial`,
-          facultyId: row.data['facultyid'] || '',
-        };
-
-        await new Promise<void>((resolve) => {
-          this.teacherService.add(form as TeacherAccount).subscribe({
-            next: () => {
-              const actor = this.auth.getCurrentUser();
-              void this.auditLog.log({
-                actorUID: actor?.UID ?? 'unknown',
-                actorName: actor?.name ?? 'Unknown Admin',
-                action: 'create',
-                entityType: 'teacher',
-                entityId: form.UID ?? '',
-                description: `Bulk imported teacher ${form.firstname} ${form.lastname} (ID: ${form.teacherID})`,
-                timestamp: new Date().toISOString(),
-              });
-              imported++;
-              resolve();
-            },
-            error: () => {
-              skipped++;
-              resolve();
-            },
-          });
-        });
-      } catch {
-        skipped++;
-      }
-    }
-
-    await this.loadAll();
-    void this.toastService.alert('Import complete', {
-      html: `<p><strong>${imported}</strong> teachers imported</p>${skipped > 0 ? `<p><strong>${skipped}</strong> teachers skipped</p>` : ''}`,
-    }, 'success');
   }
 
   // ── Bulk Status Management ─────────────────────────────────────────────────

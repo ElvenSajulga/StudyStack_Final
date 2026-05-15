@@ -99,10 +99,6 @@
           <p class="card-description">Overview of all registered students.</p>
         </div>
         <div class="card-header-actions">
-          <button type="button" class="btn secondary" (click)="showImportModal = true">
-            <i class="ti ti-upload"></i>
-            Import CSV
-          </button>
           <p class="muted" *ngIf="students.length">Total: {{ totalStudents }} student(s)</p>
         </div>
       </header>
@@ -376,11 +372,4 @@
     </div>
   </div>
 
-  <!-- CSV Import Modal -->
-  <app-csv-import-modal
-    [isOpen]="showImportModal"
-    [config]="csvImportConfig"
-    (close)="showImportModal = false"
-    (import)="onCSVImport($event)"
-  ></app-csv-import-modal>
 </div>

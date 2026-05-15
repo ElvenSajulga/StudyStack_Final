@@ -6,13 +6,12 @@ import { AcademicService, Program, Section } from '../../services/academic.servi
 import { AuditLogService } from '../../services/audit-log.service';
 import { AuthService } from '../../services/auth.service';
 import { AdminNotificationService } from '../../services/admin-notification.service';
-import { CSVImportModal, CSVImportRow, CSVImportConfig } from '../../components/csv-import-modal/csv-import-modal';
 import { ToastService } from '../../services/toast.service';
 
 @Component({
   selector: 'app-admin-students',
   standalone: true,
-  imports: [CommonModule, FormsModule, CSVImportModal],
+  imports: [CommonModule, FormsModule],
   templateUrl: './admin-students.html',
   styleUrl: './admin-students.scss',
 })
@@ -38,15 +37,6 @@ export class AdminStudents implements OnInit {
   pageSizeOptions = [10, 15, 25, 50];
   pageSize = 15;
   currentPage = 1;
-
-  // CSV Import
-  showImportModal = false;
-  csvImportConfig: CSVImportConfig = {
-    templateFileName: 'students-template.csv',
-    templateHeaders: ['firstname', 'lastname', 'middlename', 'studentID', 'email', 'status'],
-    requiredFields: ['firstname', 'lastname', 'studentID', 'status'],
-    entityType: 'student',
-  };
 
   // Bulk status management
   selectedStudentUIDs = new Set<string>();
@@ -339,71 +329,6 @@ export class AdminStudents implements OnInit {
         error: () => this.toast('error', 'Failed to remove student'),
       });
     });
-  }
-
-  // ── CSV Import ────────────────────────────────────────────────────────────
-
-  async onCSVImport(rows: CSVImportRow[]): Promise<void> {
-    let imported = 0;
-    let skipped = 0;
-
-    for (const row of rows) {
-      try {
-        const form: Partial<StudentAccount> & { programId?: string; sectionId?: string } = {
-          UID: `STU-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-          name: `${row.data['firstname']} ${row.data['lastname']}`.trim(),
-          firstname: row.data['firstname'],
-          lastname: row.data['lastname'],
-          middlename: row.data['middlename'] || '',
-          studentID: row.data['studentid'],
-          email: row.data['email'] || '',
-          status: (row.data['status'] || 'active') as 'active' | 'inactive',
-          password: `${row.data['studentid']}@initial`,
-          program: '',
-          programId: '',
-          sectionId: '',
-        };
-
-        await new Promise<void>((resolve) => {
-          this.studentService.add(form as StudentAccount).subscribe({
-            next: () => {
-              const actor = this.auth.getCurrentUser();
-              void this.auditLog.log({
-                actorUID: actor?.UID ?? 'unknown',
-                actorName: actor?.name ?? 'Unknown Admin',
-                action: 'create',
-                entityType: 'student',
-                entityId: form.UID ?? '',
-                description: `Bulk imported student ${form.firstname} ${form.lastname} (ID: ${form.studentID})`,
-                timestamp: new Date().toISOString(),
-              });
-              void this.adminNotification.createNotification({
-                recipientUID: 'admin',
-                type: 'student_registered',
-                title: 'New student registered',
-                message: `${form.firstname} ${form.lastname} (${form.studentID}) has been registered`,
-                isRead: false,
-                relatedId: form.UID,
-                relatedName: `${form.firstname} ${form.lastname}`,
-              });
-              imported++;
-              resolve();
-            },
-            error: () => {
-              skipped++;
-              resolve();
-            },
-          });
-        });
-      } catch {
-        skipped++;
-      }
-    }
-
-    await this.loadAll();
-    void this.toastService.alert('Import complete', {
-      html: `<p><strong>${imported}</strong> students imported</p>${skipped > 0 ? `<p><strong>${skipped}</strong> students skipped</p>` : ''}`,
-    }, 'success');
   }
 
   // ── Bulk Status Management ─────────────────────────────────────────────────
