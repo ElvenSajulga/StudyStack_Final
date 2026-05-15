@@ -19,8 +19,12 @@ import { ToastService } from './services/toast.service';
   styleUrl: './app.scss'
 })
 export class App implements OnInit, OnDestroy {
+  private static readonly COLLAPSED_KEY = 'sidebarCollapsed';
+  private static readonly DESKTOP_BREAKPOINT = 1024;
+
   academicOpen = false;
   sidebarOpen = false;
+  isCollapsed = false;
   studentBadges: StudentBadges = { activities: 0, grades: 0, announcements: 0 };
   teacherBadges: TeacherBadges = { activities: 0 };
   userEmail = '';
@@ -33,6 +37,7 @@ export class App implements OnInit, OnDestroy {
     private readonly toast: ToastService,
   ) {
     this.loadUserEmail();
+    this.loadCollapsedPreference();
   }
 
   ngOnInit(): void {
@@ -45,6 +50,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   private loadUserEmail(): void {
+    if (typeof localStorage === 'undefined') return;
     const userStr = localStorage.getItem('currentUser');
     if (userStr) {
       const user = JSON.parse(userStr);
@@ -52,12 +58,28 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
+  private loadCollapsedPreference(): void {
+    if (typeof localStorage === 'undefined') return;
+    this.isCollapsed = localStorage.getItem(App.COLLAPSED_KEY) === '1';
+  }
+
+  private isMobileViewport(): boolean {
+    return typeof window !== 'undefined' && window.innerWidth <= App.DESKTOP_BREAKPOINT;
+  }
+
   toggleAcademic(): void {
     this.academicOpen = !this.academicOpen;
   }
 
   toggleSidebar(): void {
-    this.sidebarOpen = !this.sidebarOpen;
+    if (this.isMobileViewport()) {
+      this.sidebarOpen = !this.sidebarOpen;
+      return;
+    }
+    this.isCollapsed = !this.isCollapsed;
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(App.COLLAPSED_KEY, this.isCollapsed ? '1' : '0');
+    }
   }
 
   closeSidebar(): void {

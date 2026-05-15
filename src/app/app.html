@@ -1,7 +1,7 @@
-<div class="app-shell" [class.app-shell-authed]="auth.isLoggedIn()">
+<div class="app-shell" [class.app-shell-authed]="auth.isLoggedIn()" [class.sidebar-collapsed]="isCollapsed && auth.isLoggedIn()">
   <header class="topbar" *ngIf="auth.isLoggedIn()">
     <div class="topbar-left">
-      <button class="hamburger-btn" (click)="toggleSidebar()" aria-label="Toggle navigation">
+      <button class="hamburger-btn" (click)="toggleSidebar()" aria-label="Toggle navigation" [attr.aria-expanded]="!isCollapsed" aria-controls="app-sidebar">
         <i class="ti ti-menu-2"></i>
       </button>
       <div class="brand">
@@ -33,7 +33,7 @@
   <div class="sidebar-backdrop" *ngIf="sidebarOpen && auth.isLoggedIn()" (click)="closeSidebar()"></div>
 
   <div class="layout">
-    <nav class="sidebar" [class.mobile-open]="sidebarOpen" *ngIf="auth.isLoggedIn() && auth.getCurrentUser() as user">
+    <nav id="app-sidebar" class="sidebar" [class.mobile-open]="sidebarOpen" *ngIf="auth.isLoggedIn() && auth.getCurrentUser() as user">
 
       <!-- User Profile Card -->
       <button type="button" class="sidebar-profile" (click)="navigateToProfile(user.role); closeSidebar()">

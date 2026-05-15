@@ -90,7 +90,7 @@
 
 /* ── HAMBURGER ──────────────────────────────────────────── */
 .hamburger-btn {
-  display: none;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 40px;
@@ -107,6 +107,10 @@
   background: var(--bg-secondary);
   border-color: var(--color-primary);
 }
+.hamburger-btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
 
 /* ── LAYOUT ─────────────────────────────────────────────── */
 .layout {
@@ -115,10 +119,16 @@
   grid-template-columns: minmax(0, 1fr);
   min-height: 0;
   align-items: flex-start;
+  transition: grid-template-columns 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .app-shell-authed .layout {
   grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+}
+
+/* Desktop collapsed state: hide sidebar, expand content */
+.app-shell-authed.sidebar-collapsed .layout {
+  grid-template-columns: 0 minmax(0, 1fr);
 }
 
 /* ── SIDEBAR ────────────────────────────────────────────── */
@@ -135,7 +145,11 @@
   height: calc(100vh - 56px);
   overflow-y: auto;
   overflow-x: hidden;
-  transition: background-color var(--t-base), border-color var(--t-base);
+  transition:
+    background-color var(--t-base),
+    border-color var(--t-base),
+    transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.2s ease;
 
   &::-webkit-scrollbar { width: 6px; }
   &::-webkit-scrollbar-track { background: transparent; }
@@ -392,6 +406,16 @@
 
       i { color: var(--color-primary-light); }
     }
+  }
+}
+
+/* ── Desktop collapsed sidebar ──────────────────────────── */
+@media (min-width: 1025px) {
+  .app-shell-authed.sidebar-collapsed .sidebar {
+    transform: translateX(-100%);
+    opacity: 0;
+    pointer-events: none;
+    border-right-color: transparent;
   }
 }
 
