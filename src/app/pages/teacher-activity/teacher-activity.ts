@@ -73,7 +73,8 @@ export class TeacherActivity implements OnInit, OnDestroy {
 
   showDuplicateModal = false;
   duplicateSourceActivity: Activity | null = null;
-  duplicateTargetCourseId = '';
+  /** CourseSection id of the (course, section) the copy should be added to. */
+  duplicateTargetCourseSectionId = '';
   duplicating = false;
 
   gradingActivity: Activity | null = null;
@@ -137,13 +138,30 @@ export class TeacherActivity implements OnInit, OnDestroy {
       enrollmentsByKey.set(k, set);
     }
 
-    // Activities grouped by course id for fast lookup.
-    const activitiesByCourse = new Map<string, Activity[]>();
+    // Activities grouped by (courseId, sectionId) for fast lookup. Each card
+    // represents one (course, section) the teacher teaches; legacy activities
+    // (no sectionId) are bucketed under every section of their course so they
+    // still appear where they used to before per-section scoping existed.
+    const activityKey = (courseId: string, sectionId: string) =>
+      `${courseId}::${sectionId}`;
+    const activitiesByKey = new Map<string, Activity[]>();
     for (const a of activities) {
       if (!a.courseId) continue;
-      const list = activitiesByCourse.get(a.courseId) ?? [];
-      list.push(a);
-      activitiesByCourse.set(a.courseId, list);
+      if (a.sectionId) {
+        const k = activityKey(a.courseId, a.sectionId);
+        const list = activitiesByKey.get(k) ?? [];
+        list.push(a);
+        activitiesByKey.set(k, list);
+      } else {
+        // Legacy: fan out to every section of this course that this teacher teaches.
+        for (const cs of courseSections) {
+          if (cs.courseId !== a.courseId) continue;
+          const k = activityKey(cs.courseId, cs.sectionId);
+          const list = activitiesByKey.get(k) ?? [];
+          list.push(a);
+          activitiesByKey.set(k, list);
+        }
+      }
     }
 
     // Pre-fetch every submission for the teacher's activities once, then
@@ -170,14 +188,19 @@ export class TeacherActivity implements OnInit, OnDestroy {
       const studentSet = enrollmentsByKey.get(enrollmentKey(cs.courseId, cs.sectionId));
       const enrollmentCount = studentSet?.size ?? 0;
 
-      const courseActivities = activitiesByCourse.get(course.id) ?? [];
+      const courseActivities = activitiesByKey.get(activityKey(cs.courseId, cs.sectionId)) ?? [];
 
       let pendingGradingCount = 0;
       let lastSubmissionAt: string | undefined;
       for (const activity of courseActivities) {
+        // Once an activity's scores are released, none of its submissions are
+        // "pending grading" anymore — releasing is the explicit close-out
+        // signal. This keeps the badge accurate even for activities where the
+        // teacher releases without manually grading every quiz.
+        const activityReleased = activity.scoresReleased === true;
         const subs = submissionsByActivity.get(activity.id) ?? [];
         for (const sub of subs) {
-          if (sub.submitted && !sub.graded) pendingGradingCount++;
+          if (sub.submitted && !sub.graded && !activityReleased) pendingGradingCount++;
           if (sub.submitted) {
             if (!lastSubmissionAt || new Date(sub.submittedAt) > new Date(lastSubmissionAt)) {
               lastSubmissionAt = sub.submittedAt;
@@ -264,7 +287,13 @@ export class TeacherActivity implements OnInit, OnDestroy {
     if (!id || !this.selectedCourseCard) { this.activities = []; this.cdr.detectChanges(); return; }
     this.loading = true;
     const all = await this.activityService.getActivitiesForTeacher(id);
-    this.activities = all.filter(a => a.courseId === this.selectedCourseCard!.course.id);
+    const courseId = this.selectedCourseCard.course.id;
+    const sectionId = this.selectedCourseCard.courseSection.sectionId;
+    // Legacy activities have no `sectionId` and remain visible to every
+    // section of their course — only freshly-created activities are scoped.
+    this.activities = all.filter(a =>
+      a.courseId === courseId && (!a.sectionId || a.sectionId === sectionId)
+    );
     this.loading = false;
     this.cdr.detectChanges();
 
@@ -374,11 +403,40 @@ export class TeacherActivity implements OnInit, OnDestroy {
     this.submissions = await this.activityService.getSubmissionsForActivity(activity.id);
     if (activity.type === 'quiz') {
       this.gradingQuestions = await this.quizService.getQuestionsForActivity(activity.id);
+      // Reconcile every quiz submission's stored score with what the current
+      // questions say. Legacy submissions persisted with score=0 because the
+      // student-side submit path didn't auto-grade; this catches those up so
+      // both the teacher's "Auto-graded score" and the student's released
+      // score reflect reality. Cheap: the comparison is local, and we only
+      // write when the stored value is actually stale.
+      await this.reconcileQuizScores();
     }
     this.selectedSubmission = this.submissions.length > 0 ? this.submissions[0] : null;
     if (this.selectedSubmission) this.initGradeForm(this.selectedSubmission);
     this.view = 'grade';
     this.cdr.detectChanges();
+  }
+
+  private async reconcileQuizScores(): Promise<void> {
+    if (this.gradingQuestions.length === 0) return;
+    const writes: Promise<void>[] = [];
+    for (const sub of this.submissions) {
+      if (!sub.submitted) continue;
+      const { totalScore } = this.quizService.gradeQuiz(
+        this.gradingQuestions,
+        sub.quizAnswers ?? {},
+      );
+      if (sub.score !== totalScore || !sub.graded) {
+        sub.score = totalScore;
+        sub.graded = true;
+        writes.push(
+          this.activityService.gradeSubmission(sub.id, totalScore, sub.feedback ?? ''),
+        );
+      }
+    }
+    if (writes.length > 0) {
+      await Promise.all(writes);
+    }
   }
 
   backToList(): void {
@@ -532,7 +590,10 @@ export class TeacherActivity implements OnInit, OnDestroy {
           type: this.form.type,
           deadline: new Date(deadline).toISOString(),
           closeAt: new Date(closeAt).toISOString(),
-          teacherID, teacherUID, courseId: this.selectedCourseCard.course.id, maxPoints: this.form.maxPoints,
+          teacherID, teacherUID,
+          courseId: this.selectedCourseCard.course.id,
+          sectionId: this.selectedCourseCard.courseSection.sectionId,
+          maxPoints: this.form.maxPoints,
           shuffleQuestions: undefined,
         });
         this.view = 'list';
@@ -658,6 +719,7 @@ export class TeacherActivity implements OnInit, OnDestroy {
         teacherID,
         teacherUID,
         courseId: this.selectedCourseCard!.course.id,
+        sectionId: this.selectedCourseCard!.courseSection.sectionId,
         maxPoints: totalPoints,
         shuffleQuestions: nqf.shuffleQuestions ?? false,
       });
@@ -776,6 +838,22 @@ export class TeacherActivity implements OnInit, OnDestroy {
       (q.correctAnswer ?? '').trim().toLowerCase();
   }
 
+  /**
+   * Live-computed quiz score for the displayed submission. Uses the same
+   * grader as `quizService.gradeQuiz` against the currently-loaded questions,
+   * so the badge labels (Correct / Wrong) and the totals line can't disagree
+   * even if the persisted `score` is briefly stale.
+   */
+  liveQuizScore(sub: ActivitySubmission | null): number {
+    if (!sub) return 0;
+    if (this.gradingQuestions.length === 0) return sub.score ?? 0;
+    const { totalScore } = this.quizService.gradeQuiz(
+      this.gradingQuestions,
+      sub.quizAnswers ?? {},
+    );
+    return totalScore;
+  }
+
   getStudentName(sub: ActivitySubmission): string {
     const s = this.studentService.getAll().find(st => st.studentID === sub.studentID);
     return s ? `${s.lastname}, ${s.firstname}` : sub.studentID;
@@ -852,22 +930,24 @@ export class TeacherActivity implements OnInit, OnDestroy {
 
   // ── Duplicate ─────────────────────────────────────────────────────────────
 
+  /**
+   * Every (course, section) the teacher teaches except the one the source
+   * activity already belongs to. Lets a teacher duplicate across both
+   * different courses AND different sections of the same course.
+   */
   get otherCourseCards(): CourseCard[] {
-    if (!this.selectedCourseCard || this.courseCards.length <= 1) {
-      return this.courseCards;
-    }
-    return this.courseCards.filter(
-      c => c.course.id !== this.selectedCourseCard!.course.id
-    );
+    if (!this.selectedCourseCard) return this.courseCards;
+    const currentCsId = this.selectedCourseCard.courseSection.id;
+    return this.courseCards.filter(c => c.courseSection.id !== currentCsId);
   }
 
-  get hasOnlyOneCourse(): boolean {
+  get hasOnlyOneCourseSection(): boolean {
     return this.courseCards.length <= 1;
   }
 
   openDuplicateModal(activity: Activity): void {
     this.duplicateSourceActivity = activity;
-    this.duplicateTargetCourseId = '';
+    this.duplicateTargetCourseSectionId = '';
     this.showDuplicateModal = true;
     this.cdr.detectChanges();
   }
@@ -875,7 +955,7 @@ export class TeacherActivity implements OnInit, OnDestroy {
   closeDuplicateModal(): void {
     this.showDuplicateModal = false;
     this.duplicateSourceActivity = null;
-    this.duplicateTargetCourseId = '';
+    this.duplicateTargetCourseSectionId = '';
     this.cdr.detectChanges();
   }
 
@@ -889,8 +969,16 @@ export class TeacherActivity implements OnInit, OnDestroy {
       return;
     }
 
-    if (!this.duplicateTargetCourseId) {
-      this.toast.warning('Choose a target course');
+    if (!this.duplicateTargetCourseSectionId) {
+      this.toast.warning('Choose a target course / section');
+      return;
+    }
+
+    const target = this.courseCards.find(
+      c => c.courseSection.id === this.duplicateTargetCourseSectionId,
+    );
+    if (!target) {
+      this.toast.warning('That target is no longer available');
       return;
     }
 
@@ -904,7 +992,8 @@ export class TeacherActivity implements OnInit, OnDestroy {
         type: source.type,
         teacherID,
         teacherUID,
-        courseId: this.duplicateTargetCourseId,
+        courseId: target.course.id,
+        sectionId: target.courseSection.sectionId,
         deadline: '',
         closeAt: '',
         maxPoints: source.maxPoints,

@@ -3,7 +3,7 @@ import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Activity, ActivityService, ActivitySubmission, AttendanceStatus } from '../../services/activity.service';
 import { AuthService } from '../../services/auth.service';
-import { AcademicService } from '../../services/academic.service';
+import { AcademicService, Enrollment } from '../../services/academic.service';
 import { TeacherAccountService } from '../../services/teacher-account.service';
 import { CourseLookupService } from '../../services/course-lookup.service';
 
@@ -62,18 +62,37 @@ export class StudentAttendance implements OnInit, OnDestroy {
   }
 
   private async loadActivities(): Promise<void> {
-    try {
-      this.allActivities = await this.activityService.getAllActivities();
-    } catch {
-      this.allActivities = [];
-    }
-
     const sid = this.studentID;
     this.submissionsByActivityId = {};
     if (!sid) {
+      this.allActivities = [];
+      this.availableCourses = [];
+      this.activityToCourseId = {};
       this.computeStats();
       this.cdr.detectChanges();
       return;
+    }
+
+    // ── Scope activities to the student's enrolled teachers ─────────────────
+    // The previous implementation pulled every activity in the system and only
+    // mapped some to courses, which surfaced unrelated activities and could
+    // leave the table feeling empty when the teacher cache was cold. Using the
+    // resilient bulk fetcher (same one the dashboard uses) keeps attendance
+    // honest: every row is something the student is actually enrolled in.
+    let enrollments: Enrollment[] = [];
+    try {
+      enrollments = await this.academic.getEnrollmentsByStudentID(sid);
+    } catch {
+      enrollments = [];
+    }
+    const teacherUIDs = [...new Set(enrollments.map(e => e.teacherUID))];
+
+    try {
+      this.allActivities = teacherUIDs.length > 0
+        ? await this.activityService.getActivitiesForEnrolledTeacherUIDsBulk(teacherUIDs)
+        : [];
+    } catch {
+      this.allActivities = [];
     }
 
     let subs: ActivitySubmission[] = [];
@@ -86,39 +105,58 @@ export class StudentAttendance implements OnInit, OnDestroy {
       this.submissionsByActivityId[sub.activityId] = sub;
     }
 
-    // ── Build course mapping ────────────────────────────────────────────────
+    // ── Build course mapping (resilient: prefer activity.courseId, fall back
+    //    to teacher→course via enrollments, and respect per-section scoping) ─
     try {
-      const enrollments = await this.academic.getEnrollmentsByStudentID(sid);
       const courses = await this.academic.getCourses();
       const teachers = this.teacherAccountService.getAll();
 
-      // Build map: teacherID → courseId
+      // Build maps for both UID-based and teacherID-based teacher lookup
+      const uidToCourseId: Record<string, string> = {};
+      const uidToSectionId: Record<string, string> = {};
       const teacherIdToCourseId: Record<string, string> = {};
-      for (const enrollment of enrollments) {
-        const teacher = teachers.find(t => t.UID === enrollment.teacherUID);
+      const teacherIdToSectionId: Record<string, string> = {};
+      for (const e of enrollments) {
+        uidToCourseId[e.teacherUID] = e.courseId;
+        uidToSectionId[e.teacherUID] = e.sectionId;
+        const teacher = teachers.find(t => t.UID === e.teacherUID);
         if (teacher) {
-          teacherIdToCourseId[teacher.teacherID] = enrollment.courseId;
+          teacherIdToCourseId[teacher.teacherID] = e.courseId;
+          teacherIdToSectionId[teacher.teacherID] = e.sectionId;
         }
       }
 
-      // Build courseId → courseName map
       const courseIdToName: Record<string, string> = {};
-      for (const course of courses) {
-        courseIdToName[course.id] = course.name;
-      }
+      for (const course of courses) courseIdToName[course.id] = course.name;
 
-      // Build activity → courseId map
+      // Filter out activities scoped to a section the student isn't enrolled
+      // in, and build the activity→courseId map for the filter dropdown.
+      const visibleActivities: Activity[] = [];
       this.activityToCourseId = {};
       const courseIdSet = new Set<string>();
+
       for (const activity of this.allActivities) {
-        const courseId = teacherIdToCourseId[activity.teacherID];
-        if (courseId) {
-          this.activityToCourseId[activity.id] = courseId;
-          courseIdSet.add(courseId);
+        // Resolve courseId — direct field wins, fall back via teacher mapping.
+        let courseId = activity.courseId
+          || uidToCourseId[activity.teacherUID ?? '']
+          || teacherIdToCourseId[activity.teacherID];
+
+        // Section scoping: if the activity targets a specific section, only
+        // show it when the student is enrolled in that section of the course.
+        if (activity.sectionId) {
+          const enrolledSection =
+            uidToSectionId[activity.teacherUID ?? ''] ||
+            teacherIdToSectionId[activity.teacherID];
+          if (enrolledSection !== activity.sectionId) continue;
         }
+
+        if (!courseId) continue;
+        visibleActivities.push(activity);
+        this.activityToCourseId[activity.id] = courseId;
+        courseIdSet.add(courseId);
       }
 
-      // Build availableCourses from unique courseIds, sorted by name
+      this.allActivities = visibleActivities;
       this.availableCourses = Array.from(courseIdSet)
         .map(id => ({ id, name: courseIdToName[id] || 'Unknown' }))
         .sort((a, b) => a.name.localeCompare(b.name));

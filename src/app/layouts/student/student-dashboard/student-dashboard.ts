@@ -260,8 +260,20 @@ export class StudentDashboard implements OnInit, OnDestroy {
     this.computeStatsFromCache();
     this.buildCourseProgressFromCache();
 
+    // Activities the student has already submitted are dropped from the
+    // dashboard's "upcoming" view (and the calendar dots / focus callout that
+    // are derived from it). Open + un-submitted is the only thing that still
+    // demands the student's attention.
+    const submittedIds = new Set(
+      this.allSubmissions
+        .filter(s => s.submitted)
+        .map(s => s.activityId)
+    );
+
     const now = new Date();
-    const openActivities = this.allEnrolledActivities.filter(a => now <= new Date(a.closeAt));
+    const openActivities = this.allEnrolledActivities.filter(
+      a => now <= new Date(a.closeAt) && !submittedIds.has(a.id)
+    );
 
     this.upcomingActivities = openActivities
       .slice()
@@ -436,11 +448,18 @@ export class StudentDashboard implements OnInit, OnDestroy {
         const teacherName = uidToTeacherName[enrollment.teacherUID] || 'Unknown';
         const teacherID = uidToTeacherID[enrollment.teacherUID];
 
-        const teacherActivities = this.allEnrolledActivities.filter(a =>
-          (a.teacherUID && a.teacherUID === enrollment.teacherUID) ||
-          (teacherID && a.teacherID === teacherID) ||
-          a.teacherID === enrollment.teacherUID
-        );
+        const teacherActivities = this.allEnrolledActivities.filter(a => {
+          const teacherMatch =
+            (a.teacherUID && a.teacherUID === enrollment.teacherUID) ||
+            (teacherID && a.teacherID === teacherID) ||
+            a.teacherID === enrollment.teacherUID;
+          if (!teacherMatch) return false;
+          // Activities with explicit course/section must match the enrollment;
+          // legacy rows without those fields fall through (visible everywhere).
+          if (a.courseId && a.courseId !== enrollment.courseId) return false;
+          if (a.sectionId && a.sectionId !== enrollment.sectionId) return false;
+          return true;
+        });
         const closedActivities = teacherActivities.filter(a => new Date(a.closeAt) < now);
         const totalActivities = closedActivities.length;
         if (totalActivities === 0) continue;
@@ -516,11 +535,12 @@ export class StudentDashboard implements OnInit, OnDestroy {
 
     const now = new Date();
     for (const a of this.allEnrolledActivities) {
-      if (now <= new Date(a.closeAt)) this.openActivities++;
-      const status: AttendanceStatus = this.activityService.getAttendanceStatus(
-        a,
-        submissionsByActivityId[a.id],
-      );
+      const sub = submissionsByActivityId[a.id];
+      // "Open" reflects what the dashboard surfaces to the student — items
+      // still demanding action. Once submitted, an activity is no longer
+      // counted as open even if its closeAt is in the future.
+      if (now <= new Date(a.closeAt) && !sub?.submitted) this.openActivities++;
+      const status: AttendanceStatus = this.activityService.getAttendanceStatus(a, sub);
       if (status === 'present') this.presentCount++;
       if (status === 'late') this.lateCount++;
       if (status === 'absent') this.absentCount++;
@@ -541,8 +561,10 @@ export class StudentDashboard implements OnInit, OnDestroy {
     this.submissionsThisWeek = this.allSubmissions
       .filter(s => s.submitted && new Date(s.submittedAt) >= sevenDaysAgo).length;
 
+    // Next deadline is the soonest upcoming activity the student hasn't yet
+    // submitted — submitted items are off the dashboard per Issue #1.
     const upcoming = this.allEnrolledActivities
-      .filter(a => new Date(a.closeAt) > now)
+      .filter(a => new Date(a.closeAt) > now && !submissionsByActivityId[a.id]?.submitted)
       .sort((a, b) => new Date(a.closeAt).getTime() - new Date(b.closeAt).getTime());
     this.nextDeadline = upcoming[0] ?? null;
 

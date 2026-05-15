@@ -122,6 +122,10 @@ export class BadgeService {
     let ungradedCount = 0;
 
     for (const activity of activities) {
+      // Released activities are explicitly closed-out by the teacher, so they
+      // no longer count toward the "pending grading" badge even if individual
+      // submissions weren't manually graded.
+      if (activity.scoresReleased === true) continue;
       const submissions = await this.activityService.getSubmissionsForActivity(activity.id);
       for (const sub of submissions) {
         if (sub.submitted && !sub.graded) {

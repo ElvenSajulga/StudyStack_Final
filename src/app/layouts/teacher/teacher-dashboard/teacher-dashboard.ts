@@ -158,6 +158,10 @@ export class TeacherDashboard implements OnInit {
         });
 
         for (const activity of closedActivities) {
+          // Released activities are explicitly closed-out — don't surface them
+          // as pending grading regardless of whether each submission was
+          // manually graded.
+          if (activity.scoresReleased === true) continue;
           const submissions = await this.activityService.getSubmissionsForActivity(activity.id);
           const ungradedCount = submissions.filter((s: any) => !s.graded && s.submitted).length;
           if (ungradedCount > 0) {
@@ -193,8 +197,11 @@ export class TeacherDashboard implements OnInit {
         return closeAt <= now;
       });
 
-      // For each closed activity, count ungraded submissions
+      // For each closed activity, count ungraded submissions. Skip activities
+      // whose scores have already been released — releasing is the explicit
+      // close-out signal, so they shouldn't appear under "needs grading".
       for (const activity of closedActivities) {
+        if (activity.scoresReleased === true) continue;
         const submissions = await this.activityService.getSubmissionsForActivity(activity.id);
         const ungradedCount = submissions.filter((s: any) => s.submitted && !s.graded).length;
 

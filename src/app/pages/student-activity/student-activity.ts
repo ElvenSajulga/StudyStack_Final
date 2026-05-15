@@ -243,7 +243,8 @@ export class StudentActivity implements OnInit, OnDestroy {
       if (!course) continue;
 
       const teacherActivities = this.allActivities.filter(a =>
-        this.activityBelongsToTeacherUID(a, e.teacherUID)
+        this.activityBelongsToTeacherUID(a, e.teacherUID) &&
+        this.activityVisibleForEnrollment(a, e),
       );
 
       const now = new Date();
@@ -279,9 +280,12 @@ export class StudentActivity implements OnInit, OnDestroy {
 
     // If the student has opened a course, refresh that course's stream too
     if (this.selectedCard) {
-      const teacherUID = this.selectedCard.teacherUID;
+      const sel = this.selectedCard;
       this.streamActivities = this.allActivities
-        .filter(a => this.activityBelongsToTeacherUID(a, teacherUID))
+        .filter(a =>
+          this.activityBelongsToTeacherUID(a, sel.teacherUID) &&
+          this.activityVisibleForEnrollment(a, sel.enrollment),
+        )
         .sort(
           (a, b) => new Date(b.deadline).getTime() - new Date(a.deadline).getTime(),
         );
@@ -297,6 +301,20 @@ export class StudentActivity implements OnInit, OnDestroy {
     if (teacher && activity.teacherID === teacher.teacherID) return true;
     if (activity.teacherID === teacherUID) return true;
     return false;
+  }
+
+  /**
+   * Course/section match for the student's enrollment. Legacy activities
+   * (no `courseId` and/or `sectionId`) fall through so historic data keeps
+   * appearing where it used to before per-section scoping was added.
+   */
+  private activityVisibleForEnrollment(
+    activity: Activity,
+    enrollment: Enrollment,
+  ): boolean {
+    if (activity.courseId && activity.courseId !== enrollment.courseId) return false;
+    if (activity.sectionId && activity.sectionId !== enrollment.sectionId) return false;
+    return true;
   }
 
   private get studentID(): string | undefined {
@@ -676,9 +694,13 @@ export class StudentActivity implements OnInit, OnDestroy {
           this.toast.warning('Answer all questions before submitting');
           return;
         }
+        // Auto-grade the quiz at submit time so the score is captured atomically
+        // with the submission. Without this, quiz submissions persisted with
+        // score=0 and the student saw nothing until the teacher manually graded.
+        const { totalScore } = this.quizService.gradeQuiz(questions, answers);
         const sub = await this.activityService.submitOrUpdateSubmission(
           activity.id, sid, sUID, content,
-          { quizAnswers: answers }
+          { quizAnswers: answers, score: totalScore, graded: true }
         );
         this.submissions[activity.id] = sub;
         // Quiz is now locked — close the answering panel.

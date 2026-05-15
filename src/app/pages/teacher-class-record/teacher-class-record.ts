@@ -4,7 +4,27 @@ import { FormsModule } from '@angular/forms';
 import { Activity, ActivityService, ActivitySubmission } from '../../services/activity.service';
 import { AuthService } from '../../services/auth.service';
 import { StudentAccount, StudentAccountService } from '../../services/student-account.service';
-import { AcademicService } from '../../services/academic.service';
+import {
+  AcademicService,
+  Course,
+  CourseSection,
+  Enrollment,
+  Section,
+} from '../../services/academic.service';
+
+/**
+ * One (course, section) the teacher teaches. The class record lets the
+ * teacher pick a group; the table below renders only that group's students
+ * and activities. Without this, a multi-section teacher saw every student in
+ * the system mixed in with everyone else's data — Issue #5.
+ */
+interface CourseGroup {
+  courseSection: CourseSection;
+  course: Course;
+  sectionName: string;
+  studentCount: number;
+  activityCount: number;
+}
 
 @Component({
   selector: 'app-teacher-class-record',
@@ -14,13 +34,26 @@ import { AcademicService } from '../../services/academic.service';
   styleUrl: './teacher-class-record.scss',
 })
 export class TeacherClassRecord implements OnInit {
+  /** Every (course, section) the teacher teaches — used to populate the selector. */
+  groups: CourseGroup[] = [];
+  selectedGroupId: string = '';
+
+  /** Activities + students for the currently selected group. */
   activities: Activity[] = [];
   students: StudentAccount[] = [];
+
   searchQuery: string = '';
   sortActivityId: string | null = null;
   sortDir: 'asc' | 'desc' = 'desc';
-  courseName: string = '';
-  courseSection: string = '';
+
+  loading = false;
+
+  // Internal lookup state — kept off the template.
+  private allTeacherActivities: Activity[] = [];
+  private allEnrollments: Enrollment[] = [];
+  private allCourses: Course[] = [];
+  private allSections: Section[] = [];
+  private allCourseSections: CourseSection[] = [];
   private submissionsByKey: Record<string, ActivitySubmission | undefined> = {};
 
   constructor(
@@ -35,6 +68,10 @@ export class TeacherClassRecord implements OnInit {
     void this.loadData();
   }
 
+  private get teacherUID(): string | undefined {
+    return (this.auth.getCurrentUser() as { UID?: string } | null)?.UID;
+  }
+
   private get teacherID(): string | undefined {
     return this.auth.getCurrentUser()?.teacherID;
   }
@@ -44,75 +81,164 @@ export class TeacherClassRecord implements OnInit {
   }
 
   private async loadData(): Promise<void> {
-    const id = this.teacherID;
-    if (!id) {
+    const uid = this.teacherUID;
+    const tid = this.teacherID;
+    if (!uid || !tid) {
+      this.resetState();
+      this.cdr.detectChanges();
+      return;
+    }
+
+    this.loading = true;
+
+    // Fetch everything we need in parallel — the teacher's course/section
+    // assignments, enrollments under them, the course/section catalogs, and
+    // every activity the teacher owns.
+    await this.studentService.reloadFromServer();
+    const [courseSections, courses, sections, enrollments, activities] = await Promise.all([
+      this.academicService.getCourseSectionsByTeacher(uid),
+      this.academicService.getCourses(),
+      this.academicService.getSections(),
+      this.academicService.getEnrollmentsByTeacher(uid),
+      this.activityService.getActivitiesForTeacher(tid),
+    ]);
+
+    this.allCourseSections = courseSections;
+    this.allCourses = courses;
+    this.allSections = sections;
+    this.allEnrollments = enrollments;
+    this.allTeacherActivities = activities;
+
+    this.groups = courseSections
+      .map<CourseGroup | null>(cs => {
+        const course = courses.find(c => c.id === cs.courseId);
+        if (!course) return null;
+        const section = sections.find(s => s.id === cs.sectionId);
+        const sectionName = section?.name ?? '';
+
+        const studentCount = new Set(
+          enrollments
+            .filter(e => e.courseId === cs.courseId && e.sectionId === cs.sectionId)
+            .map(e => e.studentUID),
+        ).size;
+
+        // Legacy activities (no sectionId) belong to every section of their
+        // course, matching how teacher-activity.ts already buckets them.
+        const activityCount = activities.filter(a =>
+          a.courseId === cs.courseId && (!a.sectionId || a.sectionId === cs.sectionId),
+        ).length;
+
+        return {
+          courseSection: cs,
+          course,
+          sectionName,
+          studentCount,
+          activityCount,
+        };
+      })
+      .filter((g): g is CourseGroup => g !== null)
+      .sort((a, b) => {
+        const byCourse = a.course.name.localeCompare(b.course.name);
+        if (byCourse !== 0) return byCourse;
+        return a.sectionName.localeCompare(b.sectionName);
+      });
+
+    // Default to the first group; preserve the existing selection if it's
+    // still valid (the teacher may have re-loaded after editing assignments).
+    if (!this.groups.some(g => g.courseSection.id === this.selectedGroupId)) {
+      this.selectedGroupId = this.groups[0]?.courseSection.id ?? '';
+    }
+
+    await this.applySelection();
+
+    this.loading = false;
+    this.cdr.detectChanges();
+  }
+
+  /**
+   * Rebuilds `activities` + `students` + submission cache for whichever group
+   * is currently selected. Called on initial load and whenever the user picks
+   * a different course/section from the selector.
+   */
+  async applySelection(): Promise<void> {
+    const group = this.groups.find(g => g.courseSection.id === this.selectedGroupId);
+    if (!group) {
       this.activities = [];
       this.students = [];
-      this.courseName = '';
-      this.courseSection = '';
       this.submissionsByKey = {};
       this.cdr.detectChanges();
       return;
     }
 
-    await this.studentService.reloadFromServer();
-    this.activities = await this.activityService.getActivitiesForTeacher(id);
-    this.students = this.studentService.getAll();
+    // Activities for this (course, section). Legacy rows (no sectionId) fall
+    // through to every section of their course.
+    this.activities = this.allTeacherActivities.filter(a =>
+      a.courseId === group.course.id &&
+      (!a.sectionId || a.sectionId === group.courseSection.sectionId),
+    );
+
+    // Students = those actually enrolled in this (course, section) under this
+    // teacher. Previously the page listed every student in the system.
+    const enrolledUIDs = new Set(
+      this.allEnrollments
+        .filter(
+          e =>
+            e.courseId === group.course.id &&
+            e.sectionId === group.courseSection.sectionId,
+        )
+        .map(e => e.studentUID),
+    );
+    const allStudents = this.studentService.getAll();
+    this.students = allStudents
+      .filter(s => enrolledUIDs.has(s.UID))
+      .sort((a, b) => (a.lastname ?? '').localeCompare(b.lastname ?? ''));
 
     const activityIds = this.activities.map(a => a.id);
-    const subs = await this.activityService.getSubmissionsForActivities(activityIds);
+    const subs = activityIds.length === 0
+      ? []
+      : await this.activityService.getSubmissionsForActivities(activityIds);
     this.submissionsByKey = {};
     for (const sub of subs) {
       this.submissionsByKey[this.submissionKey(sub.activityId, sub.studentID)] = sub;
     }
 
-    // Resolve course name and section from teacher's course assignments
-    await this.resolveCourseInfo();
-
     this.cdr.detectChanges();
   }
 
-  private async resolveCourseInfo(): Promise<void> {
-    const teacherUID = (this.auth.getCurrentUser() as any)?.UID;
-    const courseIdsFromActivities = Array.from(
-      new Set(this.activities.map(a => a.courseId).filter((id): id is string => !!id))
-    );
-
-    try {
-      const [courses, sections] = await Promise.all([
-        this.academicService.getCourses(),
-        this.academicService.getSections(),
-      ]);
-
-      // Try to resolve via teacher's course-section assignments first
-      let resolvedCourseName = '';
-      let resolvedSectionName = '';
-
-      if (teacherUID) {
-        const courseSections = await this.academicService.getCourseSectionsByTeacher(teacherUID);
-        if (courseSections.length > 0) {
-          const cs = courseSections[0];
-          const course = courses.find(c => c.id === cs.courseId);
-          const section = sections.find(s => s.id === cs.sectionId);
-          if (course) resolvedCourseName = course.name;
-          if (section) resolvedSectionName = section.name;
-        }
-      }
-
-      // Fallback: look up via the first activity's courseId
-      if (!resolvedCourseName && courseIdsFromActivities.length > 0) {
-        const course = courses.find(c => c.id === courseIdsFromActivities[0]);
-        if (course) resolvedCourseName = course.name;
-      }
-
-      this.courseName = resolvedCourseName;
-      this.courseSection = resolvedSectionName;
-    } catch (e) {
-      console.warn('Failed to resolve course info:', e);
-      this.courseName = '';
-      this.courseSection = '';
-    }
+  onGroupChange(): void {
+    this.searchQuery = '';
+    this.sortActivityId = null;
+    void this.applySelection();
   }
+
+  private resetState(): void {
+    this.groups = [];
+    this.selectedGroupId = '';
+    this.activities = [];
+    this.students = [];
+    this.allTeacherActivities = [];
+    this.allEnrollments = [];
+    this.allCourses = [];
+    this.allSections = [];
+    this.allCourseSections = [];
+    this.submissionsByKey = {};
+  }
+
+  // ── Selection-derived getters used by the template ──────────────────────
+
+  get selectedGroup(): CourseGroup | undefined {
+    return this.groups.find(g => g.courseSection.id === this.selectedGroupId);
+  }
+
+  get courseName(): string {
+    return this.selectedGroup?.course.name ?? '';
+  }
+
+  get courseSectionName(): string {
+    return this.selectedGroup?.sectionName ?? '';
+  }
+
+  // ── Data helpers ────────────────────────────────────────────────────────
 
   submissionsForStudent(student: StudentAccount): ActivitySubmission[] {
     return this.activities
@@ -127,6 +253,13 @@ export class TeacherClassRecord implements OnInit {
 
   scoreFor(student: StudentAccount, activity: Activity): number | undefined {
     return this.submissionsByKey[this.submissionKey(activity.id, student.studentID)]?.score;
+  }
+
+  averageScore(student: StudentAccount): number {
+    const totalEarned = this.totalScoreForStudent(student);
+    const totalPossible = this.activities.reduce((sum, a) => sum + (a.maxPoints ?? 0), 0);
+    if (totalPossible <= 0) return 0;
+    return (totalEarned / totalPossible) * 100;
   }
 
   get filteredStudents(): StudentAccount[] {
@@ -150,12 +283,9 @@ export class TeacherClassRecord implements OnInit {
         sorted.sort((a, b) => {
           const scoreA = this.scoreFor(a, activity);
           const scoreB = this.scoreFor(b, activity);
-
-          // undefined scores go last regardless of direction
           if (scoreA === undefined && scoreB === undefined) return 0;
           if (scoreA === undefined) return 1;
           if (scoreB === undefined) return -1;
-
           return this.sortDir === 'asc' ? scoreA - scoreB : scoreB - scoreA;
         });
       }
@@ -179,13 +309,6 @@ export class TeacherClassRecord implements OnInit {
 
   sortDirFor(activityId: string): 'asc' | 'desc' | null {
     return this.isSortedBy(activityId) ? this.sortDir : null;
-  }
-
-  averageScore(student: StudentAccount): number {
-    const totalEarned = this.totalScoreForStudent(student);
-    const totalPossible = this.activities.reduce((sum, a) => sum + (a.maxPoints ?? 0), 0);
-    if (totalPossible <= 0) return 0;
-    return (totalEarned / totalPossible) * 100;
   }
 
   exportCsv(): void {
@@ -234,8 +357,12 @@ export class TeacherClassRecord implements OnInit {
     const dd = String(today.getDate()).padStart(2, '0');
     const dateStr = `${yyyy}-${mm}-${dd}`;
 
-    const courseSlug = (this.courseName || 'class').replace(/[^a-zA-Z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
-    const filename = `class-record-${courseSlug}-${dateStr}.csv`;
+    const slug = [this.courseName, this.courseSectionName]
+      .filter(Boolean)
+      .join('-')
+      .replace(/[^a-zA-Z0-9-]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'class';
+    const filename = `class-record-${slug}-${dateStr}.csv`;
 
     const anchor = document.createElement('a');
     anchor.href = url;

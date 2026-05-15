@@ -4,7 +4,7 @@
     <h1>Class Record</h1>
     <p class="print-meta">
       <span *ngIf="courseName"><strong>Course:</strong> {{ courseName }}</span>
-      <span *ngIf="courseSection"><strong>Section:</strong> {{ courseSection }}</span>
+      <span *ngIf="courseSectionName"><strong>Section:</strong> {{ courseSectionName }}</span>
       <span><strong>Generated:</strong> {{ printDate }}</span>
     </p>
   </div>
@@ -12,8 +12,12 @@
   <header class="page-header">
     <div class="page-header-titles">
       <h2>Class Record</h2>
-      <p class="page-subtitle" *ngIf="courseName">
-        {{ courseName }}<span *ngIf="courseSection"> – {{ courseSection }}</span>
+      <p class="page-subtitle">
+        <ng-container *ngIf="selectedGroup; else noSelection">
+          <strong>{{ courseName }}</strong>
+          <span *ngIf="courseSectionName"> — {{ courseSectionName }}</span>
+        </ng-container>
+        <ng-template #noSelection>Select a course / section to view its class record.</ng-template>
       </p>
     </div>
     <div class="page-header-actions" *ngIf="students.length > 0 && activities.length > 0">
@@ -28,85 +32,154 @@
     </div>
   </header>
 
-  <section *ngIf="students.length > 0 && activities.length > 0; else emptyState">
-    <div class="toolbar">
-      <div class="search-input-wrapper">
-        <i class="ti ti-search search-icon" aria-hidden="true"></i>
-        <input
-          type="text"
-          class="search-input"
-          [(ngModel)]="searchQuery"
-          placeholder="Search students…"
-          aria-label="Search students"
-        />
-      </div>
-      <span class="muted">
-        Showing {{ filteredStudents.length }} of {{ students.length }} {{ students.length === 1 ? 'student' : 'students' }}
-      </span>
+  <p class="muted" *ngIf="loading">Loading class record…</p>
+
+  <!-- Course / section selector — the primary navigation for this page.
+       Each chip shows the course, section, and quick stats so the teacher
+       can spot the right one without expanding it first. -->
+  <section class="group-selector" *ngIf="!loading && groups.length > 0">
+    <label class="group-selector-label">Course / section</label>
+    <div class="group-chip-row" role="tablist">
+      <button
+        *ngFor="let g of groups"
+        type="button"
+        class="group-chip"
+        [class.active]="selectedGroupId === g.courseSection.id"
+        [attr.aria-selected]="selectedGroupId === g.courseSection.id"
+        role="tab"
+        (click)="selectedGroupId = g.courseSection.id; onGroupChange()"
+      >
+        <span class="group-chip-course">{{ g.course.name }}</span>
+        <span class="group-chip-section" *ngIf="g.sectionName">
+          <i class="ti ti-users" aria-hidden="true"></i> {{ g.sectionName }}
+        </span>
+        <span class="group-chip-meta">
+          <span class="group-chip-pill">{{ g.studentCount }} students</span>
+          <span class="group-chip-pill">{{ g.activityCount }} activities</span>
+        </span>
+      </button>
     </div>
+  </section>
 
-    <article class="card">
-      <header class="card-header">
-        <h3>Scores per activity</h3>
-      </header>
-
-      <div class="table-wrapper">
-        <table>
-          <thead>
-            <tr>
-              <th class="sticky-col col-0">Student ID</th>
-              <th class="sticky-col col-1">Name</th>
-              <th
-                *ngFor="let a of activities"
-                class="sortable"
-                [class.sorted]="isSortedBy(a.id)"
-                (click)="sortByActivity(a.id)"
-              >
-                {{ a.title }}
-                <i
-                  class="ti sort-icon"
-                  [ngClass]="{
-                    'ti-arrows-sort': !isSortedBy(a.id),
-                    'ti-sort-ascending': isSortedBy(a.id) && sortDirFor(a.id) === 'asc',
-                    'ti-sort-descending': isSortedBy(a.id) && sortDirFor(a.id) === 'desc'
-                  }"
-                  aria-hidden="true"
-                ></i>
-              </th>
-              <th class="total-col">Total score</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngIf="filteredStudents.length === 0">
-              <td [attr.colspan]="activities.length + 3" class="no-results">
-                No students match your search.
-              </td>
-            </tr>
-            <tr *ngFor="let s of filteredStudents">
-              <td class="sticky-col col-0">{{ s.studentID }}</td>
-              <td class="sticky-col col-1">{{ s.lastname }}, {{ s.firstname }} {{ s.middlename }}</td>
-              <td
-                *ngFor="let a of activities"
-                [class.sorted]="isSortedBy(a.id)"
-              >
-                {{ scoreFor(s, a) ?? '-' }}
-              </td>
-              <td class="total-col">
-                {{ totalScoreForStudent(s) }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
+  <section *ngIf="!loading && selectedGroup">
+    <!-- Group context band — restates the selection above the table so the
+         teacher always knows which class they're looking at, even after
+         scrolling through long activity columns. -->
+    <article class="group-banner">
+      <div class="group-banner-titles">
+        <h3 class="group-banner-course">{{ courseName }}</h3>
+        <p class="group-banner-section" *ngIf="courseSectionName">
+          <i class="ti ti-users" aria-hidden="true"></i> {{ courseSectionName }}
+        </p>
+        <p class="group-banner-meta muted" *ngIf="selectedGroup.course.semester">
+          {{ selectedGroup.course.semester }}
+        </p>
+      </div>
+      <div class="group-banner-stats">
+        <div class="group-banner-stat">
+          <span class="group-banner-stat-value">{{ students.length }}</span>
+          <span class="group-banner-stat-label">Students</span>
+        </div>
+        <div class="group-banner-stat">
+          <span class="group-banner-stat-value">{{ activities.length }}</span>
+          <span class="group-banner-stat-label">Activities</span>
+        </div>
       </div>
     </article>
+
+    <ng-container *ngIf="students.length > 0 && activities.length > 0; else emptyState">
+      <div class="toolbar">
+        <div class="search-input-wrapper">
+          <i class="ti ti-search search-icon" aria-hidden="true"></i>
+          <input
+            type="text"
+            class="search-input"
+            [(ngModel)]="searchQuery"
+            placeholder="Search students…"
+            aria-label="Search students"
+          />
+        </div>
+        <span class="muted">
+          Showing {{ filteredStudents.length }} of {{ students.length }} {{ students.length === 1 ? 'student' : 'students' }}
+        </span>
+      </div>
+
+      <article class="card">
+        <header class="card-header">
+          <h3>Scores per activity</h3>
+        </header>
+
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th class="sticky-col col-0">Student ID</th>
+                <th class="sticky-col col-1">Name</th>
+                <th
+                  *ngFor="let a of activities"
+                  class="sortable"
+                  [class.sorted]="isSortedBy(a.id)"
+                  (click)="sortByActivity(a.id)"
+                >
+                  {{ a.title }}
+                  <i
+                    class="ti sort-icon"
+                    [ngClass]="{
+                      'ti-arrows-sort': !isSortedBy(a.id),
+                      'ti-sort-ascending': isSortedBy(a.id) && sortDirFor(a.id) === 'asc',
+                      'ti-sort-descending': isSortedBy(a.id) && sortDirFor(a.id) === 'desc'
+                    }"
+                    aria-hidden="true"
+                  ></i>
+                </th>
+                <th class="total-col">Total score</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngIf="filteredStudents.length === 0">
+                <td [attr.colspan]="activities.length + 3" class="no-results">
+                  No students match your search.
+                </td>
+              </tr>
+              <tr *ngFor="let s of filteredStudents">
+                <td class="sticky-col col-0">{{ s.studentID }}</td>
+                <td class="sticky-col col-1">{{ s.lastname }}, {{ s.firstname }} {{ s.middlename }}</td>
+                <td
+                  *ngFor="let a of activities"
+                  [class.sorted]="isSortedBy(a.id)"
+                >
+                  {{ scoreFor(s, a) ?? '-' }}
+                </td>
+                <td class="total-col">
+                  {{ totalScoreForStudent(s) }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+    </ng-container>
   </section>
 
   <ng-template #emptyState>
     <article class="card empty-state">
-      <p>No students or activities yet.</p>
+      <p *ngIf="students.length === 0 && activities.length === 0">
+        No students or activities in this course / section yet.
+      </p>
+      <p *ngIf="students.length === 0 && activities.length > 0">
+        No students are enrolled in this course / section yet.
+      </p>
+      <p *ngIf="students.length > 0 && activities.length === 0">
+        You haven't created any activities for this course / section yet.
+      </p>
       <p class="meta">
-        Once you have students and activities in the system, this page will show their scores per activity.
+        Once you have students and activities for this section, this page will show their scores per activity.
       </p>
     </article>
   </ng-template>
+
+  <article class="card empty-state" *ngIf="!loading && groups.length === 0">
+    <p>You are not assigned to any courses yet.</p>
+    <p class="meta">Ask an administrator to assign you to a course / section to start a class record.</p>
+  </article>
 </div>

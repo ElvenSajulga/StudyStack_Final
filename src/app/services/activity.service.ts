@@ -16,6 +16,16 @@ export interface Activity {
   teacherID: string;      // This is TeacherAccount.teacherID, e.g. "T-0001"
   teacherUID?: string;    // Optional UID fallback for legacy/resilient lookups
   courseId?: string;      // Course this activity belongs to
+  /**
+   * Section this activity targets. Combined with `courseId` it scopes the
+   * activity to a single (course, section) the teacher teaches.
+   *
+   * Legacy records created before per-section scoping was added have no
+   * `sectionId`. Filters in the teacher/student/dashboard views treat a
+   * missing value as "applies to every section of this course" so existing
+   * data keeps working — only freshly-created activities are section-scoped.
+   */
+  sectionId?: string;
   deadline: string;
   closeAt: string;
   maxPoints?: number;

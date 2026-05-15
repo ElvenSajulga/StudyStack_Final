@@ -494,7 +494,7 @@
           </div>
 
           <div class="grade-section auto-score">
-            <p>Auto-graded score: <strong>{{ selectedSubmission.score ?? 0 }} / {{ totalMaxPoints() }}</strong></p>
+            <p>Auto-graded score: <strong>{{ liveQuizScore(selectedSubmission) }} / {{ totalMaxPoints() }}</strong></p>
           </div>
         </ng-container>
 
@@ -671,16 +671,16 @@
       </p>
 
       <label class="field full" style="margin-top:12px">
-        <span class="field-label">Target course *</span>
-        <select [(ngModel)]="duplicateTargetCourseId" [disabled]="duplicating">
-          <option value="" disabled>— Select a course —</option>
-          <option *ngFor="let card of otherCourseCards" [value]="card.course.id">
-            {{ card.course.name }}<span *ngIf="card.course.semester"> — {{ card.course.semester }}</span>
+        <span class="field-label">Target course / section *</span>
+        <select [(ngModel)]="duplicateTargetCourseSectionId" [disabled]="duplicating">
+          <option value="" disabled>— Select a course / section —</option>
+          <option *ngFor="let card of otherCourseCards" [value]="card.courseSection.id">
+            {{ card.course.name }}<span *ngIf="card.sectionName"> — {{ card.sectionName }}</span><span *ngIf="card.course.semester"> ({{ card.course.semester }})</span>
           </option>
         </select>
-        <span class="field-hint" *ngIf="hasOnlyOneCourse">
+        <span class="field-hint" *ngIf="hasOnlyOneCourseSection">
           <i class="ti ti-info-circle" aria-hidden="true"></i>
-          You only have one course. The copy will be added to it.
+          You only teach one course section. There's nowhere else to duplicate to right now.
         </span>
       </label>
 
@@ -696,7 +696,7 @@
 
       <div class="modal-actions">
         <button class="btn subtle" (click)="closeDuplicateModal()" [disabled]="duplicating">Cancel</button>
-        <button class="btn primary" (click)="duplicateActivity()" [disabled]="duplicating || !duplicateTargetCourseId">
+        <button class="btn primary" (click)="duplicateActivity()" [disabled]="duplicating || !duplicateTargetCourseSectionId">
           {{ duplicating ? 'Duplicating...' : 'Duplicate' }}
         </button>
       </div>

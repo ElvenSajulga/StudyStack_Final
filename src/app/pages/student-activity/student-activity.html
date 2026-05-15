@@ -277,8 +277,8 @@
                 <span class="submission-date">Submitted {{ submissions[selectedActivity.id]?.submittedAt | date: 'MMM d, h:mm a' }}</span>
               </div>
 
-              <!-- Score (if released) -->
-              <div class="submission-score" *ngIf="submissions[selectedActivity.id]?.graded">
+              <!-- Score (only after teacher releases) -->
+              <div class="submission-score" *ngIf="canSeeScorerAnswers(selectedActivity) && submissions[selectedActivity.id]?.graded">
                 <div class="score-row">
                   <span>Your Score</span>
                   <span class="score-value">{{ submissions[selectedActivity.id]?.score }} / {{ selectedActivity.maxPoints }}</span>
@@ -287,13 +287,13 @@
               </div>
 
               <!-- Score Not Released -->
-              <div class="score-pending" *ngIf="!submissions[selectedActivity.id]?.graded">
+              <div class="score-pending" *ngIf="!canSeeScorerAnswers(selectedActivity)">
                 <i class="ti ti-hourglass"></i>
                 <p>Scores haven't been released yet. Check back later.</p>
               </div>
 
               <!-- Feedback -->
-              <div class="feedback-card" *ngIf="submissions[selectedActivity.id]?.feedback">
+              <div class="feedback-card" *ngIf="canSeeScorerAnswers(selectedActivity) && submissions[selectedActivity.id]?.feedback">
                 <h4>Teacher's Feedback</h4>
                 <p>{{ submissions[selectedActivity.id]?.feedback }}</p>
               </div>
