@@ -61,6 +61,8 @@ export class FloatingChat implements OnInit, OnDestroy, AfterViewChecked {
   private routerSub: Subscription | null = null;
   private shouldScrollToBottom = false;
   private currentRouteUrl = '';
+  /** UID the current contacts + inbox subscription was bootstrapped for. */
+  private bootstrappedUID: string | null = null;
 
   // Routes where the floating widget shouldn't appear.
   private readonly hideOnRoutes = ['/login'];
@@ -83,12 +85,14 @@ export class FloatingChat implements OnInit, OnDestroy, AfterViewChecked {
       .pipe(filter(e => e instanceof NavigationEnd))
       .subscribe(e => {
         this.currentRouteUrl = (e as NavigationEnd).urlAfterRedirects;
+        // Cheap guard: on every navigation, verify the widget's cached state
+        // still belongs to the currently-logged-in user. Catches login/logout
+        // and account-switching without needing an auth-change observable.
+        this.syncWithCurrentUser();
         this.cdr.detectChanges();
       });
 
-    if (this.eligible) {
-      void this.bootstrap();
-    }
+    this.syncWithCurrentUser();
   }
 
   ngOnDestroy(): void {
@@ -121,6 +125,43 @@ export class FloatingChat implements OnInit, OnDestroy, AfterViewChecked {
   }
 
   // ── boot ──────────────────────────────────────────────────────────────────
+
+  /**
+   * Re-bootstrap the widget when the logged-in UID has changed since the last
+   * bootstrap, and tear it down when the user has logged out. The component
+   * is mounted once at the app root, so we can't rely on `ngOnInit` to react
+   * to login/logout/account-switching — that's what this guard handles.
+   */
+  private syncWithCurrentUser(): void {
+    const uid = this.myUID ?? null;
+    if (!this.eligible || !uid) {
+      if (this.bootstrappedUID !== null) this.resetState();
+      return;
+    }
+    if (uid !== this.bootstrappedUID) {
+      this.resetState();
+      this.bootstrappedUID = uid;
+      void this.bootstrap();
+    }
+  }
+
+  /** Clear every piece of per-user state so the next user starts fresh. */
+  private resetState(): void {
+    this.inboxSub?.unsubscribe();
+    this.inboxSub = null;
+    this.allMessages = [];
+    this.summaries = [];
+    this.contacts = [];
+    this.threadMessages = [];
+    this.selectedUID = null;
+    this.composer = '';
+    this.showPicker = false;
+    this.pickerQuery = '';
+    this.bootstrappedUID = null;
+    this.loading = true;
+    // Re-read persistence under the new (or no) user.
+    this.expanded = this.readPersistedExpanded();
+  }
 
   private async bootstrap(): Promise<void> {
     try {
