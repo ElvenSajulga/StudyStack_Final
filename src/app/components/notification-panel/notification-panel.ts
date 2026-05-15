@@ -1,5 +1,8 @@
 import { Component, OnInit, OnDestroy, inject, PLATFORM_ID, ChangeDetectorRef } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
+import { NavigationEnd, Router } from '@angular/router';
+import { Subscription } from 'rxjs';
+import { filter } from 'rxjs/operators';
 import { AppNotification, NotificationService } from '../../services/notification.service';
 import { AuthService } from '../../services/auth.service';
 import { StudentAccountService } from '../../services/student-account.service';
@@ -16,11 +19,15 @@ export class NotificationPanel implements OnInit, OnDestroy {
   isOpen = false;
   private readonly platformId = inject(PLATFORM_ID);
   private refreshTimer?: number;
+  private routerSub?: Subscription;
+  /** UID the cached notifications belong to — used to detect account switches. */
+  private lastLoadedUID: string | null = null;
 
   constructor(
     private readonly notificationService: NotificationService,
     private readonly auth: AuthService,
     private readonly studentService: StudentAccountService,
+    private readonly router: Router,
     private readonly cdr: ChangeDetectorRef,
   ) {}
 
@@ -28,6 +35,11 @@ export class NotificationPanel implements OnInit, OnDestroy {
     void this.loadNotifications();
     if (isPlatformBrowser(this.platformId)) {
       this.refreshTimer = window.setInterval(() => void this.loadNotifications(), 15000);
+      // Triggers an immediate refresh on login/logout/same-role account switch
+      // so the panel doesn't show the prior user's notifications for up to 15s.
+      this.routerSub = this.router.events
+        .pipe(filter(e => e instanceof NavigationEnd))
+        .subscribe(() => void this.loadNotifications());
     }
   }
 
@@ -35,6 +47,7 @@ export class NotificationPanel implements OnInit, OnDestroy {
     if (isPlatformBrowser(this.platformId) && this.refreshTimer != null) {
       window.clearInterval(this.refreshTimer);
     }
+    this.routerSub?.unsubscribe();
   }
 
   private get userUID(): string | undefined {
@@ -48,8 +61,19 @@ export class NotificationPanel implements OnInit, OnDestroy {
   }
 
   async loadNotifications(): Promise<void> {
-    const uid = this.userUID;
-    if (!uid) { this.notifications = []; return; }
+    const uid = this.userUID ?? null;
+    // Account switched (or logged out): drop the previous user's data and
+    // close the panel before fetching, so users never see another account's
+    // notifications and `togglePanel`'s auto-mark-as-read can't mismatch.
+    if (uid !== this.lastLoadedUID) {
+      this.notifications = [];
+      this.isOpen = false;
+      this.lastLoadedUID = uid;
+    }
+    if (!uid) {
+      this.cdr.detectChanges();
+      return;
+    }
     this.notifications = await this.notificationService.getForUser(uid);
     this.cdr.detectChanges();
   }
