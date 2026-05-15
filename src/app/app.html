@@ -1,246 +1,240 @@
-<div class="app-shell">
-  <ng-container *ngIf="auth.isLoggedIn(); else authRoutes">
-    <header class="topbar">
-      <div class="topbar-left">
-        <button class="hamburger-btn" (click)="toggleSidebar()" aria-label="Toggle navigation">
-          <i class="ti ti-menu-2"></i>
-        </button>
-        <div class="brand">
-          <img src="/stacklogo.png" alt="StudyStack logo" />
-          <span class="brand-name">StudyStack</span>
-        </div>
+<div class="app-shell" [class.app-shell-authed]="auth.isLoggedIn()">
+  <header class="topbar" *ngIf="auth.isLoggedIn()">
+    <div class="topbar-left">
+      <button class="hamburger-btn" (click)="toggleSidebar()" aria-label="Toggle navigation">
+        <i class="ti ti-menu-2"></i>
+      </button>
+      <div class="brand">
+        <img src="/stacklogo.png" alt="StudyStack logo" />
+        <span class="brand-name">StudyStack</span>
       </div>
-
-      <app-admin-global-search *ngIf="auth.isAdmin()"></app-admin-global-search>
-
-      <div class="topbar-right">
-        <button
-          type="button"
-          class="btn-theme-toggle"
-          (click)="toggleDarkMode()"
-          [attr.aria-label]="(themeService.theme$ | async) === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
-          title="Toggle theme">
-          <i class="ti" [ngClass]="(themeService.theme$ | async) === 'dark' ? 'ti-sun' : 'ti-moon'"></i>
-        </button>
-        <app-admin-notification-panel *ngIf="auth.isAdmin()"></app-admin-notification-panel>
-        <app-teacher-notification-panel *ngIf="auth.isTeacher()"></app-teacher-notification-panel>
-        <app-notification-panel *ngIf="auth.isStudent()"></app-notification-panel>
-        <div class="topbar-role" [ngClass]="'role-' + (auth.getCurrentUser()?.role || 'user' | lowercase)">
-          <span class="role-badge">{{ auth.getCurrentUser()?.role | uppercase }}</span>
-        </div>
-      </div>
-    </header>
-
-    <div class="sidebar-backdrop" *ngIf="sidebarOpen" (click)="closeSidebar()"></div>
-
-    <div class="layout">
-      <nav class="sidebar" [class.mobile-open]="sidebarOpen" *ngIf="auth.getCurrentUser() as user">
-
-        <!-- User Profile Card -->
-        <button type="button" class="sidebar-profile" (click)="navigateToProfile(user.role); closeSidebar()">
-          <div class="profile-avatar" [class.has-image]="!!user.avatar">
-            <img *ngIf="user.avatar; else avatarFallback" [src]="user.avatar" alt="Profile picture" />
-            <ng-template #avatarFallback>
-              <span class="profile-avatar-initials" *ngIf="getInitials(user.name) as ini">{{ ini }}</span>
-              <i class="ti ti-user" *ngIf="!getInitials(user.name)"></i>
-            </ng-template>
-          </div>
-          <div class="profile-info">
-            <p class="profile-name">{{ user.name || 'User' }}</p>
-            <p class="profile-email">{{ userEmail || 'email@example.com' }}</p>
-            <p class="profile-role">{{ user.role | uppercase }}</p>
-          </div>
-        </button>
-
-        <!-- Main content area - grows to fill available space -->
-        <div class="sidebar-content">
-          <!-- Admin Main Menu -->
-          <ng-container *ngIf="auth.isAdmin()">
-            <h3 class="sidebar-section-title">Main Menu</h3>
-
-            <a routerLink="/admin-dashboard" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
-              <i class="ti ti-layout-dashboard"></i>
-              <span>Dashboard</span>
-            </a>
-
-            <a routerLink="/admin-students" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
-              <i class="ti ti-users"></i>
-              <span>Students</span>
-            </a>
-
-            <a routerLink="/admin-teachers" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
-              <i class="ti ti-school"></i>
-              <span>Teachers</span>
-            </a>
-
-            <a routerLink="/admin-announcements" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
-              <i class="ti ti-speakerphone"></i>
-              <span>Announcements</span>
-            </a>
-
-            <!-- Academic Management collapsible group -->
-            <div class="sidebar-group">
-              <button type="button" class="sidebar-group-toggle" (click)="toggleAcademic()" [class.open]="academicOpen">
-                <span>Academic</span>
-                <span class="toggle-arrow"><i class="ti" [class.ti-chevron-down]="!academicOpen" [class.ti-chevron-up]="academicOpen"></i></span>
-              </button>
-              <div class="sidebar-group-links" [class.expanded]="academicOpen">
-                <a routerLink="/admin-faculties" routerLinkActive="active" (click)="closeSidebar()">
-                  <i class="ti ti-building"></i>
-                  <span>Programs &amp; Faculties</span>
-                </a>
-                <a routerLink="/admin-sections" routerLinkActive="active" (click)="closeSidebar()">
-                  <i class="ti ti-layout-grid"></i>
-                  <span>Sections</span>
-                </a>
-                <a routerLink="/admin-courses" routerLinkActive="active" (click)="closeSidebar()">
-                  <i class="ti ti-book-2"></i>
-                  <span>Courses</span>
-                </a>
-                <a routerLink="/admin-enrollments" routerLinkActive="active" (click)="closeSidebar()">
-                  <i class="ti ti-user-check"></i>
-                  <span>Enrollments</span>
-                </a>
-              </div>
-            </div>
-
-            <!-- System Management section -->
-            <h3 class="sidebar-section-title">System</h3>
-            <a routerLink="/admin-audit-log" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
-              <i class="ti ti-history"></i>
-              <span>Audit Log</span>
-            </a>
-          </ng-container>
-
-          <!-- Teacher Main Menu -->
-          <ng-container *ngIf="auth.isTeacher()">
-            <h3 class="sidebar-section-title">Main Menu</h3>
-
-            <a routerLink="/teacher-dashboard" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
-              <i class="ti ti-layout-dashboard"></i>
-              <span>Dashboard</span>
-            </a>
-
-            <a routerLink="/teacher-students" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
-              <i class="ti ti-users"></i>
-              <span>My Students</span>
-            </a>
-
-            <a routerLink="/teacher-activity" routerLinkActive="active" class="sidebar-link has-badge" (click)="closeSidebar()">
-              <i class="ti ti-clipboard-list"></i>
-              <span>Activities</span>
-              <span class="badge" *ngIf="teacherBadges.activities > 0">{{ teacherBadges.activities }}</span>
-            </a>
-
-            <a routerLink="/teacher-attendance" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
-              <i class="ti ti-calendar-check"></i>
-              <span>Attendance</span>
-            </a>
-
-            <a routerLink="/teacher-class-record" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
-              <i class="ti ti-book"></i>
-              <span>Class Record</span>
-            </a>
-
-            <a routerLink="/teacher-announcement" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
-              <i class="ti ti-speakerphone"></i>
-              <span>Announcements</span>
-            </a>
-
-            <a routerLink="/teacher-materials" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
-              <i class="ti ti-folder"></i>
-              <span>Materials</span>
-            </a>
-
-            <a routerLink="/teacher-chat" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
-              <i class="ti ti-message-circle"></i>
-              <span>Messages</span>
-            </a>
-          </ng-container>
-
-          <!-- Student Main Menu -->
-          <ng-container *ngIf="auth.isStudent()">
-            <h3 class="sidebar-section-title">Main Menu</h3>
-
-            <a routerLink="/student-dashboard" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
-              <i class="ti ti-layout-dashboard"></i>
-              <span>Dashboard</span>
-            </a>
-
-            <a routerLink="/student-activity" routerLinkActive="active" class="sidebar-link has-badge" (click)="closeSidebar()">
-              <i class="ti ti-clipboard-list"></i>
-              <span>Activities</span>
-              <span class="badge" *ngIf="studentBadges.activities > 0">{{ studentBadges.activities }}</span>
-            </a>
-
-            <a routerLink="/student-attendance" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
-              <i class="ti ti-calendar-check"></i>
-              <span>Attendance</span>
-            </a>
-
-            <a routerLink="/student-grade" routerLinkActive="active" class="sidebar-link has-badge" (click)="closeSidebar()">
-              <i class="ti ti-chart-bar"></i>
-              <span>My Grades</span>
-              <span class="badge" *ngIf="studentBadges.grades > 0">{{ studentBadges.grades }}</span>
-            </a>
-
-            <a routerLink="/student-announcement" routerLinkActive="active" class="sidebar-link has-badge" (click)="onAnnouncementsClick(); closeSidebar()">
-              <i class="ti ti-speakerphone"></i>
-              <span>Announcements</span>
-              <span class="badge" *ngIf="studentBadges.announcements > 0">{{ studentBadges.announcements }}</span>
-            </a>
-
-            <a routerLink="/student-materials" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
-              <i class="ti ti-folder"></i>
-              <span>Materials</span>
-            </a>
-
-            <a routerLink="/student-chat" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
-              <i class="ti ti-message-circle"></i>
-              <span>Messages</span>
-            </a>
-          </ng-container>
-        </div>
-
-        <!-- Support Section (all roles) - pushed to bottom -->
-        <div class="sidebar-footer">
-          <h3 class="sidebar-section-title">Support</h3>
-
-          <a routerLink="/help-center" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
-            <i class="ti ti-help"></i>
-            <span>Help Center</span>
-          </a>
-
-          <a routerLink="/student-settings" *ngIf="auth.isStudent()" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
-            <i class="ti ti-settings"></i>
-            <span>Settings</span>
-          </a>
-
-          <a routerLink="/teacher-settings" *ngIf="auth.isTeacher()" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
-            <i class="ti ti-settings"></i>
-            <span>Settings</span>
-          </a>
-
-          <a routerLink="/admin-settings" *ngIf="auth.isAdmin()" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
-            <i class="ti ti-settings"></i>
-            <span>Settings</span>
-          </a>
-
-          <button type="button" class="sidebar-link logout-btn" (click)="logout(); closeSidebar()">
-            <i class="ti ti-logout"></i>
-            <span>Log out</span>
-          </button>
-        </div>
-
-      </nav>
-
-      <main class="content">
-        <router-outlet></router-outlet>
-      </main>
     </div>
-  </ng-container>
 
-  <ng-template #authRoutes>
-    <router-outlet></router-outlet>
-  </ng-template>
+    <app-admin-global-search *ngIf="auth.isAdmin()"></app-admin-global-search>
+
+    <div class="topbar-right">
+      <button
+        type="button"
+        class="btn-theme-toggle"
+        (click)="toggleDarkMode()"
+        [attr.aria-label]="(themeService.theme$ | async) === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
+        title="Toggle theme">
+        <i class="ti" [ngClass]="(themeService.theme$ | async) === 'dark' ? 'ti-sun' : 'ti-moon'"></i>
+      </button>
+      <app-admin-notification-panel *ngIf="auth.isAdmin()"></app-admin-notification-panel>
+      <app-teacher-notification-panel *ngIf="auth.isTeacher()"></app-teacher-notification-panel>
+      <app-notification-panel *ngIf="auth.isStudent()"></app-notification-panel>
+      <div class="topbar-role" [ngClass]="'role-' + (auth.getCurrentUser()?.role || 'user' | lowercase)">
+        <span class="role-badge">{{ auth.getCurrentUser()?.role | uppercase }}</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="sidebar-backdrop" *ngIf="sidebarOpen && auth.isLoggedIn()" (click)="closeSidebar()"></div>
+
+  <div class="layout">
+    <nav class="sidebar" [class.mobile-open]="sidebarOpen" *ngIf="auth.isLoggedIn() && auth.getCurrentUser() as user">
+
+      <!-- User Profile Card -->
+      <button type="button" class="sidebar-profile" (click)="navigateToProfile(user.role); closeSidebar()">
+        <div class="profile-avatar" [class.has-image]="!!user.avatar">
+          <img *ngIf="user.avatar; else avatarFallback" [src]="user.avatar" alt="Profile picture" />
+          <ng-template #avatarFallback>
+            <span class="profile-avatar-initials" *ngIf="getInitials(user.name) as ini">{{ ini }}</span>
+            <i class="ti ti-user" *ngIf="!getInitials(user.name)"></i>
+          </ng-template>
+        </div>
+        <div class="profile-info">
+          <p class="profile-name">{{ user.name || 'User' }}</p>
+          <p class="profile-email">{{ userEmail || 'email@example.com' }}</p>
+          <p class="profile-role">{{ user.role | uppercase }}</p>
+        </div>
+      </button>
+
+      <!-- Main content area - grows to fill available space -->
+      <div class="sidebar-content">
+        <!-- Admin Main Menu -->
+        <ng-container *ngIf="auth.isAdmin()">
+          <h3 class="sidebar-section-title">Main Menu</h3>
+
+          <a routerLink="/admin-dashboard" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
+            <i class="ti ti-layout-dashboard"></i>
+            <span>Dashboard</span>
+          </a>
+
+          <a routerLink="/admin-students" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
+            <i class="ti ti-users"></i>
+            <span>Students</span>
+          </a>
+
+          <a routerLink="/admin-teachers" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
+            <i class="ti ti-school"></i>
+            <span>Teachers</span>
+          </a>
+
+          <a routerLink="/admin-announcements" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
+            <i class="ti ti-speakerphone"></i>
+            <span>Announcements</span>
+          </a>
+
+          <!-- Academic Management collapsible group -->
+          <div class="sidebar-group">
+            <button type="button" class="sidebar-group-toggle" (click)="toggleAcademic()" [class.open]="academicOpen">
+              <span>Academic</span>
+              <span class="toggle-arrow"><i class="ti" [class.ti-chevron-down]="!academicOpen" [class.ti-chevron-up]="academicOpen"></i></span>
+            </button>
+            <div class="sidebar-group-links" [class.expanded]="academicOpen">
+              <a routerLink="/admin-faculties" routerLinkActive="active" (click)="closeSidebar()">
+                <i class="ti ti-building"></i>
+                <span>Programs &amp; Faculties</span>
+              </a>
+              <a routerLink="/admin-sections" routerLinkActive="active" (click)="closeSidebar()">
+                <i class="ti ti-layout-grid"></i>
+                <span>Sections</span>
+              </a>
+              <a routerLink="/admin-courses" routerLinkActive="active" (click)="closeSidebar()">
+                <i class="ti ti-book-2"></i>
+                <span>Courses</span>
+              </a>
+              <a routerLink="/admin-enrollments" routerLinkActive="active" (click)="closeSidebar()">
+                <i class="ti ti-user-check"></i>
+                <span>Enrollments</span>
+              </a>
+            </div>
+          </div>
+
+          <!-- System Management section -->
+          <h3 class="sidebar-section-title">System</h3>
+          <a routerLink="/admin-audit-log" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
+            <i class="ti ti-history"></i>
+            <span>Audit Log</span>
+          </a>
+        </ng-container>
+
+        <!-- Teacher Main Menu -->
+        <ng-container *ngIf="auth.isTeacher()">
+          <h3 class="sidebar-section-title">Main Menu</h3>
+
+          <a routerLink="/teacher-dashboard" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
+            <i class="ti ti-layout-dashboard"></i>
+            <span>Dashboard</span>
+          </a>
+
+          <a routerLink="/teacher-students" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
+            <i class="ti ti-users"></i>
+            <span>My Students</span>
+          </a>
+
+          <a routerLink="/teacher-activity" routerLinkActive="active" class="sidebar-link has-badge" (click)="closeSidebar()">
+            <i class="ti ti-clipboard-list"></i>
+            <span>Activities</span>
+            <span class="badge" *ngIf="teacherBadges.activities > 0">{{ teacherBadges.activities }}</span>
+          </a>
+
+          <a routerLink="/teacher-attendance" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
+            <i class="ti ti-calendar-check"></i>
+            <span>Attendance</span>
+          </a>
+
+          <a routerLink="/teacher-class-record" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
+            <i class="ti ti-book"></i>
+            <span>Class Record</span>
+          </a>
+
+          <a routerLink="/teacher-announcement" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
+            <i class="ti ti-speakerphone"></i>
+            <span>Announcements</span>
+          </a>
+
+          <a routerLink="/teacher-materials" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
+            <i class="ti ti-folder"></i>
+            <span>Materials</span>
+          </a>
+
+          <a routerLink="/teacher-chat" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
+            <i class="ti ti-message-circle"></i>
+            <span>Messages</span>
+          </a>
+        </ng-container>
+
+        <!-- Student Main Menu -->
+        <ng-container *ngIf="auth.isStudent()">
+          <h3 class="sidebar-section-title">Main Menu</h3>
+
+          <a routerLink="/student-dashboard" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
+            <i class="ti ti-layout-dashboard"></i>
+            <span>Dashboard</span>
+          </a>
+
+          <a routerLink="/student-activity" routerLinkActive="active" class="sidebar-link has-badge" (click)="closeSidebar()">
+            <i class="ti ti-clipboard-list"></i>
+            <span>Activities</span>
+            <span class="badge" *ngIf="studentBadges.activities > 0">{{ studentBadges.activities }}</span>
+          </a>
+
+          <a routerLink="/student-attendance" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
+            <i class="ti ti-calendar-check"></i>
+            <span>Attendance</span>
+          </a>
+
+          <a routerLink="/student-grade" routerLinkActive="active" class="sidebar-link has-badge" (click)="closeSidebar()">
+            <i class="ti ti-chart-bar"></i>
+            <span>My Grades</span>
+            <span class="badge" *ngIf="studentBadges.grades > 0">{{ studentBadges.grades }}</span>
+          </a>
+
+          <a routerLink="/student-announcement" routerLinkActive="active" class="sidebar-link has-badge" (click)="onAnnouncementsClick(); closeSidebar()">
+            <i class="ti ti-speakerphone"></i>
+            <span>Announcements</span>
+            <span class="badge" *ngIf="studentBadges.announcements > 0">{{ studentBadges.announcements }}</span>
+          </a>
+
+          <a routerLink="/student-materials" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
+            <i class="ti ti-folder"></i>
+            <span>Materials</span>
+          </a>
+
+          <a routerLink="/student-chat" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
+            <i class="ti ti-message-circle"></i>
+            <span>Messages</span>
+          </a>
+        </ng-container>
+      </div>
+
+      <!-- Support Section (all roles) - pushed to bottom -->
+      <div class="sidebar-footer">
+        <h3 class="sidebar-section-title">Support</h3>
+
+        <a routerLink="/help-center" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
+          <i class="ti ti-help"></i>
+          <span>Help Center</span>
+        </a>
+
+        <a routerLink="/student-settings" *ngIf="auth.isStudent()" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
+          <i class="ti ti-settings"></i>
+          <span>Settings</span>
+        </a>
+
+        <a routerLink="/teacher-settings" *ngIf="auth.isTeacher()" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
+          <i class="ti ti-settings"></i>
+          <span>Settings</span>
+        </a>
+
+        <a routerLink="/admin-settings" *ngIf="auth.isAdmin()" routerLinkActive="active" class="sidebar-link" (click)="closeSidebar()">
+          <i class="ti ti-settings"></i>
+          <span>Settings</span>
+        </a>
+
+        <button type="button" class="sidebar-link logout-btn" (click)="logout(); closeSidebar()">
+          <i class="ti ti-logout"></i>
+          <span>Log out</span>
+        </button>
+      </div>
+
+    </nav>
+
+    <main class="content">
+      <router-outlet></router-outlet>
+    </main>
+  </div>
 </div>

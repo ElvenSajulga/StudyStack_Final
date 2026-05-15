@@ -112,9 +112,13 @@
 .layout {
   flex: 1;
   display: grid;
-  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   min-height: 0;
   align-items: flex-start;
+}
+
+.app-shell-authed .layout {
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
 }
 
 /* ── SIDEBAR ────────────────────────────────────────────── */
@@ -308,10 +312,14 @@
 
 .content {
   background: var(--color-bg-page);
-  padding: 24px 28px;
-  min-height: calc(100vh - 56px);
+  min-height: 100vh;
   overflow: auto;
   transition: background-color var(--t-base);
+}
+
+.app-shell-authed .content {
+  padding: 24px 28px;
+  min-height: calc(100vh - 56px);
 }
 
 /* ── Academic group ─────────────────────────────────────── */
