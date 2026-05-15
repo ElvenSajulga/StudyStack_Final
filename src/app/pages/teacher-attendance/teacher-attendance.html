@@ -27,12 +27,12 @@
       <button
         type="button"
         class="btn btn-subtle"
-        (click)="exportAttendanceCsv()"
+        (click)="exportAttendancePdf()"
         [disabled]="activities.length === 0 || studentRows.length === 0"
-        aria-label="Export CSV"
+        aria-label="Export PDF"
       >
-        <i class="ti ti-download" aria-hidden="true"></i>
-        <span>Export CSV</span>
+        <i class="ti ti-file-type-pdf" aria-hidden="true"></i>
+        <span>Export PDF</span>
       </button>
     </div>
   </header>

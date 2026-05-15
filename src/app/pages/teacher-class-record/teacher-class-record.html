@@ -21,9 +21,9 @@
       </p>
     </div>
     <div class="page-header-actions" *ngIf="students.length > 0 && activities.length > 0">
-      <button type="button" class="btn btn-subtle" (click)="exportCsv()" aria-label="Export CSV">
-        <i class="ti ti-download" aria-hidden="true"></i>
-        <span>Export CSV</span>
+      <button type="button" class="btn btn-subtle" (click)="exportPdf()" aria-label="Export PDF">
+        <i class="ti ti-file-type-pdf" aria-hidden="true"></i>
+        <span>Export PDF</span>
       </button>
       <button type="button" class="btn btn-subtle" (click)="printView()" aria-label="Print">
         <i class="ti ti-printer" aria-hidden="true"></i>

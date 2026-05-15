@@ -311,45 +311,30 @@ export class TeacherClassRecord implements OnInit {
     return this.isSortedBy(activityId) ? this.sortDir : null;
   }
 
-  exportCsv(): void {
-    const headers = [
+  async exportPdf(): Promise<void> {
+    const head = [
       'Student ID',
       'Last Name',
       'First Name',
       ...this.activities.map(a => a.title),
-      'Total Score',
+      'Total',
       'Average (%)',
     ];
 
-    const rows: (string | number)[][] = [headers];
-
+    const body: (string | number)[][] = [];
     for (const s of this.filteredStudents) {
-      const row: (string | number)[] = [
+      body.push([
         s.studentID ?? '',
         s.lastname ?? '',
         s.firstname ?? '',
         ...this.activities.map(a => {
           const score = this.scoreFor(s, a);
-          return score === undefined ? '' : score;
+          return score === undefined ? '—' : score;
         }),
         this.totalScoreForStudent(s),
         this.averageScore(s).toFixed(1),
-      ];
-      rows.push(row);
+      ]);
     }
-
-    const escapeCell = (value: string | number): string => {
-      const str = String(value ?? '');
-      const escaped = str.replace(/"/g, '""');
-      return `"${escaped}"`;
-    };
-
-    const csvContent = rows
-      .map(row => row.map(escapeCell).join(','))
-      .join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
 
     const today = new Date();
     const yyyy = today.getFullYear();
@@ -362,15 +347,50 @@ export class TeacherClassRecord implements OnInit {
       .join('-')
       .replace(/[^a-zA-Z0-9-]+/g, '-')
       .replace(/^-+|-+$/g, '') || 'class';
-    const filename = `class-record-${slug}-${dateStr}.csv`;
 
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = filename;
-    document.body.appendChild(anchor);
-    anchor.click();
-    document.body.removeChild(anchor);
-    URL.revokeObjectURL(url);
+    const subtitleParts = [this.courseName, this.courseSectionName].filter(Boolean) as string[];
+    const subtitle = subtitleParts.length ? subtitleParts.join(' • ') : 'Class record';
+
+    const { jsPDF } = await import('jspdf');
+    const { default: autoTable } = await import('jspdf-autotable');
+
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.text('Class Record', 40, 40);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(90);
+    doc.text(subtitle, 40, 58);
+    doc.text(`Generated ${dateStr}`, pageWidth - 40, 58, { align: 'right' });
+    doc.setTextColor(0);
+
+    autoTable(doc, {
+      head: [head],
+      body,
+      startY: 72,
+      margin: { left: 40, right: 40 },
+      styles: { fontSize: 8, cellPadding: 4, overflow: 'linebreak', valign: 'middle' },
+      headStyles: { fillColor: [24, 201, 138], textColor: 255, fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [245, 247, 250] },
+      didDrawPage: data => {
+        const pageCount = doc.getNumberOfPages();
+        const current = data.pageNumber;
+        doc.setFontSize(8);
+        doc.setTextColor(120);
+        doc.text(
+          `Page ${current} of ${pageCount}`,
+          pageWidth - 40,
+          doc.internal.pageSize.getHeight() - 20,
+          { align: 'right' },
+        );
+      },
+    });
+
+    doc.save(`class-record-${slug}-${dateStr}.pdf`);
   }
 
   printView(): void {

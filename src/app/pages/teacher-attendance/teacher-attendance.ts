@@ -406,11 +406,12 @@ export class TeacherAttendance implements OnInit {
 
   // ── Export ──────────────────────────────────────────────────────────────
 
-  exportAttendanceCsv(): void {
-    let rows: (string | number)[][] = [];
+  async exportAttendancePdf(): Promise<void> {
+    let head: string[] = [];
+    let body: (string | number)[][] = [];
 
     if (this.attendanceView === 'by-student') {
-      const headers = [
+      head = [
         'Student ID',
         'Last Name',
         'First Name',
@@ -419,14 +420,13 @@ export class TeacherAttendance implements OnInit {
         'Present',
         'Late',
         'Absent',
-        'Total Activities',
-        'Attendance Rate (%)',
+        'Total',
+        'Rate (%)',
       ];
-      rows.push(headers);
 
       for (const summary of this.studentSummaries) {
         const s = summary.row.student;
-        rows.push([
+        body.push([
           s.studentID ?? '',
           s.lastname ?? '',
           s.firstname ?? '',
@@ -440,7 +440,7 @@ export class TeacherAttendance implements OnInit {
         ]);
       }
     } else {
-      const headers = [
+      head = [
         'Student ID',
         'Last Name',
         'First Name',
@@ -448,10 +448,9 @@ export class TeacherAttendance implements OnInit {
         'Section',
         ...this.activities.map(a => a.title),
       ];
-      rows.push(headers);
 
       for (const r of this.studentRows) {
-        rows.push([
+        body.push([
           r.student.studentID ?? '',
           r.student.lastname ?? '',
           r.student.firstname ?? '',
@@ -462,32 +461,57 @@ export class TeacherAttendance implements OnInit {
       }
     }
 
-    const escapeCell = (value: string | number): string => {
-      const str = String(value ?? '');
-      const escaped = str.replace(/"/g, '""');
-      return `"${escaped}"`;
-    };
-
-    const csvContent = rows
-      .map(row => row.map(escapeCell).join(','))
-      .join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-
     const today = new Date();
     const yyyy = today.getFullYear();
     const mm = String(today.getMonth() + 1).padStart(2, '0');
     const dd = String(today.getDate()).padStart(2, '0');
     const dateStr = `${yyyy}-${mm}-${dd}`;
-    const filename = `attendance-${dateStr}.csv`;
+    const titleSuffix = this.attendanceView === 'by-student' ? 'Summary' : 'By Activity';
+    const subtitleParts = [
+      this.courseOptions.find(c => c.id === this.selectedCourseId)?.name,
+      this.sectionOptions.find(s => s.id === this.selectedSectionId)?.name,
+    ].filter(Boolean) as string[];
+    const subtitle = subtitleParts.length ? subtitleParts.join(' • ') : 'All courses & sections';
 
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = filename;
-    document.body.appendChild(anchor);
-    anchor.click();
-    document.body.removeChild(anchor);
-    URL.revokeObjectURL(url);
+    const { jsPDF } = await import('jspdf');
+    const { default: autoTable } = await import('jspdf-autotable');
+
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.text(`Attendance Report — ${titleSuffix}`, 40, 40);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(90);
+    doc.text(subtitle, 40, 58);
+    doc.text(`Generated ${dateStr}`, pageWidth - 40, 58, { align: 'right' });
+    doc.setTextColor(0);
+
+    autoTable(doc, {
+      head: [head],
+      body,
+      startY: 72,
+      margin: { left: 40, right: 40 },
+      styles: { fontSize: 8, cellPadding: 4, overflow: 'linebreak', valign: 'middle' },
+      headStyles: { fillColor: [24, 201, 138], textColor: 255, fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [245, 247, 250] },
+      didDrawPage: data => {
+        const pageCount = doc.getNumberOfPages();
+        const current = data.pageNumber;
+        doc.setFontSize(8);
+        doc.setTextColor(120);
+        doc.text(
+          `Page ${current} of ${pageCount}`,
+          pageWidth - 40,
+          doc.internal.pageSize.getHeight() - 20,
+          { align: 'right' },
+        );
+      },
+    });
+
+    doc.save(`attendance-${dateStr}.pdf`);
   }
 }
