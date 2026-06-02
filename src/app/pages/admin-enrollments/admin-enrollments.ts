@@ -65,21 +65,23 @@ export class AdminEnrollments implements OnInit {
   };
 
   // ── bulk enroll ─────────────────────────────────────────────────────────────
+  // New shape: pick ONE section, then pick MULTIPLE courses to enroll every
+  // student currently in that section into.
   showBulkForm = false;
   bulkForm = {
-    programId: '',
-    courseId: '',
     sectionId: '',
-    teacherUID: '',
   };
-  bulkSelectedUIDs = new Set<string>();
-  bulkSearch = '';
-  bulkProgramFilter = '';
+  /** Course IDs the admin has ticked to enroll the section into. */
+  bulkSelectedCourseIds = new Set<string>();
   bulkProcessing = false;
+  /** Per-course result of the last bulk run. */
   bulkResults: Array<{
-    studentName: string;
-    studentID: string;
-    status: 'enrolled' | 'skipped' | 'failed';
+    courseId: string;
+    courseName: string;
+    status: 'enrolled' | 'skipped' | 'partial' | 'failed';
+    enrolled: number;
+    skipped: number;
+    failed: number;
     reason?: string;
   }> = [];
   bulkProgressDone = 0;
@@ -371,14 +373,15 @@ export class AdminEnrollments implements OnInit {
   }
 
   // ── bulk enroll ─────────────────────────────────────────────────────────────
+  //
+  // Flow: admin picks ONE section, then ticks multiple courses. We enroll every
+  // student currently in that section into each ticked course. The section may
+  // be empty (zero students) — the form is still submittable; the run is a
+  // no-op for that course and is reported as such.
 
   openBulkForm(): void {
-    this.bulkForm = {
-      programId: '', courseId: '', sectionId: '', teacherUID: '',
-    };
-    this.bulkSelectedUIDs = new Set<string>();
-    this.bulkSearch = '';
-    this.bulkProgramFilter = '';
+    this.bulkForm = { sectionId: '' };
+    this.bulkSelectedCourseIds = new Set<string>();
     this.bulkResults = [];
     this.bulkProgressDone = 0;
     this.bulkProgressTotal = 0;
@@ -391,156 +394,235 @@ export class AdminEnrollments implements OnInit {
     this.bulkResults = [];
   }
 
-  onBulkProgramChange(): void {
-    this.bulkForm.courseId = '';
-    this.bulkForm.sectionId = '';
-    this.bulkForm.teacherUID = '';
-  }
-
-  onBulkCourseChange(): void {
-    this.bulkForm.sectionId = '';
-    this.bulkForm.teacherUID = '';
-  }
-
   onBulkSectionChange(): void {
-    const cs = this.courseSections.find(
-      cs => cs.courseId === this.bulkForm.courseId
-        && cs.sectionId === this.bulkForm.sectionId,
-    );
-    this.bulkForm.teacherUID = cs?.teacherUID ?? '';
+    // Changing the section invalidates any previously-picked courses, since
+    // course/section pairings are joined through `courseSections`.
+    this.bulkSelectedCourseIds = new Set<string>();
+    this.bulkResults = [];
   }
 
-  /** Distinct program names found across student records — used for the filter dropdown. */
-  get bulkStudentPrograms(): string[] {
-    const set = new Set<string>();
-    for (const s of this.students) {
-      if (s.program) set.add(s.program);
+  /** All sections, sorted, available as bulk targets. */
+  get bulkSectionOptions(): Section[] {
+    return [...this.sections].sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  /** Unique students currently enrolled in the given section (derived from
+   *  enrollment records, since StudentAccount has no fixed sectionId). */
+  studentsInSection(sectionId: string): StudentAccount[] {
+    if (!sectionId) return [];
+    const uids = new Set<string>();
+    for (const e of this.enrollments) {
+      if (e.sectionId === sectionId) uids.add(e.studentUID);
     }
-    return [...set].sort((a, b) => a.localeCompare(b));
+    return this.students.filter(s => uids.has(s.UID));
   }
 
-  get filteredBulkStudents(): StudentAccount[] {
-    const q = this.bulkSearch.trim().toLowerCase();
-    const programFilter = this.bulkProgramFilter.trim().toLowerCase();
-    return this.students.filter(s => {
-      if (programFilter && (s.program ?? '').toLowerCase() !== programFilter) return false;
-      if (!q) return true;
-      const haystack = [
-        s.firstname, s.lastname, s.studentID, s.email, s.program, s.UID,
-      ].map(v => (v ?? '').toLowerCase()).join(' ');
-      return haystack.includes(q);
-    });
+  studentCountForSection(sectionId: string): number {
+    return this.studentsInSection(sectionId).length;
   }
 
-  isBulkSelected(uid: string): boolean {
-    return this.bulkSelectedUIDs.has(uid);
+  /** Courses that have a CourseSection record (i.e. a teacher assigned) for
+   *  the picked section. Only these can be bulk-enrolled. */
+  coursesForBulkSection(): Course[] {
+    const sectionId = this.bulkForm.sectionId;
+    if (!sectionId) return [];
+    const courseIds = new Set(
+      this.courseSections
+        .filter(cs => cs.sectionId === sectionId)
+        .map(cs => cs.courseId),
+    );
+    return this.courses
+      .filter(c => courseIds.has(c.id))
+      .sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  toggleBulkSelect(uid: string): void {
-    if (this.bulkSelectedUIDs.has(uid)) this.bulkSelectedUIDs.delete(uid);
-    else this.bulkSelectedUIDs.add(uid);
+  /** Teacher assigned to teach this course in this section, if any. */
+  bulkTeacherFor(courseId: string): string {
+    const cs = this.courseSections.find(
+      cs => cs.courseId === courseId && cs.sectionId === this.bulkForm.sectionId,
+    );
+    return cs?.teacherUID ?? '';
   }
 
-  /** True iff every currently-visible student is in the selection set. */
-  get allVisibleSelected(): boolean {
-    const visible = this.filteredBulkStudents;
-    if (visible.length === 0) return false;
-    return visible.every(s => this.bulkSelectedUIDs.has(s.UID));
+  /** How many of the section's current students are already enrolled in
+   *  (courseId, sectionId). Drives the per-course status badge. */
+  enrolledInCourseCount(courseId: string): number {
+    const sectionId = this.bulkForm.sectionId;
+    if (!sectionId) return 0;
+    const inSection = this.studentsInSection(sectionId);
+    let n = 0;
+    for (const s of inSection) {
+      if (this.alreadyEnrolled(s.UID, courseId, sectionId)) n++;
+    }
+    return n;
   }
 
-  toggleSelectAllVisible(): void {
-    const visible = this.filteredBulkStudents;
-    if (this.allVisibleSelected) {
-      for (const s of visible) this.bulkSelectedUIDs.delete(s.UID);
+  /** Returns true when EVERY current student of the section is already
+   *  enrolled in this course — that's the dup case the admin should not be
+   *  allowed to re-trigger ("same courses for that specific section"). */
+  isCourseFullyEnrolledForSection(courseId: string): boolean {
+    const total = this.studentCountForSection(this.bulkForm.sectionId);
+    if (total === 0) return false;
+    return this.enrolledInCourseCount(courseId) === total;
+  }
+
+  isBulkCourseDisabled(courseId: string): boolean {
+    return (
+      this.isCourseFullyEnrolledForSection(courseId) ||
+      !this.bulkTeacherFor(courseId)
+    );
+  }
+
+  isBulkCourseSelected(courseId: string): boolean {
+    return this.bulkSelectedCourseIds.has(courseId);
+  }
+
+  toggleBulkCourse(courseId: string): void {
+    if (this.isBulkCourseDisabled(courseId)) return;
+    if (this.bulkSelectedCourseIds.has(courseId)) {
+      this.bulkSelectedCourseIds.delete(courseId);
     } else {
-      for (const s of visible) this.bulkSelectedUIDs.add(s.UID);
+      this.bulkSelectedCourseIds.add(courseId);
+    }
+  }
+
+  /** Total number of courses the admin can actually pick (excluding disabled). */
+  get bulkSelectableCourseCount(): number {
+    return this.coursesForBulkSection().filter(c => !this.isBulkCourseDisabled(c.id)).length;
+  }
+
+  get bulkSelectedCourseCount(): number {
+    return this.bulkSelectedCourseIds.size;
+  }
+
+  /** True iff every selectable course is selected — drives "Select all". */
+  get allSelectableCoursesSelected(): boolean {
+    const selectable = this.coursesForBulkSection().filter(c => !this.isBulkCourseDisabled(c.id));
+    if (selectable.length === 0) return false;
+    return selectable.every(c => this.bulkSelectedCourseIds.has(c.id));
+  }
+
+  toggleSelectAllBulkCourses(): void {
+    const selectable = this.coursesForBulkSection().filter(c => !this.isBulkCourseDisabled(c.id));
+    if (this.allSelectableCoursesSelected) {
+      for (const c of selectable) this.bulkSelectedCourseIds.delete(c.id);
+    } else {
+      for (const c of selectable) this.bulkSelectedCourseIds.add(c.id);
     }
   }
 
   clearBulkSelection(): void {
-    this.bulkSelectedUIDs.clear();
+    this.bulkSelectedCourseIds.clear();
   }
 
-  get bulkSelectedCount(): number {
-    return this.bulkSelectedUIDs.size;
-  }
-
+  // Aggregated counts shown in the post-run summary.
   get bulkSuccessCount(): number {
-    return this.bulkResults.filter(r => r.status === 'enrolled').length;
+    return this.bulkResults.reduce((n, r) => n + r.enrolled, 0);
   }
 
   get bulkSkippedCount(): number {
-    return this.bulkResults.filter(r => r.status === 'skipped').length;
+    return this.bulkResults.reduce((n, r) => n + r.skipped, 0);
   }
 
   get bulkFailedCount(): number {
-    return this.bulkResults.filter(r => r.status === 'failed').length;
+    return this.bulkResults.reduce((n, r) => n + r.failed, 0);
   }
 
   /**
-   * Enroll every selected student into the target (course, section).
-   * Each call re-uses `enrollStudent`, so the per-student validations
-   * already in place (schedule conflict, missing course) still apply.
-   * Results are collected per student so the admin can see exactly who
-   * succeeded and why anyone failed.
+   * For each selected course, enroll every student currently in the picked
+   * section into (course, section). Per-student schedule conflicts are
+   * caught by `enrollStudent`. Duplicates are skipped via `alreadyEnrolled`.
+   * Sections with zero students still complete successfully — the per-course
+   * result just shows "no students to enroll".
    */
   async bulkEnroll(): Promise<void> {
-    const { courseId, sectionId, teacherUID } = this.bulkForm;
-    if (!courseId || !sectionId) {
-      this.toast('error', 'Select a course and section first');
+    const sectionId = this.bulkForm.sectionId;
+    if (!sectionId) {
+      this.toast('error', 'Select a section first');
       return;
     }
-    if (!teacherUID) {
-      this.toast('error', 'No teacher assigned to this section for this course');
-      return;
-    }
-    const selected = this.students.filter(s => this.bulkSelectedUIDs.has(s.UID));
-    if (selected.length === 0) {
-      this.toast('error', 'Pick at least one student to enroll');
+    const courseIds = Array.from(this.bulkSelectedCourseIds);
+    if (courseIds.length === 0) {
+      this.toast('error', 'Pick at least one course to enroll the section into');
       return;
     }
 
-    const course = this.courses.find(c => c.id === courseId);
     const section = this.sections.find(s => s.id === sectionId);
+    const sectionStudents = this.studentsInSection(sectionId);
 
     this.bulkProcessing = true;
     this.bulkResults = [];
     this.bulkProgressDone = 0;
-    this.bulkProgressTotal = selected.length;
+    this.bulkProgressTotal = courseIds.length;
 
-    for (const student of selected) {
-      const displayName = `${student.lastname}, ${student.firstname}`.trim();
-      try {
-        if (this.alreadyEnrolled(student.UID, courseId, sectionId)) {
-          this.bulkResults.push({
-            studentName: displayName,
-            studentID: student.studentID,
-            status: 'skipped',
-            reason: 'Already enrolled in this section',
-          });
-        } else {
-          await this.academic.enrollStudent({
-            studentUID: student.UID,
-            studentID: student.studentID,
-            courseId,
-            sectionId,
-            teacherUID,
-          });
-          this.bulkResults.push({
-            studentName: displayName,
-            studentID: student.studentID,
-            status: 'enrolled',
-          });
-        }
-      } catch (e) {
-        const reason = e instanceof Error ? e.message : 'Unknown error';
+    for (const courseId of courseIds) {
+      const course = this.courses.find(c => c.id === courseId);
+      const courseName = course?.name ?? courseId;
+      const teacherUID = this.bulkTeacherFor(courseId);
+
+      let enrolled = 0;
+      let skipped = 0;
+      let failed = 0;
+      let reason: string | undefined;
+
+      if (!teacherUID) {
         this.bulkResults.push({
-          studentName: displayName,
-          studentID: student.studentID,
-          status: 'failed',
-          reason,
+          courseId, courseName,
+          status: 'skipped', enrolled: 0, skipped: 0, failed: 0,
+          reason: 'No teacher assigned to this section for this course',
         });
+        this.bulkProgressDone++;
+        this.cdr.detectChanges();
+        continue;
       }
+
+      if (sectionStudents.length === 0) {
+        // Empty section is allowed — record as a no-op for this course.
+        this.bulkResults.push({
+          courseId, courseName,
+          status: 'skipped', enrolled: 0, skipped: 0, failed: 0,
+          reason: 'Section has no students yet',
+        });
+        this.bulkProgressDone++;
+        this.cdr.detectChanges();
+        continue;
+      }
+
+      for (const student of sectionStudents) {
+        try {
+          if (this.alreadyEnrolled(student.UID, courseId, sectionId)) {
+            skipped++;
+          } else {
+            await this.academic.enrollStudent({
+              studentUID: student.UID,
+              studentID: student.studentID,
+              courseId,
+              sectionId,
+              teacherUID,
+            });
+            enrolled++;
+          }
+        } catch (e) {
+          failed++;
+          if (!reason) reason = e instanceof Error ? e.message : 'Enrollment failed';
+        }
+      }
+
+      let status: 'enrolled' | 'skipped' | 'partial' | 'failed';
+      if (enrolled > 0 && failed === 0) {
+        status = 'enrolled';
+      } else if (enrolled > 0 && failed > 0) {
+        status = 'partial';
+      } else if (failed > 0) {
+        status = 'failed';
+      } else {
+        status = 'skipped';
+        if (!reason && skipped > 0) reason = 'All students were already enrolled';
+      }
+
+      this.bulkResults.push({
+        courseId, courseName, status, enrolled, skipped, failed, reason,
+      });
       this.bulkProgressDone++;
       this.cdr.detectChanges();
     }
@@ -551,27 +633,34 @@ export class AdminEnrollments implements OnInit {
       actorName: actor?.name ?? 'Unknown Admin',
       action: 'create',
       entityType: 'enrollment',
-      entityId: `bulk-${courseId}-${sectionId}`,
+      entityId: `bulk-section-${sectionId}`,
       description:
-        `Bulk-enrolled ${this.bulkSuccessCount} of ${selected.length} students into ` +
-        `${course?.name ?? courseId} (${section?.name ?? sectionId}). ` +
+        `Bulk-enrolled section "${section?.name ?? sectionId}" into ${courseIds.length} ` +
+        `course(s): ${this.bulkSuccessCount} enrollment(s) created, ` +
         `${this.bulkSkippedCount} skipped, ${this.bulkFailedCount} failed.`,
       timestamp: new Date().toISOString(),
     });
 
     this.bulkProcessing = false;
-    this.bulkSelectedUIDs.clear();
+    this.bulkSelectedCourseIds.clear();
     await this.loadAll();
 
     if (this.bulkSuccessCount > 0) {
       const detail = this.bulkSkippedCount + this.bulkFailedCount > 0
         ? { text: `${this.bulkSkippedCount} skipped, ${this.bulkFailedCount} failed — see details below.` }
         : {};
-      this.toastService.success(`${this.bulkSuccessCount} student(s) enrolled`, detail);
+      this.toastService.success(
+        `${this.bulkSuccessCount} enrollment(s) created`,
+        detail,
+      );
+    } else if (sectionStudents.length === 0) {
+      this.toastService.success('Bulk operation complete', {
+        text: 'Section has no students yet — no enrollments created.',
+      });
     } else {
       this.toastService.error(
-        'No students were enrolled',
-        { text: 'See per-student details below.' },
+        'No new enrollments were created',
+        { text: 'See per-course details below.' },
       );
     }
   }

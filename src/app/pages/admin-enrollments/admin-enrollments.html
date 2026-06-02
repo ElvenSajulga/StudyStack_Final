@@ -82,102 +82,99 @@
     </div>
   </section>
 
-  <!-- Bulk enroll panel -->
+  <!-- Bulk enroll panel: section → multiple courses -->
   <section class="card bulk-enroll" *ngIf="showBulkForm">
     <div class="bulk-header">
-      <h3>Bulk enroll students</h3>
+      <h3>Bulk enroll a section into courses</h3>
       <p class="muted">
-        Pick a target section, then select every student to enroll. Each student
-        is validated individually for schedule conflicts.
+        Pick a section, then tick every course to enroll its students into.
+        Sections already fully enrolled in a course are disabled. Sections with
+        no students yet can still be picked — the run will be a no-op.
       </p>
     </div>
 
     <div class="form-grid">
       <label class="field">
-        <span class="field-label">Program</span>
-        <select [(ngModel)]="bulkForm.programId" (ngModelChange)="onBulkProgramChange()">
-          <option value="">— Select program —</option>
-          <option *ngFor="let p of programs" [value]="p.id">{{ p.name }}</option>
-        </select>
-      </label>
-
-      <label class="field">
-        <span class="field-label">Course</span>
-        <select [(ngModel)]="bulkForm.courseId"
-          (ngModelChange)="onBulkCourseChange()"
-          [disabled]="!bulkForm.programId">
-          <option value="">— Select course —</option>
-          <option *ngFor="let c of coursesForProgram(bulkForm.programId)" [value]="c.id">
-            {{ c.name }} — {{ c.semester }}
-          </option>
-        </select>
-      </label>
-
-      <label class="field">
         <span class="field-label">Section</span>
-        <select [(ngModel)]="bulkForm.sectionId"
-          (ngModelChange)="onBulkSectionChange()"
-          [disabled]="!bulkForm.courseId">
+        <select [(ngModel)]="bulkForm.sectionId" (ngModelChange)="onBulkSectionChange()">
           <option value="">— Select section —</option>
-          <option *ngFor="let s of sectionsForCourse(bulkForm.courseId)" [value]="s.id">
+          <option *ngFor="let s of bulkSectionOptions" [value]="s.id">
             {{ yearLevelName(s.yearLevelId) }} — {{ s.name }}
+            ({{ studentCountForSection(s.id) }} student{{ studentCountForSection(s.id) === 1 ? '' : 's' }})
           </option>
         </select>
       </label>
 
       <div class="field info-field" *ngIf="bulkForm.sectionId">
-        <span class="field-label">Assigned teacher</span>
-        <span class="info-value" [class.no-teacher]="!bulkForm.teacherUID">
-          {{ bulkForm.teacherUID
-            ? teacherNameForUID(bulkForm.teacherUID)
-            : 'No teacher assigned to this section' }}
+        <span class="field-label">Students in section</span>
+        <span class="info-value">
+          <strong>{{ studentCountForSection(bulkForm.sectionId) }}</strong>
+          {{ studentCountForSection(bulkForm.sectionId) === 1 ? 'student' : 'students' }}
+          <span class="muted" *ngIf="studentCountForSection(bulkForm.sectionId) === 0">
+            — none enrolled yet
+          </span>
         </span>
       </div>
     </div>
 
     <div class="bulk-selector" *ngIf="bulkForm.sectionId">
       <div class="bulk-toolbar">
-        <input type="text"
-          class="bulk-search"
-          placeholder="Search by name, ID, email…"
-          [(ngModel)]="bulkSearch" />
-        <select [(ngModel)]="bulkProgramFilter" class="bulk-program-filter">
-          <option value="">All student programs</option>
-          <option *ngFor="let p of bulkStudentPrograms" [value]="p">{{ p }}</option>
-        </select>
+        <strong>Pick courses to enroll this section into</strong>
         <div class="bulk-counts">
-          <span class="muted">{{ filteredBulkStudents.length }} visible</span>
+          <span class="muted">{{ coursesForBulkSection().length }} available</span>
           <span class="muted">·</span>
-          <strong>{{ bulkSelectedCount }} selected</strong>
+          <strong>{{ bulkSelectedCourseCount }} selected</strong>
         </div>
       </div>
 
-      <div class="bulk-list" *ngIf="filteredBulkStudents.length > 0">
+      <div class="bulk-list" *ngIf="coursesForBulkSection().length > 0">
         <label class="bulk-row bulk-row-head">
           <input type="checkbox"
-            [checked]="allVisibleSelected"
-            (change)="toggleSelectAllVisible()" />
-          <span class="bulk-name">Select all visible</span>
+            [checked]="allSelectableCoursesSelected"
+            (change)="toggleSelectAllBulkCourses()"
+            [disabled]="bulkProcessing || bulkSelectableCourseCount === 0" />
+          <span class="bulk-name">Select all available courses</span>
         </label>
-        <label class="bulk-row" *ngFor="let s of filteredBulkStudents">
+        <label class="bulk-row course-row"
+          *ngFor="let c of coursesForBulkSection()"
+          [class.disabled]="isBulkCourseDisabled(c.id)">
           <input type="checkbox"
-            [checked]="isBulkSelected(s.UID)"
-            (change)="toggleBulkSelect(s.UID)"
-            [disabled]="bulkProcessing" />
-          <span class="bulk-name">{{ s.lastname }}, {{ s.firstname }}</span>
+            [checked]="isBulkCourseSelected(c.id)"
+            (change)="toggleBulkCourse(c.id)"
+            [disabled]="bulkProcessing || isBulkCourseDisabled(c.id)" />
+          <span class="bulk-name">
+            {{ c.name }}
+            <span class="course-sub">— {{ c.semester }}</span>
+            <span class="course-sub" *ngIf="c.schedule"> · {{ c.schedule }}</span>
+          </span>
           <span class="bulk-meta">
-            {{ s.studentID }} <span *ngIf="s.program"> · {{ s.program }}</span>
+            <ng-container *ngIf="!bulkTeacherFor(c.id)">
+              <span class="chip chip-danger">No teacher assigned</span>
+            </ng-container>
+            <ng-container *ngIf="bulkTeacherFor(c.id) && isCourseFullyEnrolledForSection(c.id)">
+              <span class="chip chip-warning">Section already enrolled</span>
+            </ng-container>
+            <ng-container *ngIf="bulkTeacherFor(c.id)
+              && !isCourseFullyEnrolledForSection(c.id)
+              && enrolledInCourseCount(c.id) > 0">
+              <span class="chip chip-warning">
+                {{ enrolledInCourseCount(c.id) }} / {{ studentCountForSection(bulkForm.sectionId) }} already enrolled
+              </span>
+            </ng-container>
+            <span class="course-teacher" *ngIf="bulkTeacherFor(c.id)">
+              {{ teacherNameForUID(bulkTeacherFor(c.id)) }}
+            </span>
           </span>
         </label>
       </div>
 
-      <p class="muted" *ngIf="filteredBulkStudents.length === 0">
-        No students match the current filter.
+      <p class="muted" *ngIf="coursesForBulkSection().length === 0">
+        No courses have a teacher assigned for this section yet. Assign teachers in the Courses page first.
       </p>
     </div>
 
     <div class="bulk-progress" *ngIf="bulkProcessing">
-      Enrolling {{ bulkProgressDone }} of {{ bulkProgressTotal }}…
+      Processing course {{ bulkProgressDone }} of {{ bulkProgressTotal }}…
     </div>
 
     <div class="bulk-results" *ngIf="bulkResults.length > 0 && !bulkProcessing">
@@ -190,11 +187,19 @@
         <li *ngFor="let r of bulkResults" [class]="'result-' + r.status">
           <span class="result-status">{{
             r.status === 'enrolled' ? '✓'
+              : r.status === 'partial' ? '◐'
               : r.status === 'skipped' ? '⊘'
               : '✕'
           }}</span>
-          <span class="result-name">{{ r.studentName }} ({{ r.studentID }})</span>
-          <span class="result-reason" *ngIf="r.reason">— {{ r.reason }}</span>
+          <span class="result-name">{{ r.courseName }}</span>
+          <span class="result-reason">
+            <ng-container *ngIf="r.enrolled > 0">{{ r.enrolled }} enrolled</ng-container>
+            <ng-container *ngIf="r.skipped > 0"
+              ><span *ngIf="r.enrolled > 0">, </span>{{ r.skipped }} skipped</ng-container>
+            <ng-container *ngIf="r.failed > 0"
+              ><span *ngIf="r.enrolled > 0 || r.skipped > 0">, </span>{{ r.failed }} failed</ng-container>
+            <span *ngIf="r.reason"> — {{ r.reason }}</span>
+          </span>
         </li>
       </ul>
     </div>
@@ -207,13 +212,15 @@
       </button>
       <button class="btn subtle"
         (click)="clearBulkSelection()"
-        [disabled]="bulkProcessing || bulkSelectedCount === 0">
+        [disabled]="bulkProcessing || bulkSelectedCourseCount === 0">
         Clear selection
       </button>
       <button class="btn primary"
         (click)="bulkEnroll()"
-        [disabled]="bulkProcessing || bulkSelectedCount === 0 || !bulkForm.sectionId">
-        {{ bulkProcessing ? 'Enrolling…' : 'Enroll ' + bulkSelectedCount + ' student(s)' }}
+        [disabled]="bulkProcessing || bulkSelectedCourseCount === 0 || !bulkForm.sectionId">
+        {{ bulkProcessing
+          ? 'Enrolling…'
+          : 'Enroll section into ' + bulkSelectedCourseCount + ' course(s)' }}
       </button>
     </div>
   </section>

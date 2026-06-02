@@ -391,10 +391,43 @@
 }
 
 .bulk-result-list .result-enrolled .result-status { color: #0a7a45; }
+.bulk-result-list .result-partial  .result-status { color: #8a6300; }
 .bulk-result-list .result-skipped  .result-status { color: #8a6300; }
 .bulk-result-list .result-failed   .result-status { color: #a32115; }
 
 .bulk-result-list .result-reason {
   color: var(--color-text-secondary);
   font-size: 12px;
+}
+
+/* ── Course-pick rows (new section-first bulk flow) ─────────────────────── */
+
+.course-row.disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.course-row.disabled:hover {
+  background: inherit;
+}
+
+.course-sub {
+  color: var(--color-text-secondary);
+  font-weight: 400;
+  font-size: 12.5px;
+  margin-left: 4px;
+}
+
+.course-teacher {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  margin-left: 6px;
+}
+
+.bulk-row.course-row .bulk-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
